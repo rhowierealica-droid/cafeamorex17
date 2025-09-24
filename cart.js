@@ -314,7 +314,7 @@ addressForm?.addEventListener("submit", async e => {
   const city = document.getElementById("city").value;
   const barangay = document.getElementById("barangay").value;
   const houseNumber = document.getElementById("houseNumber")?.value || "";
-  const deliveryFee = 0;
+  const deliveryFee = 0; // default, you can calculate per barangay if needed
 
   try {
     await addDoc(collection(db, "users", currentUser.uid, "addresses"), { region, province, city, barangay, houseNumber, deliveryFee });
@@ -359,9 +359,9 @@ finalConfirmBtn?.addEventListener("click", async () => {
 
     const orderTotal = orderItems.reduce((sum, i) => sum + i.total, 0) + userDeliveryFee;
 
-    // PayMongo GCash
+    // If payment is GCash, create PayMongo payment link
     if (paymentMethod === "GCash") {
-      const res = await fetch("/.netlify/functions/create-payment-link", {
+      const res = await fetch("https://cafeamorex17.netlify.app/.netlify/functions/create-payment-link", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ amount: orderTotal, description: `Order #${queueNumber}` })
@@ -371,14 +371,14 @@ finalConfirmBtn?.addEventListener("click", async () => {
 
       if (data.checkout_url) {
         window.location.href = data.checkout_url;
-        return;
+        return; // stop further execution
       } else {
         alert("Error creating payment link. Please try again.");
         return;
       }
     }
 
-    // COD or other methods
+    // PLACE ORDER (for COD or other methods)
     await addDoc(collection(db, "DeliveryOrders"), {
       userId: currentUser.uid,
       customerName: currentUser.displayName || currentUser.email || "Customer",
@@ -393,10 +393,10 @@ finalConfirmBtn?.addEventListener("click", async () => {
       createdAt: serverTimestamp()
     });
 
-    // Deduct inventory
+    // DEDUCT INVENTORY
     await deductInventory(orderItems);
 
-    // Clear cart
+    // CLEAR CART
     for (const item of cartItems) await deleteDoc(doc(cartRef, item.id));
 
     alert(`Order placed! Queue #${queueNumber}`);
@@ -410,6 +410,7 @@ finalConfirmBtn?.addEventListener("click", async () => {
     alert("Order failed. Try again.");
   }
 });
+
 
 // ----------------------
 // DEDUCT INVENTORY
