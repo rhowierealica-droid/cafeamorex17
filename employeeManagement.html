@@ -1,0 +1,99 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Employee Management</title>
+    <link rel="stylesheet" href="employeeManagement.css">
+    <link rel="stylesheet" href="admin-nav.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
+</head>
+<body>
+    <!-- Sidebar -->
+    <aside class="sidebar" id="sidebar">
+        <div class="logo">
+            <img src="logo.png" alt="Café Amore Logo">
+            <span class="brand">Café Amore</span>
+        </div>
+        <nav>
+            <div class="close-btn" id="closeBtn"><i class="fas fa-times"></i></div>
+            <ul>
+                <li class="active"><i class="fas fa-home"></i> Home</li>
+                <li><i class="fas fa-utensils"></i> Menu Management</li>
+                <li><i class="fas fa-clipboard-list"></i> Orders</li>
+                <li><i class="fas fa-inbox"></i> Incoming Orders</li>
+                <li><i class="fas fa-comment"></i> Feedback</li>
+                <li><i class="fas fa-boxes"></i> Inventory</li>
+                <li><i class="fas fa-users"></i> Employee Management</li>
+                <li><i class="fas fa-chart-line"></i> Sales</li>
+            </ul>
+        </nav>
+        <div class="profile-card">
+            <div class="profile-avatar"><i class="fas fa-user-circle"></i></div>
+            <div class="profile-info">
+                <p class="profile-name">Admin</p>
+                <p class="edit-text">Edit Profile</p>
+            </div>
+        </div>
+        <div class="logout"><i class="fas fa-sign-out-alt"></i> Log Out</div>
+    </aside>
+
+    <!-- Hamburger -->
+    <div class="hamburger" id="hamburger"><i class="fas fa-bars"></i></div>
+
+    <!-- Main content -->
+    <div class="container">
+        <h1>Employee Management</h1>
+        <button id="addEmployeeBtn" class="add-btn"><i class="fas fa-plus"></i> Add Employee</button>
+
+        <!-- Modal Popup for Creating Employee -->
+        <div id="employeeModal" class="modal">
+            <div class="modal-content">
+                <span class="close-modal">&times;</span>
+                <h2>Create New Employee</h2>
+                <form id="employeeForm">
+                    <input type="text" id="firstName" placeholder="First Name" required>
+                    <input type="text" id="lastName" placeholder="Last Name" required>
+                    <select id="role" required>
+                        <option value="">Select Role</option>
+                        <option value="Bartender">Bartender</option>
+                        <option value="Cashier">Cashier</option>
+                        <option value="Driver">Driver</option>
+                    </select>
+                    <button type="submit">Create Employee</button>
+                </form>
+                <div id="credentials"></div>
+            </div>
+        </div>
+
+        <!-- Modal for Confirmations -->
+        <div id="confirmModal" class="modal">
+            <div class="modal-content">
+                <p id="confirmMessage">Are you sure?</p>
+                <div class="modal-buttons">
+                    <button id="confirmYes">Yes</button>
+                    <button id="confirmNo">No</button>
+                </div>
+            </div>
+        </div>
+
+        <table id="employeeTable">
+            <thead>
+                <tr>
+                    <th>First Name</th>
+                    <th>Last Name</th>
+                    <th>Role</th>
+                    <th>Email</th>
+                    <th>Password</th>
+                    <th>Actions</th>
+                </tr>
+            </thead>
+            <tbody></tbody>
+        </table>
+    </div>
+
+    <script type="module" src="employeeManagement.js"></script>
+      <script type="module" src="admin-nav.js"></script>
+
+</body>
+</html>

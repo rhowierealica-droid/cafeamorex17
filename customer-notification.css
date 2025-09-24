@@ -1,0 +1,53 @@
+/* Base styling */
+body {
+  font-family: Arial, sans-serif;
+  background-color: #f9f9f9;
+  margin: 0;
+  padding: 0;
+}
+
+/* Notifications container */
+.notifications-container {
+  position: fixed;
+  top: 20px;
+  right: 20px;
+  width: 300px;
+  z-index: 1000;
+}
+
+/* Individual notification */
+.notification {
+  color: white;
+  padding: 15px;
+  margin-bottom: 10px;
+  border-radius: 5px;
+  box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+  animation: slide-in 0.5s ease forwards;
+  font-weight: bold;
+  opacity: 0;
+}
+
+/* Status-specific colors */
+.notification.pending,
+.notification.preparing {
+  background-color: #2196f3; /* Blue */
+}
+
+.notification.delivery {
+  background-color: #ff9800; /* Orange */
+}
+
+.notification.completed {
+  background-color: #4caf50; /* Green */
+}
+
+.notification.canceled,
+.notification.cancelled {
+  background-color: #f44336; /* Red */
+}
+
+/* Slide-in animation */
+@keyframes slide-in {
+  0% { opacity: 0; transform: translateX(100%); }
+  100% { opacity: 1; transform: translateX(0); }
+}

@@ -1,0 +1,184 @@
+/* ==========================
+   Reset & Base
+========================== */
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+  font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+}
+
+body {
+  min-height: 100vh;
+  background: #fdf6f0;
+  color: #4b3621;
+  padding: 20px;
+}
+
+/* ==========================
+   Sidebar Offset for Main Content
+========================== */
+.main-content {
+  margin-left: 240px; /* space for fixed sidebar */
+  transition: margin-left 0.3s ease;
+  padding: 20px;
+}
+
+@media (max-width: 1024px) {
+  .main-content {
+    margin-left: 0; /* sidebar overlays on small screens */
+  }
+}
+
+/* ==========================
+   Page Title
+========================== */
+h1 {
+  text-align: center;
+  margin-bottom: 25px;
+  color: #4b3621;
+}
+
+/* ==========================
+   Filter Section
+========================== */
+.filter-section {
+  display: flex;
+  justify-content: flex-end;
+  margin-bottom: 25px;
+  gap: 10px;
+}
+
+.filter-section label {
+  font-weight: bold;
+}
+
+/* ==========================
+   Dashboard Cards
+========================== */
+.cards {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 20px;
+  margin-bottom: 30px;
+}
+
+.card {
+  background: #fff;
+  flex: 1;
+  min-width: 200px;
+  padding: 20px;
+  border-radius: 12px;
+  box-shadow: 0 3px 8px rgba(0,0,0,0.12);
+  text-align: center;
+  transition: transform 0.2s, box-shadow 0.2s;
+}
+
+.card:hover {
+  transform: translateY(-3px);
+  box-shadow: 0 8px 16px rgba(0,0,0,0.15);
+}
+
+.card h3 {
+  font-size: 1em;
+  margin-bottom: 10px;
+  color: #6f4e37;
+}
+
+.card p {
+  font-size: 1.4em;
+  font-weight: bold;
+}
+
+/* ==========================
+   Chart & Payment Section
+========================== */
+.chart-wrapper {
+  display: flex;
+  gap: 20px;
+  margin-bottom: 30px;
+  flex-wrap: nowrap; /* chart & payments side by side */
+}
+
+/* Chart container */
+.chart-section {
+  flex: 2;
+  background: #fff;
+  padding: 25px;
+  border-radius: 12px;
+  box-shadow: 0 3px 8px rgba(0,0,0,0.12);
+  min-width: 300px;
+}
+
+/* Side cards for payments */
+.payment-cards {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  min-width: 200px;
+}
+
+.payment-cards .card {
+  flex: unset;
+}
+
+/* ==========================
+   Best Sellers inside Payment Column
+========================== */
+.payment-best-sellers {
+  background: #fff;
+  padding: 15px;
+  border-radius: 12px;
+  box-shadow: 0 3px 8px rgba(0,0,0,0.12);
+  max-height: 300px; /* fixed height for scroll */
+  overflow-y: auto;   /* vertical scroll */
+  margin-top: 20px;
+}
+
+.payment-best-sellers h2 {
+  font-size: 1em;
+  margin-bottom: 10px;
+  color: #4b3621;
+}
+
+.payment-best-sellers table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.payment-best-sellers th, .payment-best-sellers td {
+  padding: 8px;
+  border-bottom: 1px solid #ddd;
+  text-align: left;
+}
+
+.payment-best-sellers th {
+  background: #f4f1ec;
+  color: #4b3621;
+}
+
+.payment-best-sellers tr:hover {
+  background: #fdf0e6;
+}
+
+/* ==========================
+   Responsive Adjustments
+========================== */
+@media (max-width: 1024px) {
+  .chart-wrapper {
+    flex-direction: column; /* stack chart & payments */
+  }
+
+  .chart-section,
+  .payment-cards,
+  .payment-best-sellers {
+    margin-bottom: 20px;
+  }
+}
+
+@media (max-width: 768px) {
+  .cards {
+    flex-direction: column; /* stack cards vertically */
+  }
+}

@@ -1,0 +1,138 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Café Amore - Menu Management</title>
+
+  <!-- CSS -->
+  <link rel="stylesheet" href="menumanagement.css">
+  <link rel="stylesheet" href="admin-nav.css">
+
+  <!-- Font Awesome -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
+</head>
+<body>
+
+  
+  <!-- Sidebar -->
+  <aside class="sidebar" id="sidebar">
+    <div class="logo">
+      <img src="logo.png" alt="Café Amore Logo">
+      <span class="brand">Café Amore</span>
+    </div>
+
+    <nav>
+      <div class="close-btn" id="closeBtn"><i class="fas fa-times"></i></div>
+      <ul>
+        <li class="active"><i class="fa-duotone fa-light fa-house"></i> Home</li>
+        <li><i class="fas fa-utensils"></i> Menu Management</li>
+        <li><i class="fas fa-clipboard-list"></i> Orders</li>
+        <li><i class="fas fa-inbox"></i> Incoming Orders</li>
+        <li><i class="fas fa-comment"></i> Feedback</li>
+        <li><i class="fas fa-boxes"></i> Inventory</li>
+        <li><i class="fas fa-users"></i> Employee Management</li>
+        <li><i class="fas fa-chart-line"></i> Sales</li>
+      </ul>
+    </nav>
+
+    <div class="profile-card">
+      <div class="profile-avatar"><i class="fas fa-user-circle"></i></div>
+      <div class="profile-info">
+        <p class="profile-name">Admin</p>
+        <p class="edit-text">Edit Profile</p>
+      </div>
+    </div>
+
+    <div class="logout"><i class="fas fa-sign-out-alt"></i> Log Out</div>
+  </aside>
+
+  <!-- Hamburger -->
+  <div class="hamburger" id="hamburger"><i class="fas fa-bars"></i></div>
+
+  <!-- Main Content -->
+  <main class="main-content">
+    <header>
+      <h2>Menu Management</h2>
+      <p>Manage your menu items here.</p>
+    </header>
+
+    <!-- Product Categories -->
+    <div class="category-table" data-category="Drink">
+      <h3>Drinks</h3>
+      <button class="add-btn" id="addDrinkBtn">+ Add Drink</button>
+      <div class="product-list" data-category="Drink"></div>
+    </div>
+
+    <div class="category-table" data-category="Sandwich">
+      <h3>Sandwiches</h3>
+      <button class="add-btn" id="addSandwichBtn">+ Add Sandwich</button>
+      <div class="product-list" data-category="Sandwich"></div>
+    </div>
+  </main>
+
+  <!-- Popup Form -->
+  <div id="popup" class="popup">
+    <div class="popup-content">
+      <h3 id="popupTitle">Add Product</h3>
+      <form id="popupForm">
+        <label for="productName">Product Name:</label>
+        <input type="text" id="productName" required>
+
+        <label for="productDescription">Description:</label>
+        <textarea id="productDescription" placeholder="Describe the product" rows="3" required></textarea>
+
+        <label for="productCategory">Category:</label>
+        <select id="productCategory" required>
+          <option value="">Select Category</option>
+          <option value="Ice Espresso">Ice Espresso</option>
+          <option value="Non-Coffee">Non-Coffee</option>
+          <option value="Iced Cold Brew">Iced Cold Brew</option>
+          <option value="Hot Coffee">Hot Coffee</option>
+          <option value="Sandwich">Sandwich</option>
+        </select>
+
+        <!-- Upload Image -->
+        <label for="productImage">Upload Image:</label>
+        <input type="file" id="productImage" accept="image/*" required>
+
+        <!-- Preview Image -->
+        <div id="imagePreview" style="margin-top:10px; text-align:center;">
+          <img id="previewImage" src="" alt="Preview" style="max-width:120px; display:none; border-radius:8px;">
+        </div>
+
+        <!-- Inventory Sections -->
+        <div class="popup-section">Ingredients</div>
+        <div id="ingredientsContainer">
+          <div id="ingredientsList"></div>
+        </div>
+
+        <div class="popup-section">Sizes</div>
+        <div id="sizesContainer">
+          <div id="sizesList"></div>
+        </div>
+
+        <div class="popup-section">Add-ons</div>
+        <div id="addonsContainer">
+          <div id="addonsList"></div>
+        </div>
+
+        <div class="popup-section">Others</div>
+        <div id="othersContainer">
+          <div id="othersList"></div>
+        </div>
+
+        <div class="popup-actions" style="text-align: center; margin-top: 15px;">
+          <button type="submit">Save</button>
+          <button type="button" id="cancelBtn">Cancel</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- JS -->
+  <script type="module" src="menumanagement.js"></script>
+  <script src="admin-nav.js"></script>
+
+</body>
+</html>
