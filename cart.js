@@ -25,7 +25,7 @@ const modalGrandTotalSpan = document.getElementById("modal-grand-total");
 const addressFormDiv = document.getElementById("address-form-div");
 const addressForm = document.getElementById("address-form");
 
-// Auth & state
+// Auth and cart variables
 const auth = getAuth();
 let currentUser = null;
 let cartItems = [];
@@ -35,9 +35,6 @@ let selectedAddress = null;
 let userDeliveryFee = 0;
 let defaultUserDocData = null;
 let cartAddresses = []; 
-
-// Sandbox flag
-const USE_SANDBOX = true; // true for testing, false for live PayMongo
 
 // ----------------------
 // AUTH STATE
@@ -117,26 +114,22 @@ function loadCartRealtime() {
       return;
     }
 
-    // Select All
     const selectAllDiv = document.createElement("div");
     selectAllDiv.innerHTML = `<label><input type="checkbox" id="select-all-checkbox"> Select All</label>`;
     cartItemsDiv.appendChild(selectAllDiv);
     const selectAllCheckbox = document.getElementById("select-all-checkbox");
+
     selectAllCheckbox.addEventListener("change", () => {
-      if (selectAllCheckbox.checked) {
-        cartItems.forEach(item => selectedCartItems.add(item.id));
-      } else {
-        selectedCartItems.clear();
-      }
+      if (selectAllCheckbox.checked) cartItems.forEach(item => selectedCartItems.add(item.id));
+      else selectedCartItems.clear();
       renderCartItems();
       updateCartTotal();
       updateModalTotals();
     });
 
-    // Render cart items
     function renderCartItems() {
       cartItemsDiv.querySelectorAll(".cart-item").forEach(el => el.remove());
-      
+
       cartItems.forEach(item => {
         const itemDiv = document.createElement("div");
         itemDiv.classList.add("cart-item");
@@ -175,17 +168,11 @@ function loadCartRealtime() {
           let newQty = parseInt(e.target.value) || 1;
           e.target.value = newQty;
           const newUnit = Number(item.basePrice) + Number(item.sizePrice) + Number(item.addonsPrice);
-          await updateDoc(doc(cartRef, item.id), {
-            quantity: newQty,
-            unitPrice: newUnit,
-            totalPrice: newUnit * newQty
-          });
+          await updateDoc(doc(cartRef, item.id), { quantity: newQty, unitPrice: newUnit, totalPrice: newUnit * newQty });
         });
 
         const removeBtn = itemDiv.querySelector(".remove-btn");
-        removeBtn.addEventListener("click", async () => {
-          await deleteDoc(doc(cartRef, item.id));
-        });
+        removeBtn.addEventListener("click", async () => await deleteDoc(doc(cartRef, item.id)));
 
         cartItemsDiv.appendChild(itemDiv);
       });
@@ -258,7 +245,6 @@ function populateModalCart() {
 confirmOrderBtn?.addEventListener("click", () => {
   if (!currentUser) return alert("Please log in.");
   if (!cartItems.length) return alert("Cart is empty.");
-  if (selectedCartItems.size === 0) return alert("Please select at least one product.");
   modal.style.display = "block";
   loadSavedAddresses();
 });
@@ -267,7 +253,7 @@ closeModalBtn?.addEventListener("click", () => modal.style.display = "none");
 window.addEventListener("click", e => { if (e.target === modal) modal.style.display = "none"; });
 
 // ----------------------
-// LOAD SAVED ADDRESSES
+// LOAD & ADD ADDRESSES
 // ----------------------
 async function loadSavedAddresses() {
   if (!currentUser) return;
@@ -293,7 +279,7 @@ async function loadSavedAddresses() {
     snapshot.forEach(docSnap => {
       const data = docSnap.data();
       const full = [data.houseNumber, data.barangay, data.city, data.province, data.region].filter(Boolean).join(", ");
-      const fee = Number(data.deliveryFee ?? 0);
+      const fee = Number(data.deliveryFee || 0);
       cartAddresses.push({ fullAddress: full, deliveryFee: fee });
       const div = document.createElement("div");
       div.innerHTML = `<label><input type="radio" name="selectedAddress" value="${full}">Address ${i}: ${full}</label>`;
@@ -328,11 +314,11 @@ addressForm?.addEventListener("submit", async e => {
   const city = document.getElementById("city").value;
   const barangay = document.getElementById("barangay").value;
   const houseNumber = document.getElementById("houseNumber")?.value || "";
-  const deliveryFee = Number(document.getElementById("deliveryFee")?.value || 0);
+  const deliveryFee = 0; // default, you can calculate per barangay if needed
 
   try {
     await addDoc(collection(db, "users", currentUser.uid, "addresses"), { region, province, city, barangay, houseNumber, deliveryFee });
-    alert(`Address saved! Delivery fee: ₱${deliveryFee}`);
+    alert(`Address saved!`);
     addressForm.reset();
     addressFormDiv.style.display = "none";
     loadSavedAddresses();
@@ -341,6 +327,90 @@ addressForm?.addEventListener("submit", async e => {
     alert("Failed to save address.");
   }
 });
+
+// ----------------------
+// FINAL CONFIRM ORDER + PAYMONGO GCash
+// ----------------------
+finalConfirmBtn?.addEventListener("click", async () => {
+  if (!currentUser) return alert("Log in first.");
+  if (!cartItems.length) return alert("Cart empty.");
+  if (!selectedAddress) return alert("Select an address.");
+
+  const paymentMethod = document.querySelector("input[name='payment']:checked")?.value || "COD";
+
+  try {
+    const queueNumber = await getNextQueueNumber();
+    const cartRef = collection(db, "users", currentUser.uid, "cart");
+
+    const orderItems = cartItems.map(item => ({
+      product: item.name,
+      productId: item.productId || null,
+      size: item.size || null,
+      sizeId: item.sizeId || null,
+      qty: item.quantity || 1,
+      basePrice: Number(item.basePrice || 0),
+      sizePrice: Number(item.sizePrice || 0),
+      addonsPrice: Number(item.addonsPrice || 0),
+      addons: item.addons || [],
+      ingredients: item.ingredients || [],
+      others: item.others || [],
+      total: Number(item.totalPrice || 0)
+    }));
+
+    const orderTotal = orderItems.reduce((sum, i) => sum + i.total, 0) + userDeliveryFee;
+
+    // If payment is GCash, create PayMongo payment link
+    if (paymentMethod === "GCash") {
+      const res = await fetch("https://zesty-beijinho-3dff6d.netlify.app/.netlify/functions/create-payment-link", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ amount: orderTotal, description: `Order #${queueNumber}` })
+      });
+
+      const data = await res.json();
+
+      if (data.checkout_url) {
+        window.location.href = data.checkout_url;
+        return; // stop further execution
+      } else {
+        alert("Error creating payment link. Please try again.");
+        return;
+      }
+    }
+
+    // PLACE ORDER (for COD or other methods)
+    await addDoc(collection(db, "DeliveryOrders"), {
+      userId: currentUser.uid,
+      customerName: currentUser.displayName || currentUser.email || "Customer",
+      address: selectedAddress,
+      queueNumber,
+      orderType: "Delivery",
+      items: orderItems,
+      deliveryFee: userDeliveryFee,
+      total: orderTotal,
+      paymentMethod,
+      status: "Pending",
+      createdAt: serverTimestamp()
+    });
+
+    // DEDUCT INVENTORY
+    await deductInventory(orderItems);
+
+    // CLEAR CART
+    for (const item of cartItems) await deleteDoc(doc(cartRef, item.id));
+
+    alert(`Order placed! Queue #${queueNumber}`);
+    modal.style.display = "none";
+    cartItems = [];
+    cartItemsDiv.innerHTML = "<p>Your cart is empty.</p>";
+    cartTotalSpan.textContent = "0.00";
+    updateModalTotals();
+  } catch (err) {
+    console.error(err);
+    alert("Order failed. Try again.");
+  }
+});
+
 
 // ----------------------
 // DEDUCT INVENTORY
@@ -361,117 +431,6 @@ async function deductInventory(order) {
     for (const addon of item.addons || []) await deductItem(addon.id, item.qty);
   }
 }
-
-// ----------------------
-// FINAL CONFIRM ORDER (SANDBOX READY)
-// ----------------------
-finalConfirmBtn?.addEventListener("click", async () => {
-  if (!currentUser) return alert("Log in first.");
-  if (!cartItems.length) return alert("Cart empty.");
-  if (selectedCartItems.size === 0) return alert("Select at least one product.");
-  if (!selectedAddress) return alert("Select an address.");
-
-  const paymentMethod = document.querySelector("input[name='payment']:checked")?.value || "COD";
-
-  const orderItems = cartItems
-    .filter(item => selectedCartItems.has(item.id))
-    .map(item => ({
-      product: item.name,
-      productId: item.productId || null,
-      size: item.size || null,
-      sizeId: item.sizeId || null,
-      qty: item.quantity || 1,
-      basePrice: Number(item.basePrice || 0),
-      sizePrice: Number(item.sizePrice || 0),
-      addonsPrice: Number(item.addonsPrice || 0),
-      addons: item.addons || [],
-      ingredients: item.ingredients || [],
-      others: item.others || [],
-      total: Number(item.totalPrice || 0)
-    }));
-
-  const orderTotal = orderItems.reduce((sum, i) => sum + i.total, 0) + userDeliveryFee;
-  const cartRef = collection(db, "users", currentUser.uid, "cart");
-
-  try {
-    const queueNumber = await getNextQueueNumber();
-
-    if (paymentMethod === "GCASH") {
-      if (USE_SANDBOX) {
-        await addDoc(collection(db, "DeliveryOrders"), {
-          userId: currentUser.uid,
-          customerName: currentUser.displayName || currentUser.email || "Customer",
-          address: selectedAddress,
-          queueNumber,
-          orderType: "Delivery",
-          items: orderItems,
-          deliveryFee: userDeliveryFee,
-          total: orderTotal,
-          paymentMethod: "GCASH (Sandbox)",
-          status: "Paid (Sandbox)",
-          createdAt: serverTimestamp()
-        });
-
-        await deductInventory(orderItems);
-        for (const item of cartItems) await deleteDoc(doc(cartRef, item.id));
-
-        alert(`Order placed in SANDBOX mode! Queue #${queueNumber}`);
-        modal.style.display = "none";
-        cartItems = [];
-        cartItemsDiv.innerHTML = "<p>Your cart is empty.</p>";
-        cartTotalSpan.textContent = "0.00";
-        updateModalTotals();
-        return;
-      } else {
-        const res = await fetch("http://localhost:3000/create-paymongo-payment-intent", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            amount: Math.round(orderTotal * 100),
-            currency: "PHP",
-            description: `Order #${queueNumber} by ${currentUser.email}`
-          })
-        });
-
-        const data = await res.json();
-        if (data.checkoutUrl) {
-          window.location.href = data.checkoutUrl;
-          return;
-        } else {
-          throw new Error("Failed to create PayMongo checkout.");
-        }
-      }
-    }
-
-    await addDoc(collection(db, "DeliveryOrders"), {
-      userId: currentUser.uid,
-      customerName: currentUser.displayName || currentUser.email || "Customer",
-      address: selectedAddress,
-      queueNumber,
-      orderType: "Delivery",
-      items: orderItems,
-      deliveryFee: userDeliveryFee,
-      total: orderTotal,
-      paymentMethod,
-      status: "Pending",
-      createdAt: serverTimestamp()
-    });
-
-    await deductInventory(orderItems);
-    for (const item of cartItems) await deleteDoc(doc(cartRef, item.id));
-
-    alert(`Order placed! Queue #${queueNumber}`);
-    modal.style.display = "none";
-    cartItems = [];
-    cartItemsDiv.innerHTML = "<p>Your cart is empty.</p>";
-    cartTotalSpan.textContent = "0.00";
-    updateModalTotals();
-
-  } catch (err) {
-    console.error(err);
-    alert("Order failed. Try again.");
-  }
-});
 
 // ----------------------
 // QUEUE NUMBER
