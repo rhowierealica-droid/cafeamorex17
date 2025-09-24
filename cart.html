@@ -12,6 +12,8 @@
   <!-- Font Awesome -->
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
 
+  <script src="https://cdn.jsdelivr.net/npm/axios/dist/axios.min.js"></script>
+
   <!-- Firebase -->
   <script type="module" src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js"></script>
   <script type="module" src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js"></script>
@@ -83,7 +85,7 @@
       <div class="modal-section">
         <h3>Delivery Address</h3>
         <div id="saved-address">
-          <!-- JS will inject multiple addresses here as radio buttons -->
+          <!-- JS will inject multiple addresses here as checkboxes -->
         </div>
         <button type="button" id="add-address-btn">+ Add New Address</button>
 
@@ -99,7 +101,7 @@
             <label for="barangay">Barangay:</label>
             <select id="barangay" required>
               <option value="">-- Select Barangay --</option>
-              <!-- Barangays list -->
+              <!-- All barangays here -->
               <option value="Alima">Alima</option>
               <option value="Aniban I">Aniban I</option>
               <option value="Aniban II">Aniban II</option>
@@ -181,12 +183,8 @@
       <!-- Payment Section -->
       <div class="modal-section">
         <h3>Payment Method</h3>
-        <label>
-          <input type="radio" name="payment" value="COD" checked> Cash on Delivery
-        </label><br>
-        <label>
-          <input type="radio" name="payment" value="GCASH"> Pay with GCash (via PayMongo)
-        </label>
+        <label><input type="radio" name="payment" value="COD" checked> Cash on Delivery</label><br>
+        <label><input type="radio" name="payment" value="GCash"> GCash</label><br>
       </div>
 
       <button id="final-confirm-btn">Confirm & Place Order</button>
@@ -195,6 +193,6 @@
 
   <!-- Scripts -->
   <script type="module" src="cart.js"></script>
-  <script type="module" src="customer-side.js"></script>
+  <script type="module" src="customer-side.js"></script> <!-- Sidebar toggle -->
 </body>
 </html>
