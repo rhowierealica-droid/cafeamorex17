@@ -24,7 +24,7 @@ exports.handler = async (event, context) => {
         const lineItems = [
             {
                 currency: 'PHP',
-                amount: amount, 
+                amount: parseInt(amount), 
                 name: `Order #${metadata.queueNumber}`,
                 quantity: 1
             }
@@ -64,4 +64,5 @@ exports.handler = async (event, context) => {
             body: JSON.stringify({ error: 'Failed to create PayMongo checkout session.', details: error.response?.data || error.message }),
         };
     }
+
 };
