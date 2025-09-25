@@ -1,0 +1,175 @@
+  <!DOCTYPE html>
+  <html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Café Amore | Customer Menu</title>
+
+    <!-- Font Awesome -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
+
+    <!-- CSS -->
+    <link rel="stylesheet" href="index.css">
+    <link rel="stylesheet" href="customer-side.css">
+  </head>
+  <body>
+
+    <!-- Hamburger (only visible on small screens) -->
+    <div class="hamburger hidden" id="hamburger"><i class="fas fa-bars"></i></div>
+
+    <!-- Sidebar Navigation -->
+    <aside class="sidebar" id="sidebar">
+      <div class="close-btn hidden" id="closeBtn">&times;</div>
+
+      <div class="logo">
+        <img src="logo.png" alt="Café Amore Logo">
+        <span class="brand">Café Amore</span>
+      </div>
+
+      <nav>
+        <ul>
+          <li class="menu-link"><i class="fas fa-utensils"></i> Menu</li>
+          <li class="cart-link"><i class="fas fa-shopping-cart"></i> Cart</li>
+          <li class="order-status-link"><i class="fas fa-truck"></i> Order Status</li>
+          <li class="favorites-link"><i class="fas fa-heart"></i> Favorites</li>
+          <li class="history-link"><i class="fas fa-history"></i> History</li>
+        </ul>
+      </nav>
+
+      <div class="login-link"><i class="fas fa-sign-in-alt"></i> Login</div>
+
+      <div class="profile-card">
+        <div class="profile-avatar"><i class="fas fa-user-circle"></i></div>
+        <div class="profile-info">
+          <p class="profile-name">Customer</p>
+          <p class="edit-text">Edit Profile</p>
+        </div>
+      </div>
+
+      <div class="logout"><i class="fas fa-sign-out-alt"></i> Log Out</div>
+    </aside>
+
+    <!-- Main Content -->
+    <main class="menu-container">
+      <section class="main-content">
+        <header>
+          <h1>Welcome, Customer</h1>
+          <p>Select a menu item from the sidebar.</p>
+        </header>
+
+        <section class="main-section">
+          <h2>Drinks</h2>
+          <div class="category-list" data-main="Drink"></div>
+        </section>
+
+        <section class="main-section">
+          <h2>Sandwiches</h2>
+          <div class="category-list" data-main="Sandwich"></div>
+        </section>
+
+        <section class="info-section">
+          <div class="about">
+            <h3>About Us</h3>
+            <p><a href="about.html" target="_blank">Learn more about Café Amore</a></p>
+          </div>
+
+          <div class="terms">
+            <h3>Terms & Conditions</h3>
+            <p><a href="#" id="openTerms">Read our Terms & Conditions</a></p>
+          </div>
+
+          <div class="follow">
+            <h3>Follow Us</h3>
+            <p>
+              <a href="https://www.facebook.com/cafeamorex17s" target="_blank"><i class="fab fa-facebook-square"></i> Facebook</a><br>
+              <a href="https://www.instagram.com/_cafeamore17s_?igsh=cWJnZTE1ZTNmMnZk" target="_blank"><i class="fab fa-instagram"></i> Instagram</a>
+            </p>
+          </div>
+
+          <div class="contact">
+            <h3>Contact Us</h3>
+            <p>
+              <a><i class="fas fa-envelope"></i> cafeamorex17s@gmail.com</a><br>
+              <a><i class="fas fa-phone"></i> +63 965 497 1413</a>
+            </p>
+          </div>
+
+          <hr class="divider">
+
+          <div class="credits">
+            <span>&copy; 2025 Café Amore Team. All rights reserved.</span>
+          </div>
+        </section>
+      </section>
+    </main>
+
+    <!-- Login Popup -->
+    <div id="loginPopup" class="popup hidden">
+      <div class="popup-content">
+        <p>Please login first to add items to your cart.</p>
+        <button id="loginRedirect">Go to Login</button>
+      </div>
+    </div>
+
+    <!-- Add-to-Cart Popup -->
+    <div id="cartPopup" class="popup hidden">
+      <div class="popup-content cart-popup">
+        <span class="close-cart">&times;</span>
+        <h2 class="product-name">Product Name</h2>
+        <p class="product-desc">Description goes here</p>
+
+        <!-- Sizes & Add-ons with Labels -->
+        <div class="sizes-container"></div>
+        <div class="addons-container"></div>
+
+        <label>
+          Quantity:
+          <input type="number" min="1" value="1" class="quantity-input">
+        </label>
+
+        <button class="confirm-add-cart">Add to Cart</button>
+      </div>
+    </div>
+
+    <!-- Terms & Conditions Popup -->
+    <div id="termsPopup" class="popup hidden">
+      <div class="popup-content">
+        <span class="close-terms">&times;</span>
+        <h2>Terms & Conditions</h2>
+        <p>
+          <!-- Your T&C content goes here -->
+          Sana hindi muna tignan hehehehe
+        </p>
+      </div>
+    </div>
+
+    <!-- JS -->
+    <script type="module" src="index.js"></script>
+    <script type="module" src="customer-side.js"></script>
+    <script>
+      // Open Terms Popup
+      const openTermsBtn = document.getElementById('openTerms');
+      const termsPopup = document.getElementById('termsPopup');
+      const closeTermsBtn = termsPopup.querySelector('.close-terms');
+
+      openTermsBtn.addEventListener('click', e => {
+        e.preventDefault();
+        termsPopup.classList.remove('hidden');
+        termsPopup.style.display = 'flex';
+      });
+
+      closeTermsBtn.addEventListener('click', () => {
+        termsPopup.classList.add('hidden');
+        termsPopup.style.display = 'none';
+      });
+
+      // Close when clicking outside
+      termsPopup.addEventListener('click', e => {
+        if (e.target === termsPopup) {
+          termsPopup.classList.add('hidden');
+          termsPopup.style.display = 'none';
+        }
+      });
+    </script>
+  </body>
+  </html>
