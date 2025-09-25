@@ -1,0 +1,258 @@
+/* ==========================
+   Global Styles
+========================== */
+body {
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    background-color: #fdf6f0;
+    margin: 0;
+    padding: 0;
+    color: #4b3621;
+}
+
+h1 {
+    text-align: center;
+    margin: 30px 0 20px 0;
+    font-size: 2rem;
+    color: #552915;
+}
+
+.container {
+    margin-left: 260px;
+    padding: 30px 20px;
+    min-height: 100vh;
+}
+
+/* ==========================
+   Buttons
+========================== */
+.add-btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 10px; /* space between icon and text */
+    margin: 0 auto 25px auto;
+    padding: 12px 25px;
+    font-size: 16px;
+    font-weight: 600;
+    background: linear-gradient(135deg, #552915, #77482e);
+    color: #fff;
+    border: none;
+    border-radius: 12px;
+    cursor: pointer;
+    box-shadow: 0 6px 12px rgba(0,0,0,0.15);
+    transition: all 0.3s ease;
+}
+
+.add-btn i {
+    font-size: 18px;
+}
+
+.add-btn:hover {
+    transform: translateY(-2px);
+    background: linear-gradient(135deg, #77482e, #552915);
+    box-shadow: 0 8px 16px rgba(0,0,0,0.25);
+}
+
+/* ==========================
+   Modal Styles
+========================== */
+.modal {
+    display: none;
+    position: fixed;
+    z-index: 3000;
+    left: 0;
+    top: 0;
+    width: 100%;
+    height: 100%;
+    background-color: rgba(0,0,0,0.6);
+    justify-content: center;
+    align-items: center;
+}
+
+.modal-content {
+    background-color: #fff;
+    padding: 30px 25px;
+    border-radius: 15px;
+    width: 90%;
+    max-width: 450px;
+    position: relative;
+    box-shadow: 0 10px 25px rgba(0,0,0,0.25);
+    text-align: center;
+    animation: fadeIn 0.3s ease-in-out;
+}
+
+.close-modal {
+    position: absolute;
+    top: 15px;
+    right: 20px;
+    font-size: 26px;
+    cursor: pointer;
+    color: #552915;
+    transition: 0.2s;
+}
+.close-modal:hover {
+    color: #77482e;
+}
+
+form {
+    display: flex;
+    flex-direction: column;
+    text-align: left;
+}
+
+input, select {
+    margin: 10px 0;
+    padding: 12px 10px;
+    border-radius: 8px;
+    border: 1px solid #ccc;
+    font-size: 14px;
+    outline: none;
+    transition: 0.2s;
+}
+input:focus, select:focus {
+    border-color: #77482e;
+    box-shadow: 0 0 5px rgba(119,72,46,0.4);
+}
+
+button[type="submit"] {
+    margin-top: 15px;
+    padding: 12px;
+    border-radius: 8px;
+    border: none;
+    background: #552915;
+    color: #fff;
+    cursor: pointer;
+    font-size: 16px;
+    transition: 0.3s;
+}
+button[type="submit"]:hover {
+    background: #77482e;
+}
+
+/* Confirmation Modal Buttons */
+.modal-buttons {
+    display: flex;
+    justify-content: space-between;
+    margin-top: 25px;
+}
+.modal-buttons button {
+    width: 48%;
+    padding: 10px 0;
+    border-radius: 8px;
+    border: none;
+    font-weight: bold;
+    cursor: pointer;
+    transition: 0.2s;
+}
+#confirmYes {
+    background-color: #552915;
+    color: #fff;
+}
+#confirmYes:hover { background-color: #77482e; }
+#confirmNo {
+    background-color: #ccc;
+    color: #4b3621;
+}
+#confirmNo:hover { background-color: #bbb; }
+
+/* ==========================
+   Table Styles
+========================== */
+table {
+    width: 95%;
+    margin: 20px auto;
+    border-collapse: collapse;
+    background: #fff;
+    border-radius: 12px;
+    overflow: hidden;
+    box-shadow: 0 6px 18px rgba(0,0,0,0.1);
+}
+
+th, td {
+    padding: 14px 12px;
+    text-align: left;
+    font-size: 14px;
+}
+
+th {
+    background-color: #f3e9dc;
+    font-weight: 600;
+    color: #552915;
+}
+
+tr:nth-child(even) {
+    background-color: #fcf7f2;
+}
+
+tr:hover {
+    background-color: #f5e8dc;
+}
+
+.resetBtn, .deleteBtn {
+    padding: 6px 10px;
+    border-radius: 6px;
+    border: none;
+    font-size: 13px;
+    cursor: pointer;
+    transition: 0.2s;
+    margin-right: 5px;
+}
+.resetBtn {
+    background-color: brown;
+    color: #fff;
+}
+.resetBtn:hover { background-color: red; }
+
+.deleteBtn {
+    background-color: red;
+    color: #fff;
+}
+.deleteBtn:hover { background-color: #d32f2f; }
+
+/* ==========================
+   Sidebar & Hamburger
+========================== */
+.sidebar {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 240px;
+    height: 100%;
+    background: #f3e9dc;
+    padding-top: 20px;
+    z-index: 2000;
+    display: flex;
+    flex-direction: column;
+    box-shadow: 2px 0 8px rgba(0,0,0,0.1);
+}
+.hamburger {
+    position: fixed;
+    top: 15px;
+    left: 15px;
+    font-size: 2em;
+    color: #552915;
+    cursor: pointer;
+    z-index: 2001;
+    display: none;
+}
+
+@media (max-width:1024px) {
+    .container {
+        margin-left: 10px;
+        margin-right: 10px;
+        padding-top: 80px;
+    }
+    .sidebar {
+        transform: translateX(-240px);
+    }
+    .sidebar.active { transform: translateX(0); }
+    .hamburger { display: block; }
+}
+
+/* ==========================
+   Animations
+========================== */
+@keyframes fadeIn {
+    from { opacity: 0; transform: scale(0.95); }
+    to { opacity: 1; transform: scale(1); }
+}

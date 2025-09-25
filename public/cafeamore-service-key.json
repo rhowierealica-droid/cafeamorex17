@@ -1,0 +1,13 @@
+{
+  "type": "service_account",
+  "project_id": "cafeamore-7f222",
+  "private_key_id": "8d980221caa2e4df7c691861b28637cf35ac7b5b",
+  "private_key": "-----BEGIN PRIVATE KEY-----\nMIIEvgIBADANBgkqhkiG9w0BAQEFAASCBKgwggSkAgEAAoIBAQDSlz/jjQYq121Z\n9ly5yq69XTZhBdpqDrnBbwSd6Lda+uu9zgr7+RxOiUrezHdb9Y3ugjeFtQH3J4Az\neXua9LTr4IdQ0lMg/H9sbE91cIC8pt6M3vibZhFyMW4aKDseiWZclmCIILjz3dpI\nKuGDH9qczf3067nmseBHgI7pcTK6mOydYXRLzvUkGskXaGmxpm2FLVUGxUBMb6bo\nap8eVFh0gRlS2UVRjogAm8cgdgF5Ms3Wg93vZdEXrvghl369gsf+vD7K6FFbJ4sC\nTq/3AKCoGUQQiJsRMvVMhiPX+4wwXb7XSLbe5C64Q1pk5WE2CRdBQMde+suKU50h\n78iXchelAgMBAAECggEAMBM9z1OONSENcnRqyjJSTmIVbDRTHpOihd1zix4Jn7A5\nOZEsUkYWF3rBuBeq5vgpkOmyxagjHPpsSrQAywjytYeCNKnzNsxVxZl7UUbf6NFa\nbIPpcsZsFKripP+KsYex8dCVlHYN6wQ6VO/PIClZNaNUBsH6pEb2ubQITBQevdiJ\n3dsvoRbQ3PTAnO53YXHYuHL3rQF/chV2s5EIPeDB7c/EMbZ0GosM1Df5+3DF3kkj\nQg7sbLUINk/lKHXqhNGipPUpkrRWFDLdk5R/hSKKiRzciZHulDaMh83pUM7ULcPW\nctbmSlbwEMfQKrr2kAUOBrqpAXQTCi01e0b6VDOLaQKBgQDuJGqY0VzL8npA2wEQ\n6FEPIdPLZMVk26KazWiWj3BoCez4Xo2oQcRtfxvNgpnE5ZYQZ/X5zqigFkSSubjX\n/++nsLgIM/1fmpR+oxWTtVL+57XVJP0fYzQlZop2yF8wPlmgLp4u+319aLdItoZ0\n5bOEdo4A9d7NLe1b2DgvKPyjrQKBgQDiYe6hrE7WGmSPyYl9kVsL84/snc7/eG8Y\nXWt3IDi49oz+TzUI2x6crkYZMAeiEIAIDaO0GG60izHcwJNTSoOpseRCFx5DeAio\n0mUjozsFM5fnzQ7e4+nuw72wmWOpmxEiGXEz8UqQYItqXJvKPfjooL1CjnpmDpvy\nPGjvQJQC2QKBgBWYWc5H1glskKeG9J7K4mbj42fjWH8f56vwCpb0pPXaSJHxSRlD\n9YMUbroBKN6RDz2nn8eqdOIngspnaxqzS9FCFj4wML7VrreZJGDDpaYV7whIFWge\nP+FQXigNXYxrawc6kv+hsKyJrW07mA/LsK7HbXMq2Kx0iLy2a8njBp31AoGBALG9\nUD2xaohhWnkmNAPZnxFoHnLZyA7+gMMxfdGfA8n9EcANckdMuuErVzApbKTKrasl\nAlXBJRItg22d6U3o4CzY1a0qN4GjebEK14u+efVgh7DgZ/+KFD55grJoDD662B3c\nueudU/y9QFi28z47n/UNVustsF32tGvhEEZgfpUpAoGBAMoIAOkiOG1dM+oL7a/G\n53YQajrkhnL1RozOgZDxANyVqO9SO+kPb02vPX8z52gBDz/Y8fI56s1EIgg3tZOR\nkYsAm1dOETPgHW6OKJEapbSsGvdMRUICFTUxWpcQEtg4eceu/NqkmjcMFYkwZlPN\nrfCpAfGTXJ4N+MwbQfDxHSy3\n-----END PRIVATE KEY-----\n",
+  "client_email": "firebase-adminsdk-fbsvc@cafeamore-7f222.iam.gserviceaccount.com",
+  "client_id": "106272790780419534055",
+  "auth_uri": "https://accounts.google.com/o/oauth2/auth",
+  "token_uri": "https://oauth2.googleapis.com/token",
+  "auth_provider_x509_cert_url": "https://www.googleapis.com/oauth2/v1/certs",
+  "client_x509_cert_url": "https://www.googleapis.com/robot/v1/metadata/x509/firebase-adminsdk-fbsvc%40cafeamore-7f222.iam.gserviceaccount.com",
+  "universe_domain": "googleapis.com"
+}

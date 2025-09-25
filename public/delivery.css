@@ -1,0 +1,46 @@
+body {
+  font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+  background: #fdf6f0;
+  color: #4b3621;
+  margin: 0;
+  padding: 20px;
+}
+
+.main-content h1 {
+  text-align: center;
+  margin-bottom: 10px;
+}
+
+.orders-container {
+  display: flex;
+  flex-direction: column;
+  gap: 15px;
+  max-width: 700px;
+  margin: 0 auto;
+}
+
+/* Order Card */
+.order-card {
+  background: #fffaf0;
+  border-radius: 12px;
+  box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+  padding: 15px;
+}
+
+.order-header {
+  margin-bottom: 10px;
+}
+
+.order-header p {
+  margin: 5px 0;
+  font-weight: bold;
+}
+
+.order-products {
+  padding-left: 10px;
+  border-left: 2px solid #6f4e37;
+}
+
+.order-products p {
+  margin: 5px 0;
+}

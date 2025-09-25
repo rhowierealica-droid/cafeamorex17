@@ -1,0 +1,176 @@
+/* ==========================
+   Reset & Base
+========================== */
+* { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
+html, body { width: 100%; overflow-x: hidden; }
+body { min-height: 100vh; background: #f6f1eb; color: #4b3621; }
+
+/* ==========================
+   Main Content
+========================== */
+main { width: calc(100% - 240px); margin-left: 240px; padding: 30px 20px; }
+header { text-align: center; margin-bottom: 25px; }
+header h2 { font-family: 'Cursive', Arial; font-size: 2em; color: #6f4e37; }
+header p { color: #a67c52; font-size: 1.1em; margin-top: 5px; }
+
+/* ==========================
+   Category Table & Product List
+========================== */
+.category-table { background: #fff8f0; border-radius: 12px; box-shadow: 0 4px 12px rgba(0,0,0,0.08); padding: 18px 20px; margin-bottom: 20px; width: 100%; overflow-x: auto; }
+.category-table h3 { color: #6f4e37; margin-bottom: 12px; }
+.add-btn { background: #a67c52; color: white; border: none; border-radius: 8px; padding: 8px 14px; cursor: pointer; margin-bottom: 12px; transition: 0.3s; z-index: 1; position: relative; }
+
+/* ==========================
+   Product List Items
+========================== */
+.product-list { display: flex; flex-direction: column; gap: 10px; width: 100%; }
+.product-item { background: #fff; border-radius: 10px; padding: 10px 12px; border: 1px solid #ddd; box-shadow: 0 2px 6px rgba(0,0,0,0.05); transition: 0.3s; width: 100%; }
+.product-item:hover { box-shadow: 0 4px 12px rgba(0,0,0,0.1); }
+
+/* Disabled product (greyed out) */
+.product-item.disabled-product {
+  background: #f0f0f0;
+  color: grey;
+  opacity: 0.6;
+  pointer-events: none;   /* block clicks on the card */
+}
+/* Re-enable actions inside disabled card */
+.product-item.disabled-product .product-actions {
+  pointer-events: auto;
+  opacity: 1;
+}
+.product-actions { margin-top: 5px; display: flex; gap: 8px; }
+
+/* ==========================
+   Popup
+========================== */
+.popup { 
+  display: none; 
+  position: fixed; 
+  z-index: 10000; /* higher than sidebar */
+  left: 0; top: 0; 
+  width: 100%; height: 100%; 
+  background: rgba(0,0,0,0.5); 
+  justify-content: center; 
+  align-items: center; 
+  padding: 10px; 
+}
+.popup.show { display: flex; }
+.popup-content { 
+  background: #fff8f0; 
+  padding: 25px 30px; 
+  width: 95%; 
+  max-width: 600px; 
+  border-radius: 12px; 
+  box-shadow: 0 6px 30px rgba(0,0,0,0.3); 
+  overflow-y: auto; 
+  max-height: 90vh; 
+  text-align: left; 
+  position: relative; 
+  z-index: 10001; /* above overlay */
+}
+
+/* ==========================
+   Forms
+========================== */
+form label { font-weight: 600; color: #4b3621; margin-top: 10px; display: block; }
+form input, form select, form textarea { width: 100%; padding: 8px 10px; margin-top: 5px; border-radius: 6px; border: 1px solid #ccc; font-size: 0.95em; }
+form input:focus, form select:focus, form textarea:focus { border-color: #a67c52; outline: none; }
+form button { padding: 10px 16px; margin-top: 12px; cursor: pointer; border-radius: 6px; border: none; background: #a67c52; color: white; font-size: 1em; transition: 0.3s; }
+form button:hover { background: #8b5e3c; }
+#cancelBtn { background: #e74c3c; margin-left: 8px; }
+#cancelBtn:hover { background: #c0392b; }
+
+/* Preview image inside popup */
+#previewImg { max-width: 120px; display: block; margin: 10px auto; border-radius: 8px; }
+
+/* ==========================
+   Inventory Alignment
+========================== */
+.inventory-header, .inventory-row { display: grid; grid-template-columns: 40px 1fr 60px 60px 80px; align-items: center; gap: 10px; padding: 4px 0; }
+.inventory-header { font-weight: 700; border-bottom: 1px solid #6f4e37; margin-bottom: 6px; }
+.inventory-row input[type="number"] { width: 100%; padding: 4px 6px; font-size: 0.9em; border: 1px solid #ccc; border-radius: 4px; }
+
+/* ==========================
+   Responsive
+========================== */
+@media (max-width: 1024px) { 
+  main { width: 95%; margin-left: 0; padding-top: 65px; } 
+  .category-table { padding: 15px 12px; } 
+}
+@media (max-width: 768px) { 
+  main { width: 100%; margin-left: 0; padding: 15px; } 
+  .inventory-header, .inventory-row { grid-template-columns: auto 1fr; } 
+}
+
+/* ==========================
+   Buttons Design
+========================== */
+
+/* General button style */
+button, .add-btn {
+  padding: 10px 18px;
+  border-radius: 8px;
+  border: none;
+  font-size: 1em;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  position: relative;
+  overflow: hidden;
+  box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+  background: linear-gradient(135deg, #a67c52, #d2a679);
+  color: #fff;
+}
+
+/* Hover effect */
+button:hover, .add-btn:hover {
+  background: linear-gradient(135deg, #8b5e3c, #c79e77);
+  box-shadow: 0 6px 12px rgba(0,0,0,0.15);
+  transform: translateY(-2px);
+}
+
+/* Active / click effect */
+button:active, .add-btn:active {
+  transform: translateY(1px);
+  box-shadow: 0 2px 6px rgba(0,0,0,0.1);
+}
+
+/* Cancel button style override */
+#cancelBtn {
+  background: #552915;
+  color: #fff;
+}
+
+#cancelBtn:hover {
+  background: linear-gradient(135deg, #c0392b, #e74c3c);
+  transform: translateY(-2px);
+}
+
+/* Action buttons inside product cards */
+.product-actions button {
+  padding: 6px 12px;
+  font-size: 0.9em;
+  border-radius: 6px;
+  background: #552915;
+  color: #fff;
+  border: none;
+  cursor: pointer;
+  transition: 0.3s;
+  box-shadow: 0 2px 5px rgba(0,0,0,0.08);
+}
+
+.product-actions button:hover {
+  background: #552915;
+  box-shadow: 0 4px 8px rgba(0,0,0,0.12);
+  transform: translateY(-1px);
+}
+
+/* Disabled buttons */
+button:disabled, .add-btn:disabled, .product-actions button:disabled {
+  background: #ccc;
+  color: #888;
+  cursor: not-allowed;
+  box-shadow: none;
+  transform: none;
+}

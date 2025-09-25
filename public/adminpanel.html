@@ -1,0 +1,173 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Café Amore - Admin Panel</title>
+
+  <!-- Font Awesome -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
+
+  <!-- CSS -->
+  <link rel="stylesheet" href="adminpanel.css">
+  <link rel="stylesheet" href="admin-nav.css">
+  <link rel="stylesheet" href="menumanagement.css">
+</head>
+<body>
+
+  <!-- Sidebar -->
+  <aside class="sidebar" id="sidebar">
+    <div class="logo">
+      <img src="logo.png" alt="Café Amore Logo">
+      <span class="brand">Café Amore</span>
+    </div>
+
+    <nav>
+      <div class="close-btn" id="closeBtn"><i class="fas fa-times"></i></div>
+      <ul>
+        <li class="active"><i class="fa-duotone fa-light fa-house"></i> Home</li>
+        <li><i class="fas fa-utensils"></i> Menu Management</li>
+        <li><i class="fas fa-clipboard-list"></i> Orders</li>
+        <li><i class="fas fa-inbox"></i> Incoming Orders</li>
+        <li><i class="fas fa-comment"></i> Feedback</li>
+        <li><i class="fas fa-boxes"></i> Inventory</li>
+        <li><i class="fas fa-users"></i> Employee Management</li>
+        <li><i class="fas fa-chart-line"></i> Sales</li>
+      </ul>
+    </nav>
+
+    <div class="profile-card">
+      <div class="profile-avatar"><i class="fas fa-user-circle"></i></div>
+      <div class="profile-info">
+        <p class="profile-name">Admin</p>
+        <p class="edit-text">Edit Profile</p>
+      </div>
+    </div>
+
+    <div class="logout"><i class="fas fa-sign-out-alt"></i> Log Out</div>
+  </aside>
+
+  <!-- Hamburger -->
+  <div class="hamburger" id="hamburger"><i class="fas fa-bars"></i></div>
+
+  <!-- Main Content -->
+  <main class="main-content">
+    <header>
+      <h1>Welcome, Admin</h1>
+      <p>Manage and monitor your café operations at a glance</p>
+    </header>
+
+    <!-- Dashboard -->
+    <section class="dashboard">
+      <div class="card">
+        <h3><i class="fas fa-receipt"></i> Orders</h3>
+        <p id="ordersToday">0 Today</p>
+      </div>
+      <div class="card">
+        <h3><i class="fas fa-dollar-sign"></i> Sales</h3>
+        <p id="salesToday">₱0.00</p>
+      </div>
+      <div class="card">
+        <h3><i class="fas fa-boxes"></i> Inventory</h3>
+        <p id="lowInventory">0 Items Low</p>
+      </div>
+      <div class="card">
+        <h3><i class="fas fa-utensils"></i> Menu Items</h3>
+        <p id="menuCount">0 Available</p>
+      </div>
+    </section>
+
+   
+    <!-- Analytics & Best Sellers Side by Side -->
+    <section class="analytics-best-sellers">
+      <div class="analytics">
+        <div class="chart-card">
+          <h3><i class="fas fa-chart-line"></i> Sales Analytics</h3>
+          <canvas id="salesChart"></canvas>
+        </div>
+      </div>
+
+      <div class="best-sellers">
+        <div class="table-card">
+          <h3><i class="fas fa-star"></i> Top 5 Best Sellers</h3>
+          <table id="bestSellersTable">
+            <thead>
+              <tr>
+                <th>Product</th>
+                <th>Total Sales (₱)</th>
+              </tr>
+            </thead>
+            <tbody>
+              <!-- Dynamically filled -->
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+    
+    </section>
+
+  </main>
+
+  <!-- Popup Form for Adding Menu Items -->
+  <div id="popup" class="popup">
+    <div class="popup-content">
+      <h3 id="popupTitle">Add Product</h3>
+      <form id="popupForm">
+        <label for="productName">Product Name:</label>
+        <input type="text" id="productName" required>
+
+        <label for="productDescription">Description:</label>
+        <textarea id="productDescription" placeholder="Describe the product" rows="3" required></textarea>
+
+        <label for="productCategory">Category:</label>
+        <select id="productCategory" required>
+          <option value="">Select Category</option>
+          <option value="Ice Espresso">Ice Espresso</option>
+          <option value="Non-Coffee">Non-Coffee</option>
+          <option value="Iced Cold Brew">Iced Cold Brew</option>
+          <option value="Hot Coffee">Hot Coffee</option>
+          <option value="Sandwich">Sandwich</option>
+        </select>
+
+        <div class="popup-section">Ingredients</div>
+        <div id="ingredientsContainer">
+          <div id="ingredientsList"></div>
+        </div>
+
+        <div class="popup-section">Sizes</div>
+        <div id="sizesContainer">
+          <div id="sizesList"></div>
+        </div>
+
+        <div class="popup-section">Add-ons</div>
+        <div id="addonsContainer">
+          <div id="addonsList"></div>
+        </div>
+
+        <div class="popup-section">Others</div>
+        <div id="othersContainer">
+          <div id="othersList"></div>
+        </div>
+
+        <div class="popup-actions" style="text-align: center; margin-top: 15px;">
+          <button type="submit">Save</button>
+          <button type="button" id="cancelBtn">Cancel</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- JS -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <script type="module" src="adminpanel.js"></script>
+  <script type="module" src="admin-nav.js"></script>
+  <script type="module" src="menumanagement.js"></script>
+
+  <!-- Notification module -->
+  <script type="module">
+    import { initOrderBadge } from './notification.js';
+    initOrderBadge();
+  </script>
+</body>
+</html>

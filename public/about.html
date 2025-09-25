@@ -1,0 +1,103 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Café Amore | About Us</title>
+
+  <!-- Font Awesome -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
+
+  <!-- CSS -->
+  <link rel="stylesheet" href="index.css">
+  <link rel="stylesheet" href="customer-side.css">
+  <link rel="stylesheet" href="about.css">
+</head>
+
+<body>
+  <!-- Hamburger (only visible on small screens) -->
+  <div class="hamburger hidden" id="hamburger"><i class="fas fa-bars"></i></div>
+
+  <!-- Sidebar Navigation -->
+  <aside class="sidebar" id="sidebar">
+    <div class="close-btn hidden" id="closeBtn">&times;</div>
+
+    <!-- Logo -->
+    <div class="logo">
+      <img src="logo.png" alt="Café Amore Logo">
+      <span class="brand">Café Amore</span>
+    </div>
+
+    <!-- Navigation -->
+    <nav>
+      <ul>
+        <li class="menu-link"><i class="fas fa-utensils"></i> Menu</li>
+        <li class="cart-link"><i class="fas fa-shopping-cart"></i> Cart</li>
+        <li class="favorites-link"><i class="fas fa-heart"></i> Favorites</li>
+        <li class="history-link"><i class="fas fa-history"></i> History</li>
+        <li class="feedback-link"><i class="fa-solid fa-comment"></i> Feedback</li>
+      </ul>
+    </nav>
+
+    <!-- Profile Card -->
+    <div class="profile-card" id="profileCard">
+      <div class="profile-avatar"><i class="fas fa-user-circle"></i></div>
+      <div class="profile-info">
+        <p class="profile-name">Customer</p>
+        <p class="edit-text" id="editProfile">Edit Profile</p>
+      </div>
+    </div>
+
+    <!-- Logout -->
+    <div class="logout" id="logoutBtn"><i class="fas fa-sign-out-alt"></i> Log Out</div>
+  </aside>
+
+  <!-- Main Content -->
+  <main class="menu-container">
+    <section class="main-content about-section">
+
+      <div class="about-content">
+        <!-- Image -->
+        <div class="img-container">
+          <img class="img-owner" src="download.jpg" alt="Café Amore Owner">
+        </div>
+
+        <!-- Text -->
+        <div class="p-about">
+          <h1 class="about-title">Who we are</h1>
+          <p class="p-content">
+            Café Amoré x17s started from a simple motor with a table, serving coffee on the streets.
+            From that humble beginning, it has grown into a café that’s now loved by many,
+            bringing people together over warm drinks and comforting meals.
+            Guided by our motto “keep on fighting even in zero days,” we turned a small idea into a
+            meaningful space for everyone to enjoy.
+          </p>
+          <p class="p-content">
+            More than just a coffee shop, Café Amoré x17s is a place where people can share stories,
+            laughter, and moments that matter. With our online ordering system, we make it easier than ever to
+            experience the same passion and flavor we’ve always served anytime, anywhere.
+          </p>
+        </div>
+      </div>
+
+      <!-- Map Section -->
+      <div class="map-container">
+        <h2 class="map-title">Find Us Here</h2>
+        <div class="map-wrapper coffee-map">
+          <iframe
+            src="https://www.google.com/maps/embed?pb=!1m18!1m12!1m3!1d482.95030331697535!2d120.96921801181807!3d14.45006107823628!2m3!1f0!2f0!3f0!3m2!1i1024!2i768!4f13.1!3m3!1m2!1s0x3397cde8f84033ad%3A0x8daaf758618116ed!2sCaf%C3%A8%20amore%20x%2017s!5e0!3m2!1sen!2sph!4v1757415272048!5m2!1sen!2sph"
+            allowfullscreen="" loading="lazy" referrerpolicy="no-referrer-when-downgrade">
+          </iframe>
+        </div>
+      </div>
+
+    </section>
+  </main>
+
+  <!-- JS -->
+  <script type="module" src="index.js"></script>
+  <script type="module" src="customer-side.js"></script>
+</body>
+
+</html>

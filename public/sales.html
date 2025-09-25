@@ -1,0 +1,137 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Café Amore - Sales Dashboard</title>
+
+  <!-- Font Awesome for icons -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
+  
+  <!-- Chart.js -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  
+  <!-- CSS -->
+  <link rel="stylesheet" href="sales.css">
+  <link rel="stylesheet" href="admin-nav.css">
+</head>
+<body>
+
+  <!-- Sidebar -->
+  <aside class="sidebar" id="sidebar">
+    <div class="logo">
+      <img src="logo.png" alt="Café Amore Logo">
+      <span class="brand">Café Amore</span>
+    </div>
+
+    <nav>
+      <div class="close-btn" id="closeBtn"><i class="fas fa-times"></i></div>
+      <ul>
+        <li class="active"><i class="fa-duotone fa-light fa-house"></i> Home</li>
+        <li><i class="fas fa-utensils"></i> Menu Management</li>
+        <li><i class="fas fa-clipboard-list"></i> Orders</li>
+        <li><i class="fas fa-inbox"></i> Incoming Orders</li>
+        <li><i class="fas fa-comment"></i> Feedback</li>
+        <li><i class="fas fa-boxes"></i> Inventory</li>
+        <li><i class="fas fa-users"></i> Employee Management</li>
+        <li><i class="fas fa-chart-line"></i> Sales</li>
+      </ul>
+    </nav>
+
+    <div class="profile-card">
+      <div class="profile-avatar"><i class="fas fa-user-circle"></i></div>
+      <div class="profile-info">
+        <p class="profile-name">Admin</p>
+        <p class="edit-text">Edit Profile</p>
+      </div>
+    </div>
+
+    <div class="logout"><i class="fas fa-sign-out-alt"></i> Log Out</div>
+  </aside>
+
+  <!-- Hamburger -->
+  <div class="hamburger" id="hamburger"><i class="fas fa-bars"></i></div>
+
+  <!-- Main Content -->
+  <div class="main-content">
+    <h1>Sales Dashboard</h1>
+
+    <!-- Filter -->
+    <div class="filter-section">
+      <label for="salesFilter">Filter Sales:</label>
+      <select id="salesFilter">
+        <option value="today">Today</option>
+        <option value="week">This Week</option>
+        <option value="month">This Month</option>
+        <option value="3months">Last 3 Months</option>
+        <option value="6months">Last 6 Months</option>
+        <option value="year">This Year</option>
+        <option value="all">All</option>
+      </select>
+    </div>
+
+    <!-- Dashboard Cards -->
+    <div class="cards">
+      <div class="card">
+        <h3 id="salesLabel">Sales Today</h3>
+        <p id="salesToday">₱0.00</p>
+      </div>
+      <div class="card">
+        <h3 id="completedLabel">Completed Orders Today</h3>
+        <p id="completedToday">0</p>
+      </div>
+      <div class="card">
+        <h3 id="cancelledLabel">Cancelled Orders Today</h3>
+        <p id="cancelledToday">0</p>
+      </div>
+    </div>
+
+    <!-- Sales Chart & Payment Cards Side by Side -->
+    <div class="chart-wrapper">
+      <!-- Chart Section -->
+      <div class="chart-section">
+        <canvas id="salesChart"></canvas>
+      </div>
+
+      <!-- Payment Totals + Best Sellers inside payment column -->
+      <div class="payment-cards">
+        <div class="card payment-card">
+          <h3>Cash Payments</h3>
+          <p id="cashTotal">₱0.00</p>
+        </div>
+        <div class="card payment-card">
+          <h3>E-Payments</h3>
+          <p id="ePayTotal">₱0.00</p>
+        </div>
+
+        <!-- Top 5 Best Sellers under E-Payments -->
+        <div class="payment-best-sellers">
+          <h2>Top 5 Best Sellers</h2>
+          <table>
+            <thead>
+              <tr>
+                <th>Product</th>
+                <th>Qty Sold</th>
+                <th>Total Sales</th>
+              </tr>
+            </thead>
+            <tbody id="bestSellersTable">
+              <!-- Filled by JS -->
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script type="module" src="sales.js"></script>
+  <script type="module" src="admin-nav.js"></script>
+   <!-- Notification module -->
+  
+  <script type="module">
+    import { initOrderBadge } from './notification.js';
+    initOrderBadge();
+  </script>
+
+</body>
+</html>

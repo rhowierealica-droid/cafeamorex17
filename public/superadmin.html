@@ -1,0 +1,81 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Café Amore | Register</title>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
+  <link rel="stylesheet" href="superadmin.css">
+  <link rel="stylesheet" href="customer-nav.css">
+</head>
+<body>
+
+  <!-- Navigation -->
+  <nav class="customer-nav">
+    <a href="index.html" class="logo">
+      <img src="logo.png" alt="Café Amore"> Café Amore
+    </a>
+    <ul>
+      <li><a href="login.html"><i class="fas fa-user"></i> Login</a></li>
+    </ul>
+  </nav>
+
+  <!-- Register Wrapper -->
+  <div class="login-wrapper">
+    <div class="login-container">
+
+      <!-- Left Panel -->
+      <div class="login-left">
+        <img src="logo.png" alt="Coffee Illustration" class="coffee-img">
+        <h2>Join Café Amore</h2>
+        <p>Delivery within Bacoor. Get the best coffee delivered to your doorstep.</p>
+      </div>
+
+      <!-- Right Panel -->
+      <div class="login-right">
+        <div class="login-box">
+          <h2>Create Account</h2>
+          <p>Fill in your details to sign up</p>
+          <form id="registerForm">
+
+            <div class="input-group">
+              <label for="username">Username</label>
+              <input type="text" id="username" placeholder="Username" required>
+            </div>
+
+            <div class="row">
+              <div class="input-group">
+                <label for="password">Password</label>
+                <input type="password" id="password" placeholder="Password" required>
+              </div>
+              <div class="input-group">
+                <label for="confirmPassword">Confirm Password</label>
+                <input type="password" id="confirmPassword" placeholder="Confirm Password" required>
+              </div>
+            </div>
+
+            <div class="error-msg" id="passwordError">Passwords do not match!</div>
+
+            <button type="submit" class="signin-btn">REGISTER</button>
+          </form>
+
+          <p class="register-text">
+            Already have an account? <a href="login.html">Login here</a>
+          </p>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- Message Popup Modal -->
+  <div id="messagePopup" class="message-popup">
+    <div class="message-content">
+      <p id="messageText"></p>
+      <button id="popupOkBtn">OK</button>
+    </div>
+  </div>
+
+  <script type="module" src="registration.js"></script>
+</body>
+</html>

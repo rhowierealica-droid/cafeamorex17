@@ -1,0 +1,284 @@
+/* ==========================
+Reset
+========================== */
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+  font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+}
+
+/* ==========================
+Body
+========================== */
+body {
+  min-height: 100vh;
+  background: #f6f1eb; /* coffee cream */
+  color: #4b3621; /* dark coffee text */
+  overflow-x: hidden;
+  display: flex;
+  flex-direction: column;
+}
+
+/* ==========================
+Main Content
+========================== */
+.main-content {
+  flex: 1;
+  padding: 25px 35px;
+  overflow-y: auto;
+  margin-left: 240px; /* adjust to your sidebar width */
+}
+
+h2 {
+  text-align: center;
+  color: #6f4e37;
+  margin-bottom: 25px;
+}
+
+/* ==========================
+Container
+========================== */
+.container {
+  display: flex;
+  gap: 25px;
+  flex-wrap: wrap;
+  align-items: flex-start;
+}
+
+/* ==========================
+Product List
+========================== */
+.product-list {
+  flex: 2;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  gap: 20px;
+}
+
+.product-box {
+  background: #fff5f0;
+  border-radius: 15px;
+  padding: 15px;
+  display: flex;               /* add this */
+  flex-direction: column;      /* stack name, price, etc. vertically */
+  justify-content: center;     /* vertical center */
+  align-items: center;         /* horizontal center */
+  text-align: center;
+  cursor: pointer;
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+  transition: transform 0.2s, box-shadow 0.2s;
+  min-height: 100px; 
+  position: relative;          /* needed for the "Unavailable" badge */
+}
+
+
+.product-box:hover {
+  transform: translateY(-3px);
+  box-shadow: 0 8px 12px rgba(0, 0, 0, 0.15);
+}
+
+.product-box.disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+  position: relative;
+}
+
+/* Badge instead of covering text */
+.product-box.disabled::after {
+  content: "Unavailable";
+  position: absolute;
+  bottom: 8px;   /* was -10px */
+  right: 8px;
+  background: rgba(255, 0, 0, 0.85);
+  color: white;
+  padding: 3px 8px;
+  border-radius: 6px;
+  font-size: 12px;
+  font-weight: bold;
+  pointer-events: none;
+}
+
+/* ==========================
+Order Receipt
+========================== */
+.order-receipt {
+  flex: 1;
+  min-width: 250px;
+  background: #fffaf0;
+  border-radius: 15px;
+  padding: 20px;
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+}
+
+.order-receipt h3 {
+  color: #6f4e37;
+  margin-bottom: 15px;
+}
+
+.order-item {
+  border-bottom: 1px solid #e0d8d0;
+  padding: 8px 0;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.remove-btn {
+  background: #fceaea;
+  color: #a12a2a;
+  border: none;
+  padding: 5px 10px;
+  border-radius: 8px;
+  cursor: pointer;
+}
+
+.remove-btn:hover {
+  background: #a12a2a;
+  color: white;
+}
+
+#doneOrderBtn,
+#cancelOrderBtn {
+  width: 100%;
+  padding: 10px;
+  margin-top: 10px;
+  border: none;
+  border-radius: 12px;
+  font-weight: bold;
+  color: white;
+}
+
+#doneOrderBtn {
+  background-color: #6f4e37;
+}
+
+#cancelOrderBtn {
+  background-color: #c94c4c;
+}
+
+/* ==========================
+Popup Styling (Form)
+========================== */
+.popup {
+  display: none;
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: rgba(0, 0, 0, 0.5);
+  z-index: 999;
+  justify-content: center;
+  align-items: center;
+}
+
+.popup-content {
+  background: #fff8f0;
+  padding: 25px 20px;
+  width: 350px;
+  max-width: 90%;
+  border-radius: 15px;
+  text-align: center;
+  box-shadow: 0 6px 15px rgba(0, 0, 0, 0.2);
+  max-height: 90%;
+  overflow-y: auto;
+}
+
+.popup-content button {
+  margin: 8px;
+  padding: 10px 18px;
+  cursor: pointer;
+  border: none;
+  border-radius: 12px;
+  background-color: #6f4e37;
+  color: white;
+  transition: background 0.2s;
+}
+
+.popup-content button:hover {
+  background-color: #50382b;
+}
+
+input[type="number"] {
+  width: 60px;
+  padding: 5px;
+  margin-top: 5px;
+  border-radius: 8px;
+  border: 1px solid #d0c4b6;
+  text-align: center;
+}
+
+/* Sizes & Add-ons */
+#sizeContainer div,
+#addonContainer div {
+  margin: 5px 0;
+  text-align: left;
+}
+
+#sizeContainer label,
+#addonContainer label {
+  margin-left: 5px;
+}
+
+#addonContainer h4 {
+  margin-top: 10px;
+  color: #6f4e37;
+}
+
+/* ==========================
+Popup Message (Success/Error)
+========================== */
+#messagePopup {
+  position: fixed;
+  top: 20px;
+  left: 50%;
+  transform: translateX(-50%) translateY(-20px);
+  background: #4caf50; /* default = success green */
+  color: #fff;
+  padding: 12px 20px;
+  border-radius: 8px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+  display: none;
+  z-index: 9999;
+  font-weight: bold;
+  opacity: 0;
+  transition: opacity 0.4s ease, transform 0.4s ease;
+  min-width: 200px;
+  text-align: center;
+}
+
+/* Show state */
+#messagePopup.show {
+  display: block;
+  opacity: 1;
+  transform: translateX(-50%) translateY(0);
+}
+
+/* Success & Error variations */
+#messagePopup.success {
+  background: #4caf50; /* Green */
+}
+
+#messagePopup.error {
+  background: #e53935; /* Red */
+}
+
+/* ==========================
+Responsive
+========================== */
+@media screen and (max-width: 900px) {
+  .main-content {
+    padding: 15px;
+    margin-left: 0; /* ✅ remove sidebar space on small screens */
+  }
+
+  .container {
+    flex-direction: column;
+  }
+
+  .order-receipt {
+    min-width: 100%;
+    margin-top: 20px;
+  }
+}
