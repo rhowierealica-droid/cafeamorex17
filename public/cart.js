@@ -439,7 +439,7 @@ finalConfirmBtn?.addEventListener("click", async () => {
       // --- PAYMONGO GCASH FLOW ---
       
       // 1. Call your Node.js backend server to create the checkout session
-const response = await fetch("/.netlify/function/create-checkout", {
+const response = await fetch("/.netlify/functions/create-checkout", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -486,3 +486,4 @@ async function getNextQueueNumber() {
   return !snapshot.empty ? (snapshot.docs[0].data().queueNumber || 0) + 1 : 1;
 
 }
+
