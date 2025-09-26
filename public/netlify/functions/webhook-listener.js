@@ -1,4 +1,3 @@
-// netlify/functions/webhook-listener.js
 require("dotenv").config();
 const crypto = require("crypto");
 const admin = require("firebase-admin");
@@ -55,11 +54,11 @@ exports.handler = async (event, context) => {
       }
 
       console.log(`✅ Payment confirmed for Order #${metadata.queueNumber}`);
-      console.log("📦 Raw order items from metadata:", metadata.orderItems);
 
-      // Safely parse order items and ensure proper structure
+      // Safely parse order items
       const rawItems = safeParse(metadata.orderItems, []);
       const orderItems = rawItems.map(item => ({
+        id: item.id || "",
         product: item.product || item.name || "Unnamed Product",
         productId: item.productId || null,
         size: item.size || null,
@@ -68,6 +67,9 @@ exports.handler = async (event, context) => {
         basePrice: Number(item.basePrice || 0),
         sizePrice: Number(item.sizePrice || 0),
         addonsPrice: Number(item.addonsPrice || 0),
+        total: Number(item.total || item.totalPrice || 0),
+        name: item.name || "Unnamed Product",
+        price: Number(item.unitPrice || 0),
         addons: Array.isArray(item.addons) ? item.addons.map(a => ({
           id: a.id || null,
           name: a.name || "Addon",
@@ -76,23 +78,23 @@ exports.handler = async (event, context) => {
         ingredients: Array.isArray(item.ingredients) ? item.ingredients.map(i => ({
           id: i.id || null,
           name: i.name || "Ingredient",
-          qty: Number(i.qty || 1)
+          qty: Number(i.qty || 1),
+          unit: i.unit || "pcs"
         })) : [],
         others: Array.isArray(item.others) ? item.others.map(o => ({
           id: o.id || null,
           name: o.name || "Other",
           qty: Number(o.qty || 1)
-        })) : [],
-        total: Number(item.total || item.totalPrice || 0),
+        })) : []
       }));
 
       // Save order in Firestore
       const orderRef = await db.collection("DeliveryOrders").add({
         userId: metadata.userId,
         customerName: metadata.customerName || metadata.email || "Customer",
-        email: metadata.email || null, // Include email explicitly
+        email: metadata.email || null,
         address: metadata.address || "",
-        queueNumber: metadata.queueNumber,
+        queueNumber: metadata.queueNumber.toString(),
         orderType: "Delivery",
         items: orderItems,
         deliveryFee: parseFloat(metadata.deliveryFee) || 0,
@@ -100,35 +102,21 @@ exports.handler = async (event, context) => {
         paymentMethod: "GCash",
         status: "Pending",
         createdAt: admin.firestore.FieldValue.serverTimestamp(),
-        paymongoPaymentId: payment.id,
+        paymongoPaymentId: payment.id
       });
 
       console.log("💾 Order saved with ID:", orderRef.id);
 
       // Deduct inventory
-      async function deductInventory(order) {
-        const deductItem = async (id, amount, name = "Unknown") => {
-          if (!id) return;
-          const invRef = db.collection("Inventory").doc(id);
-          const invSnap = await invRef.get();
-          const invQty = invSnap.exists ? Number(invSnap.data().quantity || 0) : 0;
-          const newQty = Math.max(invQty - amount, 0);
-          await invRef.update({ quantity: newQty });
-          console.log(`💸 Deducted ${amount} from ${name} (ID: ${id}). New quantity: ${newQty}`);
-        };
-
-        for (const item of order) {
-          if (item.productId) await deductItem(item.productId, item.qty, item.product);
-          if (item.sizeId) await deductItem(item.sizeId, item.qty, `Size of ${item.product}`);
-          for (const addon of item.addons) await deductItem(addon.id, item.qty, `Addon ${addon.name} of ${item.product}`);
-          for (const ing of item.ingredients) await deductItem(ing.id, (ing.qty || 1) * item.qty, `Ingredient ${ing.name} of ${item.product}`);
-          for (const other of item.others) await deductItem(other.id, (other.qty || 1) * item.qty, `Other ${other.name} of ${item.product}`);
-        }
+      for (const item of orderItems) {
+        if (item.productId) await deductInventoryItem(item.productId, item.qty, item.product);
+        if (item.sizeId) await deductInventoryItem(item.sizeId, item.qty, `Size of ${item.product}`);
+        for (const addon of item.addons) await deductInventoryItem(addon.id, item.qty, `Addon ${addon.name} of ${item.product}`);
+        for (const ing of item.ingredients) await deductInventoryItem(ing.id, (ing.qty || 1) * item.qty, `Ingredient ${ing.name} of ${item.product}`);
+        for (const other of item.others) await deductInventoryItem(other.id, (other.qty || 1) * item.qty, `Other ${other.name} of ${item.product}`);
       }
 
-      await deductInventory(orderItems);
-
-      // Clear user's cart items
+      // Remove cart items
       const cartItemIds = safeParse(metadata.cartItemIds, []);
       if (Array.isArray(cartItemIds) && metadata.userId) {
         for (const cartItemId of cartItemIds) {
@@ -149,7 +137,7 @@ exports.handler = async (event, context) => {
   }
 };
 
-// Helper: safely parse JSON
+// Helper functions
 function safeParse(value, fallback) {
   try {
     if (!value) return fallback;
@@ -157,4 +145,14 @@ function safeParse(value, fallback) {
   } catch {
     return fallback;
   }
+}
+
+async function deductInventoryItem(id, qty, name = "Unknown") {
+  if (!id) return;
+  const invRef = db.collection("Inventory").doc(id);
+  const invSnap = await invRef.get();
+  const invQty = invSnap.exists ? Number(invSnap.data().quantity || 0) : 0;
+  const newQty = Math.max(invQty - qty, 0);
+  await invRef.update({ quantity: newQty });
+  console.log(`💸 Deducted ${qty} from ${name} (ID: ${id}). New quantity: ${newQty}`);
 }
