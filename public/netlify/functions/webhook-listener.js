@@ -75,9 +75,26 @@ exports.handler = async (event, context) => {
 
       console.log(`✅ Payment confirmed for Order #${metadata.queueNumber}`);
 
-      const orderItems = safeParse(metadata.orderItems, []);
+      // ----------------------------
+      // MAP ITEMS LIKE COD
+      // ----------------------------
+      const rawItems = safeParse(metadata.orderItems, []);
+      const orderItems = rawItems.map(item => ({
+        product: item.product || item.name,
+        productId: item.productId || null,
+        size: item.size || null,
+        sizeId: item.sizeId || null,
+        qty: Number(item.qty || 1),
+        basePrice: Number(item.basePrice || 0),
+        sizePrice: Number(item.sizePrice || 0),
+        addonsPrice: Number(item.addonsPrice || 0),
+        addons: item.addons || [],
+        ingredients: item.ingredients || [],
+        others: item.others || [],
+        total: Number(item.total || item.totalPrice || 0),
+      }));
 
-      // 💾 Save order in Firestore like COD
+      // 💾 Save order in Firestore
       await db.collection("DeliveryOrders").add({
         userId: metadata.userId,
         customerName: metadata.customerName || metadata.email || "Customer",
@@ -115,7 +132,9 @@ exports.handler = async (event, context) => {
 
       await deductInventory(orderItems);
 
-      // 🗑 Clear cart items from the user's cart
+      // ----------------------------
+      // CLEAR CART
+      // ----------------------------
       const cartItemIds = safeParse(metadata.cartItemIds, []);
       if (Array.isArray(cartItemIds) && metadata.userId) {
         for (const cartItemId of cartItemIds) {
