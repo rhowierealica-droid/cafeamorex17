@@ -83,7 +83,7 @@ exports.handler = async (event, context) => {
       {
         data: {
           attributes: {
-            success_url: "https://thriving-blancmange-e2dc71.netlify.app/menu.html",
+            success_url: "https://thriving-blancmange-e2dc71.netlify.app/index.html",
             cancel_url: "https://thriving-blancmange-e2dc71.netlify.app/cart.html",
             send_email_receipt: false,
             description: description || `Payment for Order #${metadata.queueNumber}`,
@@ -120,3 +120,4 @@ exports.handler = async (event, context) => {
     };
   }
 };
+
