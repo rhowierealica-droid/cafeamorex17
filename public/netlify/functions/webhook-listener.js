@@ -3,7 +3,7 @@ require("dotenv").config();
 const crypto = require("crypto");
 const admin = require("firebase-admin");
 
-// ✅ Initialize Firebase Admin once
+// Initialize Firebase Admin
 if (!admin.apps.length) {
   admin.initializeApp({
     credential: admin.credential.cert(
@@ -19,19 +19,12 @@ exports.handler = async (event, context) => {
   }
 
   try {
-    // Load secret from environment
     const webhookSecret = process.env.WEBHOOK_SECRET_KEY;
-    if (!webhookSecret) {
-      console.error("❌ Missing WEBHOOK_SECRET_KEY in environment variables");
-      return { statusCode: 500, body: "Server misconfigured" };
-    }
+    if (!webhookSecret) return { statusCode: 500, body: "Server misconfigured" };
 
     // Verify PayMongo signature
     const sigHeader = event.headers["paymongo-signature"];
-    if (!sigHeader) {
-      console.error("❌ Missing PayMongo signature header");
-      return { statusCode: 400, body: "Missing signature header" };
-    }
+    if (!sigHeader) return { statusCode: 400, body: "Missing signature header" };
 
     const sigParts = sigHeader.split(",");
     const sigMap = {};
@@ -39,25 +32,16 @@ exports.handler = async (event, context) => {
       const [k, v] = p.split("=");
       sigMap[k] = v;
     });
-
     const signature = sigMap.te || sigMap.v1;
     const timestamp = sigMap.t;
-    if (!signature || !timestamp) {
-      console.error("❌ Could not extract signature/timestamp from header:", sigHeader);
-      return { statusCode: 400, body: "Invalid signature header format" };
-    }
+    if (!signature || !timestamp) return { statusCode: 400, body: "Invalid signature header" };
 
     const signedPayload = `${timestamp}.${event.body}`;
     const hmac = crypto.createHmac("sha256", webhookSecret);
     hmac.update(signedPayload, "utf8");
     const digest = hmac.digest("hex");
+    if (digest !== signature) return { statusCode: 401, body: "Invalid signature" };
 
-    if (digest !== signature) {
-      console.error("❌ Invalid webhook signature.", { expected: signature, got: digest });
-      return { statusCode: 401, body: "Invalid signature" };
-    }
-
-    // Parse webhook body
     const body = JSON.parse(event.body);
     const eventType = body.data?.attributes?.type;
     const payment = body.data?.attributes?.data;
@@ -66,9 +50,7 @@ exports.handler = async (event, context) => {
 
     if (eventType === "payment.paid") {
       const metadata = payment?.attributes?.metadata || {};
-
       if (!metadata.userId || !metadata.queueNumber) {
-        console.error("❌ Missing required metadata:", metadata);
         return { statusCode: 400, body: "Missing metadata" };
       }
 
@@ -109,13 +91,10 @@ exports.handler = async (event, context) => {
 
       console.log("💾 Order saved with ID:", orderRef.id);
 
-      // Deduct inventory with logging
+      // Deduct inventory
       async function deductInventory(order) {
         const deductItem = async (id, amount, name = "Unknown") => {
-          if (!id) {
-            console.warn(`⚠️ Skipping inventory deduction for item without ID: ${name}`);
-            return;
-          }
+          if (!id) return;
           const invRef = db.collection("Inventory").doc(id);
           const invSnap = await invRef.get();
           const invQty = invSnap.exists ? Number(invSnap.data().quantity || 0) : 0;
@@ -125,36 +104,22 @@ exports.handler = async (event, context) => {
         };
 
         for (const item of order) {
-          // Deduct main product
           if (item.productId) await deductItem(item.productId, item.qty, item.product);
-
-          // Deduct size
           if (item.sizeId) await deductItem(item.sizeId, item.qty, `Size of ${item.product}`);
-
-          // Deduct addons
           for (const addon of item.addons || []) await deductItem(addon.id, item.qty, `Addon ${addon.name} of ${item.product}`);
-
-          // Deduct ingredients
           for (const ing of item.ingredients || []) await deductItem(ing.id, (ing.qty || 1) * item.qty, `Ingredient ${ing.name} of ${item.product}`);
-
-          // Deduct others
           for (const other of item.others || []) await deductItem(other.id, (other.qty || 1) * item.qty, `Other ${other.name} of ${item.product}`);
         }
       }
 
       await deductInventory(orderItems);
 
-      // Clear cart
+      // Clear user's cart items
       const cartItemIds = safeParse(metadata.cartItemIds, []);
       if (Array.isArray(cartItemIds) && metadata.userId) {
         for (const cartItemId of cartItemIds) {
           try {
-            await db
-              .collection("users")
-              .doc(metadata.userId)
-              .collection("cart")
-              .doc(cartItemId)
-              .delete();
+            await db.collection("users").doc(metadata.userId).collection("cart").doc(cartItemId).delete();
             console.log(`🗑️ Removed cart item ${cartItemId}`);
           } catch (err) {
             console.error(`❌ Failed to delete cart item ${cartItemId}`, err);
@@ -170,7 +135,7 @@ exports.handler = async (event, context) => {
   }
 };
 
-// Helper: safely parse JSON fields
+// Helper: safely parse JSON
 function safeParse(value, fallback) {
   try {
     if (!value) return fallback;
