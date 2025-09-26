@@ -43,18 +43,22 @@ exports.handler = async (event, context) => {
 
     // Use `te` if present, otherwise fallback to `v1`
     const signature = sigMap.te || sigMap.v1;
-    if (!signature) {
-      console.error("❌ Could not extract signature from header:", sigHeader);
+    const timestamp = sigMap.t;
+    if (!signature || !timestamp) {
+      console.error("❌ Could not extract signature/timestamp from header:", sigHeader);
       return { statusCode: 400, body: "Invalid signature header format" };
     }
 
-    // ✅ Compute HMAC using webhook secret
+    // ✅ Build signed payload: timestamp + '.' + raw body
+    const signedPayload = `${timestamp}.${event.body}`;
     const hmac = crypto.createHmac("sha256", webhookSecret);
-    hmac.update(event.body, "utf8");
+    hmac.update(signedPayload, "utf8");
     const digest = hmac.digest("hex");
 
     if (digest !== signature) {
-      console.error("❌ Invalid webhook signature. Expected:", signature, "Got:", digest);
+      console.error("❌ Invalid webhook signature.");
+      console.error("Expected:", signature);
+      console.error("Got:", digest);
       return { statusCode: 401, body: "Invalid signature" };
     }
 
