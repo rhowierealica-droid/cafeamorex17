@@ -22,7 +22,7 @@ exports.handler = async (event, context) => {
       };
     }
 
-    // Validate required metadata fields (same as old working code)
+    // Validate required metadata fields
     const requiredFields = [
       'userId', 'queueNumber', 'customerName',
       'address', 'orderItems', 'deliveryFee',
@@ -40,6 +40,13 @@ exports.handler = async (event, context) => {
         })
       };
     }
+
+    // Serialize orderItems and cartItemIds for metadata
+    const serializedMetadata = {
+      ...metadata,
+      orderItems: JSON.stringify(metadata.orderItems),
+      cartItemIds: JSON.stringify(metadata.cartItemIds)
+    };
 
     // Prepare line items
     const lineItems = metadata.orderItems.flatMap(item => {
@@ -59,7 +66,7 @@ exports.handler = async (event, context) => {
           name: `${item.product || "Product"} Add-on: ${addon.name || "Addon"}`,
           currency: 'PHP',
           amount: Math.round(Number(addon.price || 0) * 100),
-          quantity: qty
+          quantity: qty // total add-on per product qty
         });
       });
 
@@ -89,7 +96,7 @@ exports.handler = async (event, context) => {
             description: description || `Payment for Order #${metadata.queueNumber}`,
             line_items: lineItems,
             payment_method_types: ['gcash'],
-            metadata
+            metadata: serializedMetadata
           }
         }
       },
@@ -120,4 +127,3 @@ exports.handler = async (event, context) => {
     };
   }
 };
-
