@@ -55,11 +55,12 @@ exports.handler = async (event, context) => {
       }
 
       console.log(`✅ Payment confirmed for Order #${metadata.queueNumber}`);
+      console.log("📦 Raw order items from metadata:", metadata.orderItems);
 
-      // Parse order items
+      // Parse order items and ensure product names exist
       const rawItems = safeParse(metadata.orderItems, []);
       const orderItems = rawItems.map(item => ({
-        product: item.product || item.name,
+        product: item.name || item.product || "Unnamed Product",
         productId: item.productId || null,
         size: item.size || null,
         sizeId: item.sizeId || null,
@@ -67,9 +68,21 @@ exports.handler = async (event, context) => {
         basePrice: Number(item.basePrice || 0),
         sizePrice: Number(item.sizePrice || 0),
         addonsPrice: Number(item.addonsPrice || 0),
-        addons: item.addons || [],
-        ingredients: item.ingredients || [],
-        others: item.others || [],
+        addons: Array.isArray(item.addons) ? item.addons.map(a => ({
+          id: a.id || null,
+          name: a.name || "Addon",
+          price: Number(a.price || 0)
+        })) : [],
+        ingredients: Array.isArray(item.ingredients) ? item.ingredients.map(i => ({
+          id: i.id || null,
+          name: i.name || "Ingredient",
+          qty: Number(i.qty || 1)
+        })) : [],
+        others: Array.isArray(item.others) ? item.others.map(o => ({
+          id: o.id || null,
+          name: o.name || "Other",
+          qty: Number(o.qty || 1)
+        })) : [],
         total: Number(item.total || item.totalPrice || 0),
       }));
 
@@ -106,9 +119,9 @@ exports.handler = async (event, context) => {
         for (const item of order) {
           if (item.productId) await deductItem(item.productId, item.qty, item.product);
           if (item.sizeId) await deductItem(item.sizeId, item.qty, `Size of ${item.product}`);
-          for (const addon of item.addons || []) await deductItem(addon.id, item.qty, `Addon ${addon.name} of ${item.product}`);
-          for (const ing of item.ingredients || []) await deductItem(ing.id, (ing.qty || 1) * item.qty, `Ingredient ${ing.name} of ${item.product}`);
-          for (const other of item.others || []) await deductItem(other.id, (other.qty || 1) * item.qty, `Other ${other.name} of ${item.product}`);
+          for (const addon of item.addons) await deductItem(addon.id, item.qty, `Addon ${addon.name} of ${item.product}`);
+          for (const ing of item.ingredients) await deductItem(ing.id, (ing.qty || 1) * item.qty, `Ingredient ${ing.name} of ${item.product}`);
+          for (const other of item.others) await deductItem(other.id, (other.qty || 1) * item.qty, `Other ${other.name} of ${item.product}`);
         }
       }
 
