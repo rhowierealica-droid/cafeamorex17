@@ -23,15 +23,13 @@ exports.handler = async (event, context) => {
       };
     }
 
-    // Metadata required for webhook listener
+    // Validate required metadata fields
     const requiredFields = [
       'userId', 'queueNumber', 'customerName',
       'address', 'orderItems', 'deliveryFee',
       'orderTotal', 'cartItemIds'
     ];
-    const missingFields = requiredFields.filter(
-      f => !(metadata && metadata[f] !== undefined)
-    );
+    const missingFields = requiredFields.filter(f => !(metadata && metadata[f] !== undefined));
 
     if (!amount || amount < 1 || missingFields.length > 0) {
       return {
@@ -43,7 +41,7 @@ exports.handler = async (event, context) => {
       };
     }
 
-    // ✅ amount is already in centavos, don’t multiply again
+    // ✅ Prepare line items for PayMongo checkout
     const lineItems = [
       {
         currency: 'PHP',
@@ -53,18 +51,19 @@ exports.handler = async (event, context) => {
       }
     ];
 
+    // ✅ Create checkout session
     const response = await axios.post(
       `${PAYMONGO_API}/checkout_sessions`,
       {
         data: {
           attributes: {
-            success_url: "https://thriving-blancmange-e2dc71.netlify.app/index.html",
+            success_url: "https://thriving-blancmange-e2dc71.netlify.app/menu.html",
             cancel_url: "https://thriving-blancmange-e2dc71.netlify.app/cart.html",
             send_email_receipt: false,
-            description,
+            description: description || `Payment for Order #${metadata.queueNumber}`,
             line_items: lineItems,
             payment_method_types: ['gcash'],
-            metadata
+            metadata // pass all metadata to be available in webhook listener
           }
         }
       },
@@ -95,4 +94,3 @@ exports.handler = async (event, context) => {
     };
   }
 };
-
