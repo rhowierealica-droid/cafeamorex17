@@ -19,7 +19,7 @@ exports.handler = async (event, context) => {
   }
 
   try {
-    // ✅ Load secret from env
+    // ✅ Load secret from environment
     const webhookSecret = process.env.WEBHOOK_SECRET_KEY;
     if (!webhookSecret) {
       console.error("❌ Missing WEBHOOK_SECRET_KEY in environment variables");
@@ -33,7 +33,6 @@ exports.handler = async (event, context) => {
       return { statusCode: 400, body: "Missing signature header" };
     }
 
-    // Split header into key=value pairs (e.g. "t=...,te=...,li=...")
     const sigParts = sigHeader.split(",");
     const sigMap = {};
     sigParts.forEach((p) => {
@@ -41,7 +40,6 @@ exports.handler = async (event, context) => {
       sigMap[k] = v;
     });
 
-    // Use `te` if present, otherwise fallback to `v1`
     const signature = sigMap.te || sigMap.v1;
     const timestamp = sigMap.t;
     if (!signature || !timestamp) {
@@ -49,16 +47,14 @@ exports.handler = async (event, context) => {
       return { statusCode: 400, body: "Invalid signature header format" };
     }
 
-    // ✅ Build signed payload: timestamp + '.' + raw body
+    // ✅ Build signed payload and compute HMAC
     const signedPayload = `${timestamp}.${event.body}`;
     const hmac = crypto.createHmac("sha256", webhookSecret);
     hmac.update(signedPayload, "utf8");
     const digest = hmac.digest("hex");
 
     if (digest !== signature) {
-      console.error("❌ Invalid webhook signature.");
-      console.error("Expected:", signature);
-      console.error("Got:", digest);
+      console.error("❌ Invalid webhook signature.", { expected: signature, got: digest });
       return { statusCode: 401, body: "Invalid signature" };
     }
 
@@ -79,18 +75,18 @@ exports.handler = async (event, context) => {
 
       console.log(`✅ Payment confirmed for Order #${metadata.queueNumber}`);
 
-      // 💾 Save order in Firestore
+      // 💾 Save order in Firestore like COD
       await db.collection("DeliveryOrders").add({
         userId: metadata.userId,
-        customerName: metadata.customerName || "",
+        customerName: metadata.customerName || metadata.email || "Customer",
         address: metadata.address || "",
         queueNumber: metadata.queueNumber,
         orderType: "Delivery",
         items: safeParse(metadata.orderItems, []),
-        deliveryFee: parseInt(metadata.deliveryFee) || 0,
-        total: parseInt(metadata.orderTotal) || 0,
+        deliveryFee: parseFloat(metadata.deliveryFee) || 0,
+        total: parseFloat(metadata.orderTotal) || 0,
         paymentMethod: "GCash",
-        status: "Pending",
+        status: "Pending", // ✅ same as COD
         createdAt: admin.firestore.FieldValue.serverTimestamp(),
         paymongoPaymentId: payment.id,
       });
@@ -103,9 +99,7 @@ exports.handler = async (event, context) => {
             .collection("Cart")
             .doc(cartItemId)
             .delete()
-            .catch((err) => {
-              console.error(`❌ Failed to delete cart item ${cartItemId}`, err);
-            });
+            .catch((err) => console.error(`❌ Failed to delete cart item ${cartItemId}`, err));
         }
       }
     }
@@ -121,9 +115,8 @@ exports.handler = async (event, context) => {
 function safeParse(value, fallback) {
   try {
     if (!value) return fallback;
-    return JSON.parse(value);
+    return typeof value === "string" ? JSON.parse(value) : value;
   } catch {
     return fallback;
   }
 }
-
