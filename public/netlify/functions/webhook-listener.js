@@ -19,9 +19,10 @@ exports.handler = async (event, context) => {
   }
 
   try {
-    const webhookSecret = process.env.webhook_SECRET_KEY;
+    // ✅ Load secret from env
+    const webhookSecret = process.env.WEBHOOK_SECRET_KEY;
     if (!webhookSecret) {
-      console.error("❌ Missing webhook_SECRET_KEY in environment variables");
+      console.error("❌ Missing WEBHOOK_SECRET_KEY in environment variables");
       return { statusCode: 500, body: "Server misconfigured" };
     }
 
