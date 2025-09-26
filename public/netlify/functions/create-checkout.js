@@ -17,7 +17,9 @@ exports.handler = async (event, context) => {
     if (!PAYMONGO_SECRET_KEY) {
       return {
         statusCode: 500,
-        body: JSON.stringify({ error: 'PAYMONGO_SECRET_KEY is not set in Netlify Environment Variables.' })
+        body: JSON.stringify({
+          error: 'PAYMONGO_SECRET_KEY is not set in Netlify Environment Variables.'
+        })
       };
     }
 
@@ -27,7 +29,9 @@ exports.handler = async (event, context) => {
       'address', 'orderItems', 'deliveryFee',
       'orderTotal', 'cartItemIds'
     ];
-    const missingFields = requiredFields.filter(f => !(metadata && metadata[f] !== undefined));
+    const missingFields = requiredFields.filter(
+      f => !(metadata && metadata[f] !== undefined)
+    );
 
     if (!amount || amount < 1 || missingFields.length > 0) {
       return {
@@ -39,41 +43,45 @@ exports.handler = async (event, context) => {
       };
     }
 
-    // Convert PHP to centavos (PayMongo requires integer amount)
-    const amountCentavos = Math.round(amount * 100);
-
+    // ✅ amount is already in centavos, don’t multiply again
     const lineItems = [
       {
         currency: 'PHP',
-        amount: amountCentavos,
+        amount, // already in centavos
         name: `Order #${metadata.queueNumber}`,
         quantity: 1
       }
     ];
 
-    const response = await axios.post(`${PAYMONGO_API}/checkout_sessions`, {
-      data: {
-        attributes: {
-          success_url: "https://profound-praline-058760.netlify.app/index.html",
-          cancel_url: "https://profound-praline-058760.netlify.app/cart.html",
-          send_email_receipt: false,
-          description,
-          line_items: lineItems,
-          payment_method_types: ['gcash'],
-          metadata
+    const response = await axios.post(
+      `${PAYMONGO_API}/checkout_sessions`,
+      {
+        data: {
+          attributes: {
+            success_url: "https://profound-praline-058760.netlify.app/index.html",
+            cancel_url: "https://profound-praline-058760.netlify.app/cart.html",
+            send_email_receipt: false,
+            description,
+            line_items: lineItems,
+            payment_method_types: ['gcash'],
+            metadata
+          }
+        }
+      },
+      {
+        headers: {
+          'Authorization': `Basic ${Buffer.from(PAYMONGO_SECRET_KEY + ':').toString('base64')}`,
+          'Content-Type': 'application/json',
+          'Accept': 'application/json'
         }
       }
-    }, {
-      headers: {
-        'Authorization': `Basic ${Buffer.from(PAYMONGO_SECRET_KEY + ':').toString('base64')}`,
-        'Content-Type': 'application/json',
-        'Accept': 'application/json'
-      }
-    });
+    );
 
     return {
       statusCode: 200,
-      body: JSON.stringify({ checkout_url: response.data.data.attributes.checkout_url })
+      body: JSON.stringify({
+        checkout_url: response.data.data.attributes.checkout_url
+      })
     };
 
   } catch (error) {
