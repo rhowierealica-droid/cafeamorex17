@@ -11,7 +11,7 @@ exports.handler = async (event, context) => {
   }
 
   try {
-    const { amount, metadata = {}, description } = JSON.parse(event.body);
+    const { amount, metadata, description } = JSON.parse(event.body);
 
     if (!PAYMONGO_SECRET_KEY) {
       return {
@@ -22,13 +22,13 @@ exports.handler = async (event, context) => {
       };
     }
 
-    // Required metadata fields
+    // Validate required metadata fields (same as old working code)
     const requiredFields = [
-      'userId', 'queueNumber', 'customerName', 'email',
+      'userId', 'queueNumber', 'customerName',
       'address', 'orderItems', 'deliveryFee',
       'orderTotal', 'cartItemIds'
     ];
-    const missingFields = requiredFields.filter(f => !(metadata[f] !== undefined));
+    const missingFields = requiredFields.filter(f => !(metadata && metadata[f] !== undefined));
 
     if (!amount || amount < 1 || missingFields.length > 0) {
       console.warn("Missing required metadata fields:", missingFields);
@@ -41,13 +41,11 @@ exports.handler = async (event, context) => {
       };
     }
 
-    // Ensure orderItems is an array
-    const orderItems = Array.isArray(metadata.orderItems) ? metadata.orderItems : [];
-
     // Prepare line items
-    const lineItems = orderItems.flatMap(item => {
+    const lineItems = metadata.orderItems.flatMap(item => {
       const qty = Number(item.qty || 1);
       const baseAmount = Math.round((Number(item.basePrice || 0) + Number(item.sizePrice || 0)) * 100);
+
       const itemsArray = [{
         name: item.product || "Unnamed Product",
         currency: 'PHP',
@@ -68,7 +66,7 @@ exports.handler = async (event, context) => {
       return itemsArray;
     });
 
-    // Delivery fee
+    // Add delivery fee
     const deliveryFee = Number(metadata.deliveryFee || 0);
     if (deliveryFee > 0) {
       lineItems.push({
@@ -88,10 +86,10 @@ exports.handler = async (event, context) => {
             success_url: "https://thriving-blancmange-e2dc71.netlify.app/menu.html",
             cancel_url: "https://thriving-blancmange-e2dc71.netlify.app/cart.html",
             send_email_receipt: false,
-            description: description || `Payment for Order #${metadata.queueNumber || 'N/A'}`,
+            description: description || `Payment for Order #${metadata.queueNumber}`,
             line_items: lineItems,
             payment_method_types: ['gcash'],
-            metadata // pass all metadata to webhook
+            metadata
           }
         }
       },
