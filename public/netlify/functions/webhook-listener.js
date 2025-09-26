@@ -90,7 +90,7 @@ exports.handler = async (event, context) => {
         deliveryFee: parseInt(metadata.deliveryFee) || 0,
         total: parseInt(metadata.orderTotal) || 0,
         paymentMethod: "GCash",
-        status: "Paid",
+        status: "Pending",
         createdAt: admin.firestore.FieldValue.serverTimestamp(),
         paymongoPaymentId: payment.id,
       });
@@ -126,3 +126,4 @@ function safeParse(value, fallback) {
     return fallback;
   }
 }
+
