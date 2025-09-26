@@ -11,7 +11,7 @@ exports.handler = async (event, context) => {
   }
 
   try {
-    const { amount, metadata, description } = JSON.parse(event.body);
+    const { amount, metadata = {}, description } = JSON.parse(event.body);
 
     if (!PAYMONGO_SECRET_KEY) {
       return {
@@ -22,15 +22,16 @@ exports.handler = async (event, context) => {
       };
     }
 
-    // Validate required metadata fields
+    // Required metadata fields
     const requiredFields = [
       'userId', 'queueNumber', 'customerName', 'email',
       'address', 'orderItems', 'deliveryFee',
       'orderTotal', 'cartItemIds'
     ];
-    const missingFields = requiredFields.filter(f => !(metadata && metadata[f] !== undefined));
+    const missingFields = requiredFields.filter(f => !(metadata[f] !== undefined));
 
     if (!amount || amount < 1 || missingFields.length > 0) {
+      console.warn("Missing required metadata fields:", missingFields);
       return {
         statusCode: 400,
         body: JSON.stringify({
@@ -40,25 +41,27 @@ exports.handler = async (event, context) => {
       };
     }
 
-    // Prepare line items for PayMongo checkout
-    const lineItems = metadata.orderItems.flatMap(item => {
-      const itemsArray = [];
+    // Ensure orderItems is an array
+    const orderItems = Array.isArray(metadata.orderItems) ? metadata.orderItems : [];
 
-      // Base product + size
-      itemsArray.push({
-        name: item.product,
+    // Prepare line items
+    const lineItems = orderItems.flatMap(item => {
+      const qty = Number(item.qty || 1);
+      const baseAmount = Math.round((Number(item.basePrice || 0) + Number(item.sizePrice || 0)) * 100);
+      const itemsArray = [{
+        name: item.product || "Unnamed Product",
         currency: 'PHP',
-        amount: Math.round((Number(item.basePrice) + Number(item.sizePrice || 0)) * 100),
-        quantity: Number(item.qty || 1)
-      });
+        amount: baseAmount,
+        quantity: qty
+      }];
 
       // Add-ons
       (item.addons || []).forEach(addon => {
         itemsArray.push({
-          name: `${item.product} Add-on: ${addon.name}`,
+          name: `${item.product || "Product"} Add-on: ${addon.name || "Addon"}`,
           currency: 'PHP',
-          amount: Math.round(Number(addon.price) * 100),
-          quantity: Number(item.qty || 1)
+          amount: Math.round(Number(addon.price || 0) * 100),
+          quantity: qty
         });
       });
 
@@ -66,11 +69,12 @@ exports.handler = async (event, context) => {
     });
 
     // Delivery fee
-    if (metadata.deliveryFee && Number(metadata.deliveryFee) > 0) {
+    const deliveryFee = Number(metadata.deliveryFee || 0);
+    if (deliveryFee > 0) {
       lineItems.push({
         name: "Delivery Fee",
         currency: "PHP",
-        amount: Math.round(Number(metadata.deliveryFee) * 100),
+        amount: Math.round(deliveryFee * 100),
         quantity: 1
       });
     }
@@ -84,7 +88,7 @@ exports.handler = async (event, context) => {
             success_url: "https://thriving-blancmange-e2dc71.netlify.app/menu.html",
             cancel_url: "https://thriving-blancmange-e2dc71.netlify.app/cart.html",
             send_email_receipt: false,
-            description: description || `Payment for Order #${metadata.queueNumber}`,
+            description: description || `Payment for Order #${metadata.queueNumber || 'N/A'}`,
             line_items: lineItems,
             payment_method_types: ['gcash'],
             metadata // pass all metadata to webhook
