@@ -1,4 +1,3 @@
-// netlify/functions/create-checkout.js
 require('dotenv').config();
 const axios = require('axios');
 
@@ -25,7 +24,7 @@ exports.handler = async (event, context) => {
 
     // Validate required metadata fields
     const requiredFields = [
-      'userId', 'queueNumber', 'customerName',
+      'userId', 'queueNumber', 'customerName', 'email',
       'address', 'orderItems', 'deliveryFee',
       'orderTotal', 'cartItemIds'
     ];
@@ -41,32 +40,32 @@ exports.handler = async (event, context) => {
       };
     }
 
-    // ✅ Prepare line items for PayMongo checkout (split add-ons if any)
+    // Prepare line items for PayMongo checkout
     const lineItems = metadata.orderItems.flatMap(item => {
       const itemsArray = [];
 
-      // Base product
+      // Base product + size
       itemsArray.push({
         name: item.product,
         currency: 'PHP',
-        amount: Math.round((item.basePrice + (item.sizePrice || 0)) * 100),
-        quantity: item.qty || 1
+        amount: Math.round((Number(item.basePrice) + Number(item.sizePrice || 0)) * 100),
+        quantity: Number(item.qty || 1)
       });
 
-      // Each add-on as separate line item
+      // Add-ons
       (item.addons || []).forEach(addon => {
         itemsArray.push({
           name: `${item.product} Add-on: ${addon.name}`,
           currency: 'PHP',
           amount: Math.round(Number(addon.price) * 100),
-          quantity: item.qty || 1
+          quantity: Number(item.qty || 1)
         });
       });
 
       return itemsArray;
     });
 
-    // ✅ Add delivery fee as separate line item
+    // Delivery fee
     if (metadata.deliveryFee && Number(metadata.deliveryFee) > 0) {
       lineItems.push({
         name: "Delivery Fee",
@@ -76,13 +75,13 @@ exports.handler = async (event, context) => {
       });
     }
 
-    // ✅ Create checkout session
+    // Create checkout session
     const response = await axios.post(
       `${PAYMONGO_API}/checkout_sessions`,
       {
         data: {
           attributes: {
-            success_url: "https://thriving-blancmange-e2dc71.netlify.app/index.html",
+            success_url: "https://thriving-blancmange-e2dc71.netlify.app/menu.html",
             cancel_url: "https://thriving-blancmange-e2dc71.netlify.app/cart.html",
             send_email_receipt: false,
             description: description || `Payment for Order #${metadata.queueNumber}`,
