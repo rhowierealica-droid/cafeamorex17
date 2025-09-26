@@ -75,6 +75,8 @@ exports.handler = async (event, context) => {
 
       console.log(`✅ Payment confirmed for Order #${metadata.queueNumber}`);
 
+      const orderItems = safeParse(metadata.orderItems, []);
+
       // 💾 Save order in Firestore like COD
       await db.collection("DeliveryOrders").add({
         userId: metadata.userId,
@@ -82,24 +84,51 @@ exports.handler = async (event, context) => {
         address: metadata.address || "",
         queueNumber: metadata.queueNumber,
         orderType: "Delivery",
-        items: safeParse(metadata.orderItems, []),
+        items: orderItems,
         deliveryFee: parseFloat(metadata.deliveryFee) || 0,
         total: parseFloat(metadata.orderTotal) || 0,
         paymentMethod: "GCash",
-        status: "Pending", // ✅ same as COD
+        status: "Pending",
         createdAt: admin.firestore.FieldValue.serverTimestamp(),
         paymongoPaymentId: payment.id,
       });
 
-      // 🗑 Clear cart items if provided
+      // ----------------------------
+      // DEDUCT INVENTORY
+      // ----------------------------
+      async function deductInventory(order) {
+        const deductItem = async (id, amount) => {
+          if (!id) return;
+          const invRef = db.collection("Inventory").doc(id);
+          const invSnap = await invRef.get();
+          const invQty = invSnap.exists ? Number(invSnap.data().quantity || 0) : 0;
+          await invRef.update({ quantity: Math.max(invQty - amount, 0) });
+        };
+
+        for (const item of order) {
+          for (const ing of item.ingredients || []) await deductItem(ing.id, (ing.qty || 1) * item.qty);
+          for (const other of item.others || []) await deductItem(other.id, (other.qty || 1) * item.qty);
+          if (item.sizeId) await deductItem(item.sizeId, item.qty);
+          for (const addon of item.addons || []) await deductItem(addon.id, item.qty);
+        }
+      }
+
+      await deductInventory(orderItems);
+
+      // 🗑 Clear cart items from the user's cart
       const cartItemIds = safeParse(metadata.cartItemIds, []);
-      if (Array.isArray(cartItemIds)) {
+      if (Array.isArray(cartItemIds) && metadata.userId) {
         for (const cartItemId of cartItemIds) {
-          await db
-            .collection("Cart")
-            .doc(cartItemId)
-            .delete()
-            .catch((err) => console.error(`❌ Failed to delete cart item ${cartItemId}`, err));
+          try {
+            await db
+              .collection("users")
+              .doc(metadata.userId)
+              .collection("cart")
+              .doc(cartItemId)
+              .delete();
+          } catch (err) {
+            console.error(`❌ Failed to delete cart item ${cartItemId}`, err);
+          }
         }
       }
     }
