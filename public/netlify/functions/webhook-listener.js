@@ -57,7 +57,7 @@ exports.handler = async (event, context) => {
       console.log(`✅ Payment confirmed for Order #${metadata.queueNumber}`);
       console.log("📦 Raw order items from metadata:", metadata.orderItems);
 
-      // Parse order items and ensure product names exist
+      // Parse order items
       const rawItems = safeParse(metadata.orderItems, []);
       const orderItems = rawItems.map(item => ({
         product: item.name || item.product || "Unnamed Product",
