@@ -48,7 +48,7 @@ exports.handler = async (event, context) => {
         const webhookEvent = body.data.attributes;
 
         // Handle payment.paid
-        if (webhookEvent.type === 'payment.paid') {
+if (webhookEvent.type === 'payment.paid' || webhookEvent.type === 'checkout.session.payment.paid') {
             const payment = webhookEvent.data;
             const metadata = payment.attributes.metadata;
 
@@ -95,3 +95,4 @@ exports.handler = async (event, context) => {
         return { statusCode: 500, body: 'Error processing webhook' };
     }
 };
+
