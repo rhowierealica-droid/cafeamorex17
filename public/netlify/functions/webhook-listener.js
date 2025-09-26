@@ -27,18 +27,26 @@ exports.handler = async (event, context) => {
     }
 
     // 🔒 Verify PayMongo signature
-    const signature = event.headers["paymongo-signature"];
-    if (!signature) {
+    const sigHeader = event.headers["paymongo-signature"];
+    if (!sigHeader) {
       console.error("❌ Missing PayMongo signature header");
       return { statusCode: 400, body: "Missing signature header" };
+    }
+
+    // PayMongo format: t=timestamp,v1=signature
+    const parts = sigHeader.split(",");
+    const v1 = parts.find((p) => p.startsWith("v1="))?.replace("v1=", "");
+    if (!v1) {
+      console.error("❌ Invalid signature header format:", sigHeader);
+      return { statusCode: 400, body: "Invalid signature header format" };
     }
 
     const hmac = crypto.createHmac("sha256", webhookSecret);
     hmac.update(event.body, "utf8");
     const digest = hmac.digest("hex");
 
-    if (digest !== signature) {
-      console.error("❌ Invalid webhook signature");
+    if (digest !== v1) {
+      console.error("❌ Invalid webhook signature. Expected:", v1, "Got:", digest);
       return { statusCode: 401, body: "Invalid signature" };
     }
 
