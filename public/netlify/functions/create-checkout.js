@@ -41,13 +41,40 @@ exports.handler = async (event, context) => {
       };
     }
 
-    // ✅ Prepare line items for PayMongo checkout (one per product)
-    const lineItems = metadata.orderItems.map(item => ({
-      name: item.product,
-      currency: 'PHP',
-      amount: Math.round(item.total * 100), // in centavos
-      quantity: item.qty || 1
-    }));
+    // ✅ Prepare line items for PayMongo checkout (split add-ons if any)
+    const lineItems = metadata.orderItems.flatMap(item => {
+      const itemsArray = [];
+
+      // Base product
+      itemsArray.push({
+        name: item.product,
+        currency: 'PHP',
+        amount: Math.round((item.basePrice + (item.sizePrice || 0)) * 100),
+        quantity: item.qty || 1
+      });
+
+      // Each add-on as separate line item
+      (item.addons || []).forEach(addon => {
+        itemsArray.push({
+          name: `${item.product} Add-on: ${addon.name}`,
+          currency: 'PHP',
+          amount: Math.round(Number(addon.price) * 100),
+          quantity: item.qty || 1
+        });
+      });
+
+      return itemsArray;
+    });
+
+    // ✅ Add delivery fee as separate line item
+    if (metadata.deliveryFee && Number(metadata.deliveryFee) > 0) {
+      lineItems.push({
+        name: "Delivery Fee",
+        currency: "PHP",
+        amount: Math.round(Number(metadata.deliveryFee) * 100),
+        quantity: 1
+      });
+    }
 
     // ✅ Create checkout session
     const response = await axios.post(
@@ -61,7 +88,7 @@ exports.handler = async (event, context) => {
             description: description || `Payment for Order #${metadata.queueNumber}`,
             line_items: lineItems,
             payment_method_types: ['gcash'],
-            metadata // pass all metadata to be available in webhook listener
+            metadata // pass all metadata to webhook
           }
         }
       },
