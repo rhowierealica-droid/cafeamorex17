@@ -41,14 +41,39 @@ exports.handler = async (event, context) => {
       };
     }
 
-    // Serialize orderItems and cartItemIds for metadata
+    // Serialize orderItems and cartItemIds for metadata, including all IDs
     const serializedMetadata = {
       ...metadata,
-      orderItems: JSON.stringify(metadata.orderItems),
+      orderItems: JSON.stringify(
+        metadata.orderItems.map(item => ({
+          id: item.id || '',
+          productId: item.productId || '',
+          sizeId: item.sizeId || '',
+          qty: item.qty || 1,
+          product: item.product || 'Unnamed Product',
+          basePrice: item.basePrice || 0,
+          sizePrice: item.sizePrice || 0,
+          addons: (item.addons || []).map(a => ({
+            id: a.id || '',
+            name: a.name || 'Addon',
+            price: a.price || 0
+          })),
+          ingredients: (item.ingredients || []).map(i => ({
+            id: i.id || '',
+            name: i.name || 'Ingredient',
+            qty: i.qty || 1
+          })),
+          others: (item.others || []).map(o => ({
+            id: o.id || '',
+            name: o.name || 'Other',
+            qty: o.qty || 1
+          }))
+        }))
+      ),
       cartItemIds: JSON.stringify(metadata.cartItemIds)
     };
 
-    // Prepare line items
+    // Prepare line items for PayMongo
     const lineItems = metadata.orderItems.flatMap(item => {
       const qty = Number(item.qty || 1);
       const baseAmount = Math.round((Number(item.basePrice || 0) + Number(item.sizePrice || 0)) * 100);
@@ -66,7 +91,7 @@ exports.handler = async (event, context) => {
           name: `${item.product || "Product"} Add-on: ${addon.name || "Addon"}`,
           currency: 'PHP',
           amount: Math.round(Number(addon.price || 0) * 100),
-          quantity: qty // total add-on per product qty
+          quantity: qty
         });
       });
 
