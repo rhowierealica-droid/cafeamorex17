@@ -27,8 +27,13 @@ exports.handler = async (event, context) => {
 
     // 🔒 Verify PayMongo signature
     const signature = event.headers["paymongo-signature"];
+    if (!signature) {
+      console.error("❌ Missing PayMongo signature header");
+      return { statusCode: 400, body: "Missing signature header" };
+    }
+
     const hmac = crypto.createHmac("sha256", webhookSecret);
-    hmac.update(event.body);
+    hmac.update(event.body, "utf8");
     const digest = hmac.digest("hex");
 
     if (digest !== signature) {
@@ -56,13 +61,13 @@ exports.handler = async (event, context) => {
       // 💾 Save order in Firestore
       await db.collection("DeliveryOrders").add({
         userId: metadata.userId,
-        customerName: metadata.customerName,
-        address: metadata.address,
+        customerName: metadata.customerName || "",
+        address: metadata.address || "",
         queueNumber: metadata.queueNumber,
         orderType: "Delivery",
-        items: metadata.orderItems,
-        deliveryFee: metadata.deliveryFee,
-        total: metadata.orderTotal,
+        items: safeParse(metadata.orderItems, []),
+        deliveryFee: parseInt(metadata.deliveryFee) || 0,
+        total: parseInt(metadata.orderTotal) || 0,
         paymentMethod: "GCash",
         status: "Paid",
         createdAt: admin.firestore.FieldValue.serverTimestamp(),
@@ -70,8 +75,9 @@ exports.handler = async (event, context) => {
       });
 
       // 🗑 Clear cart items if provided
-      if (metadata.cartItemIds) {
-        for (const cartItemId of metadata.cartItemIds) {
+      const cartItemIds = safeParse(metadata.cartItemIds, []);
+      if (Array.isArray(cartItemIds)) {
+        for (const cartItemId of cartItemIds) {
           await db
             .collection("Cart")
             .doc(cartItemId)
@@ -89,3 +95,13 @@ exports.handler = async (event, context) => {
     return { statusCode: 500, body: "Webhook handler failed" };
   }
 };
+
+// ✅ Helper: safely parse JSON fields
+function safeParse(value, fallback) {
+  try {
+    if (!value) return fallback;
+    return JSON.parse(value);
+  } catch {
+    return fallback;
+  }
+}
