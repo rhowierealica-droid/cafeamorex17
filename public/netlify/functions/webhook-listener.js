@@ -33,20 +33,28 @@ exports.handler = async (event, context) => {
       return { statusCode: 400, body: "Missing signature header" };
     }
 
-    // PayMongo format: t=timestamp,v1=signature
-    const parts = sigHeader.split(",");
-    const v1 = parts.find((p) => p.startsWith("v1="))?.replace("v1=", "");
-    if (!v1) {
-      console.error("❌ Invalid signature header format:", sigHeader);
+    // Split header into key=value pairs (e.g. "t=...,te=...,li=...")
+    const sigParts = sigHeader.split(",");
+    const sigMap = {};
+    sigParts.forEach((p) => {
+      const [k, v] = p.split("=");
+      sigMap[k] = v;
+    });
+
+    // Use `te` if present, otherwise fallback to `v1`
+    const signature = sigMap.te || sigMap.v1;
+    if (!signature) {
+      console.error("❌ Could not extract signature from header:", sigHeader);
       return { statusCode: 400, body: "Invalid signature header format" };
     }
 
+    // ✅ Compute HMAC using webhook secret
     const hmac = crypto.createHmac("sha256", webhookSecret);
     hmac.update(event.body, "utf8");
     const digest = hmac.digest("hex");
 
-    if (digest !== v1) {
-      console.error("❌ Invalid webhook signature. Expected:", v1, "Got:", digest);
+    if (digest !== signature) {
+      console.error("❌ Invalid webhook signature. Expected:", signature, "Got:", digest);
       return { statusCode: 401, body: "Invalid signature" };
     }
 
