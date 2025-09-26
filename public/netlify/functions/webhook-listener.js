@@ -57,10 +57,10 @@ exports.handler = async (event, context) => {
       console.log(`✅ Payment confirmed for Order #${metadata.queueNumber}`);
       console.log("📦 Raw order items from metadata:", metadata.orderItems);
 
-      // Parse order items
+      // Safely parse order items and ensure proper structure
       const rawItems = safeParse(metadata.orderItems, []);
       const orderItems = rawItems.map(item => ({
-        product: item.name || item.product || "Unnamed Product",
+        product: item.product || item.name || "Unnamed Product",
         productId: item.productId || null,
         size: item.size || null,
         sizeId: item.sizeId || null,
@@ -90,6 +90,7 @@ exports.handler = async (event, context) => {
       const orderRef = await db.collection("DeliveryOrders").add({
         userId: metadata.userId,
         customerName: metadata.customerName || metadata.email || "Customer",
+        email: metadata.email || null, // Include email explicitly
         address: metadata.address || "",
         queueNumber: metadata.queueNumber,
         orderType: "Delivery",
