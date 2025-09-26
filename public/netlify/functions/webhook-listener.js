@@ -19,14 +19,14 @@ exports.handler = async (event, context) => {
   }
 
   try {
-    // ✅ Load secret from environment
+    // Load secret from environment
     const webhookSecret = process.env.WEBHOOK_SECRET_KEY;
     if (!webhookSecret) {
       console.error("❌ Missing WEBHOOK_SECRET_KEY in environment variables");
       return { statusCode: 500, body: "Server misconfigured" };
     }
 
-    // 🔒 Verify PayMongo signature
+    // Verify PayMongo signature
     const sigHeader = event.headers["paymongo-signature"];
     if (!sigHeader) {
       console.error("❌ Missing PayMongo signature header");
@@ -47,7 +47,6 @@ exports.handler = async (event, context) => {
       return { statusCode: 400, body: "Invalid signature header format" };
     }
 
-    // ✅ Build signed payload and compute HMAC
     const signedPayload = `${timestamp}.${event.body}`;
     const hmac = crypto.createHmac("sha256", webhookSecret);
     hmac.update(signedPayload, "utf8");
@@ -58,7 +57,7 @@ exports.handler = async (event, context) => {
       return { statusCode: 401, body: "Invalid signature" };
     }
 
-    // ✅ Parse webhook body
+    // Parse webhook body
     const body = JSON.parse(event.body);
     const eventType = body.data?.attributes?.type;
     const payment = body.data?.attributes?.data;
@@ -75,9 +74,7 @@ exports.handler = async (event, context) => {
 
       console.log(`✅ Payment confirmed for Order #${metadata.queueNumber}`);
 
-      // ----------------------------
-      // MAP ITEMS LIKE COD
-      // ----------------------------
+      // Parse order items
       const rawItems = safeParse(metadata.orderItems, []);
       const orderItems = rawItems.map(item => ({
         product: item.product || item.name,
@@ -94,8 +91,8 @@ exports.handler = async (event, context) => {
         total: Number(item.total || item.totalPrice || 0),
       }));
 
-      // 💾 Save order in Firestore
-      await db.collection("DeliveryOrders").add({
+      // Save order in Firestore
+      const orderRef = await db.collection("DeliveryOrders").add({
         userId: metadata.userId,
         customerName: metadata.customerName || metadata.email || "Customer",
         address: metadata.address || "",
@@ -110,31 +107,44 @@ exports.handler = async (event, context) => {
         paymongoPaymentId: payment.id,
       });
 
-      // ----------------------------
-      // DEDUCT INVENTORY
-      // ----------------------------
+      console.log("💾 Order saved with ID:", orderRef.id);
+
+      // Deduct inventory with logging
       async function deductInventory(order) {
-        const deductItem = async (id, amount) => {
-          if (!id) return;
+        const deductItem = async (id, amount, name = "Unknown") => {
+          if (!id) {
+            console.warn(`⚠️ Skipping inventory deduction for item without ID: ${name}`);
+            return;
+          }
           const invRef = db.collection("Inventory").doc(id);
           const invSnap = await invRef.get();
           const invQty = invSnap.exists ? Number(invSnap.data().quantity || 0) : 0;
-          await invRef.update({ quantity: Math.max(invQty - amount, 0) });
+          const newQty = Math.max(invQty - amount, 0);
+          await invRef.update({ quantity: newQty });
+          console.log(`💸 Deducted ${amount} from ${name} (ID: ${id}). New quantity: ${newQty}`);
         };
 
         for (const item of order) {
-          for (const ing of item.ingredients || []) await deductItem(ing.id, (ing.qty || 1) * item.qty);
-          for (const other of item.others || []) await deductItem(other.id, (other.qty || 1) * item.qty);
-          if (item.sizeId) await deductItem(item.sizeId, item.qty);
-          for (const addon of item.addons || []) await deductItem(addon.id, item.qty);
+          // Deduct main product
+          if (item.productId) await deductItem(item.productId, item.qty, item.product);
+
+          // Deduct size
+          if (item.sizeId) await deductItem(item.sizeId, item.qty, `Size of ${item.product}`);
+
+          // Deduct addons
+          for (const addon of item.addons || []) await deductItem(addon.id, item.qty, `Addon ${addon.name} of ${item.product}`);
+
+          // Deduct ingredients
+          for (const ing of item.ingredients || []) await deductItem(ing.id, (ing.qty || 1) * item.qty, `Ingredient ${ing.name} of ${item.product}`);
+
+          // Deduct others
+          for (const other of item.others || []) await deductItem(other.id, (other.qty || 1) * item.qty, `Other ${other.name} of ${item.product}`);
         }
       }
 
       await deductInventory(orderItems);
 
-      // ----------------------------
-      // CLEAR CART
-      // ----------------------------
+      // Clear cart
       const cartItemIds = safeParse(metadata.cartItemIds, []);
       if (Array.isArray(cartItemIds) && metadata.userId) {
         for (const cartItemId of cartItemIds) {
@@ -145,6 +155,7 @@ exports.handler = async (event, context) => {
               .collection("cart")
               .doc(cartItemId)
               .delete();
+            console.log(`🗑️ Removed cart item ${cartItemId}`);
           } catch (err) {
             console.error(`❌ Failed to delete cart item ${cartItemId}`, err);
           }
@@ -159,7 +170,7 @@ exports.handler = async (event, context) => {
   }
 };
 
-// ✅ Helper: safely parse JSON fields
+// Helper: safely parse JSON fields
 function safeParse(value, fallback) {
   try {
     if (!value) return fallback;
