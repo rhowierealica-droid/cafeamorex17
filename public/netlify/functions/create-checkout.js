@@ -58,8 +58,8 @@ exports.handler = async (event, context) => {
       {
         data: {
           attributes: {
-            success_url: "https://profound-praline-058760.netlify.app/index.html",
-            cancel_url: "https://profound-praline-058760.netlify.app/cart.html",
+            success_url: "https://thriving-blancmange-e2dc71.netlify.app/index.html",
+            cancel_url: "https://thriving-blancmange-e2dc71.netlify.app/cart.html",
             send_email_receipt: false,
             description,
             line_items: lineItems,
@@ -95,3 +95,4 @@ exports.handler = async (event, context) => {
     };
   }
 };
+
