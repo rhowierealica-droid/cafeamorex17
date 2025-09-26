@@ -51,7 +51,7 @@ exports.handler = async (event, context) => {
         const response = await axios.post(`${PAYMONGO_API}/checkout_sessions`, {
             data: {
                 attributes: {
-                    success_url: "https://profound-praline-058760.netlify.app/menu.html",
+                    success_url: "https://profound-praline-058760.netlify.app/index.html",
                     cancel_url: "https://profound-praline-058760.netlify.app/cart.html",
                     send_email_receipt: false,
                     description,
@@ -84,3 +84,4 @@ exports.handler = async (event, context) => {
         };
     }
 };
+
