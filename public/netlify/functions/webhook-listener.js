@@ -1,11 +1,14 @@
 // netlify/functions/webhook-listener.js
-require('dotenv').config();
-const admin = require('firebase-admin');
+require("dotenv").config();
+const crypto = require("crypto");
+const admin = require("firebase-admin");
 
-// Initialize Firebase Admin once
+// ✅ Initialize Firebase Admin once
 if (!admin.apps.length) {
   admin.initializeApp({
-    credential: admin.credential.cert(JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT_KEY)),
+    credential: admin.credential.cert(
+      JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT_KEY)
+    ),
   });
 }
 const db = admin.firestore();
@@ -16,9 +19,25 @@ exports.handler = async (event, context) => {
   }
 
   try {
-    const body = JSON.parse(event.body);
+    const webhookSecret = process.env.webhook_SECRET_KEY;
+    if (!webhookSecret) {
+      console.error("❌ Missing webhook_SECRET_KEY in environment variables");
+      return { statusCode: 500, body: "Server misconfigured" };
+    }
 
-    // Get event type correctly
+    // 🔒 Verify PayMongo signature
+    const signature = event.headers["paymongo-signature"];
+    const hmac = crypto.createHmac("sha256", webhookSecret);
+    hmac.update(event.body);
+    const digest = hmac.digest("hex");
+
+    if (digest !== signature) {
+      console.error("❌ Invalid webhook signature");
+      return { statusCode: 401, body: "Invalid signature" };
+    }
+
+    // ✅ Parse webhook body
+    const body = JSON.parse(event.body);
     const eventType = body.data?.attributes?.type;
     const payment = body.data?.attributes?.data;
 
@@ -34,7 +53,7 @@ exports.handler = async (event, context) => {
 
       console.log(`✅ Payment confirmed for Order #${metadata.queueNumber}`);
 
-      // Save to DeliveryOrders collection
+      // 💾 Save order in Firestore
       await db.collection("DeliveryOrders").add({
         userId: metadata.userId,
         customerName: metadata.customerName,
@@ -47,21 +66,24 @@ exports.handler = async (event, context) => {
         paymentMethod: "GCash",
         status: "Paid",
         createdAt: admin.firestore.FieldValue.serverTimestamp(),
-        paymongoPaymentId: payment.id
+        paymongoPaymentId: payment.id,
       });
 
-      // Clear cart items if provided
+      // 🗑 Clear cart items if provided
       if (metadata.cartItemIds) {
         for (const cartItemId of metadata.cartItemIds) {
-          await db.collection("Cart").doc(cartItemId).delete().catch(err => {
-            console.error(`❌ Failed to delete cart item ${cartItemId}`, err);
-          });
+          await db
+            .collection("Cart")
+            .doc(cartItemId)
+            .delete()
+            .catch((err) => {
+              console.error(`❌ Failed to delete cart item ${cartItemId}`, err);
+            });
         }
       }
     }
 
     return { statusCode: 200, body: JSON.stringify({ received: true }) };
-
   } catch (error) {
     console.error("⚠️ Webhook handler error:", error);
     return { statusCode: 500, body: "Webhook handler failed" };
