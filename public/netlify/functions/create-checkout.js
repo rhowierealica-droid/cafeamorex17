@@ -41,15 +41,13 @@ exports.handler = async (event, context) => {
       };
     }
 
-    // ✅ Prepare line items for PayMongo checkout
-    const lineItems = [
-      {
-        currency: 'PHP',
-        amount, // already in centavos
-        name: `Order #${metadata.queueNumber}`,
-        quantity: 1
-      }
-    ];
+    // ✅ Prepare line items for PayMongo checkout (one per product)
+    const lineItems = metadata.orderItems.map(item => ({
+      name: item.product,
+      currency: 'PHP',
+      amount: Math.round(item.total * 100), // in centavos
+      quantity: item.qty || 1
+    }));
 
     // ✅ Create checkout session
     const response = await axios.post(
@@ -94,4 +92,3 @@ exports.handler = async (event, context) => {
     };
   }
 };
-
