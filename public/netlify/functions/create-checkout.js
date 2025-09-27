@@ -12,7 +12,6 @@ if (!admin.apps.length) {
 }
 const db = admin.firestore();
 
-// Netlify environment variables
 const PAYMONGO_SECRET_KEY = process.env.PAYMONGO_SECRET_KEY;
 const PAYMONGO_API = 'https://api.paymongo.com/v1';
 
@@ -25,10 +24,7 @@ exports.handler = async (event, context) => {
     const { amount, metadata, description } = JSON.parse(event.body);
 
     if (!PAYMONGO_SECRET_KEY) {
-      return {
-        statusCode: 500,
-        body: JSON.stringify({ error: 'PAYMONGO_SECRET_KEY is not set.' })
-      };
+      return { statusCode: 500, body: JSON.stringify({ error: 'PAYMONGO_SECRET_KEY is not set.' }) };
     }
 
     // Validate required metadata fields
@@ -39,26 +35,7 @@ exports.handler = async (event, context) => {
     ];
     const missingFields = requiredFields.filter(f => !(metadata && metadata[f] !== undefined));
     if (!amount || amount < 1 || missingFields.length > 0) {
-      return {
-        statusCode: 400,
-        body: JSON.stringify({ error: 'Invalid order details', missingFields })
-      };
-    }
-
-    // --- CHECK EXISTING PENDING ORDER ---
-    const existingOrderQuery = await db
-      .collection("DeliveryOrders")
-      .where("userId", "==", metadata.userId)
-      .where("queueNumber", "==", metadata.queueNumber)
-      .where("status", "in", ["Pending", "Processing"])
-      .limit(1)
-      .get();
-
-    if (!existingOrderQuery.empty) {
-      return {
-        statusCode: 400,
-        body: JSON.stringify({ error: "Checkout already in progress for this order." })
-      };
+      return { statusCode: 400, body: JSON.stringify({ error: 'Invalid order details', missingFields }) };
     }
 
     // Ensure orderItems is always an array
@@ -79,10 +56,8 @@ exports.handler = async (event, context) => {
       const qty = Number(item.qty || 1);
       const baseAmount = Math.round((Number(item.basePrice || 0) + Number(item.sizePrice || 0)) * 100);
 
-      // Main product
       lineItems.push({ name: item.product || "Unnamed Product", currency: "PHP", amount: baseAmount, quantity: qty });
 
-      // Add-ons
       (item.addons || []).forEach(addon => {
         lineItems.push({
           name: `${item.product || "Product"} Add-on: ${addon.name || "Addon"}`,
@@ -93,7 +68,6 @@ exports.handler = async (event, context) => {
       });
     });
 
-    // Add delivery fee if any
     const deliveryFee = Number(metadata.deliveryFee || 0);
     if (deliveryFee > 0) {
       lineItems.push({ name: "Delivery Fee", currency: "PHP", amount: Math.round(deliveryFee * 100), quantity: 1 });
