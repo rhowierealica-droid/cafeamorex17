@@ -53,6 +53,18 @@ exports.handler = async (event, context) => {
         return { statusCode: 400, body: "Missing metadata" };
       }
 
+      // --- IDMPOTENT CHECK: skip if order already exists ---
+      const existingOrderQuery = await db
+        .collection("DeliveryOrders")
+        .where("paymongoPaymentId", "==", payment.id)
+        .limit(1)
+        .get();
+
+      if (!existingOrderQuery.empty) {
+        console.log(`⚠️ Order for payment ${payment.id} already exists. Skipping.`);
+        return { statusCode: 200, body: JSON.stringify({ received: true, skipped: true }) };
+      }
+
       console.log(`✅ Payment confirmed for Order #${metadata.queueNumber}`);
 
       // Safely parse order items
