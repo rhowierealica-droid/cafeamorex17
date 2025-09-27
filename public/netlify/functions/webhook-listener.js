@@ -100,7 +100,7 @@ exports.handler = async (event, context) => {
         })) : []
       }));
 
-      // Save order in Firestore
+      // Save order in Firestore as Pending
       const orderRef = await db.collection("DeliveryOrders").add({
         userId: metadata.userId,
         customerName: metadata.customerName || metadata.email || "Customer",
@@ -112,21 +112,12 @@ exports.handler = async (event, context) => {
         deliveryFee: parseFloat(metadata.deliveryFee) || 0,
         total: parseFloat(metadata.orderTotal) || 0,
         paymentMethod: "GCash",
-        status: "Pending",
+        status: "Pending", // inventory will be deducted later
         createdAt: admin.firestore.FieldValue.serverTimestamp(),
         paymongoPaymentId: payment.id
       });
 
       console.log("💾 Order saved with ID:", orderRef.id);
-
-      // Deduct inventory
-      for (const item of orderItems) {
-        if (item.productId) await deductInventoryItem(item.productId, item.qty, item.product);
-        if (item.sizeId) await deductInventoryItem(item.sizeId, item.qty, `Size of ${item.product}`);
-        for (const addon of item.addons) await deductInventoryItem(addon.id, item.qty, `Addon ${addon.name} of ${item.product}`);
-        for (const ing of item.ingredients) await deductInventoryItem(ing.id, (ing.qty || 1) * item.qty, `Ingredient ${ing.name} of ${item.product}`);
-        for (const other of item.others) await deductInventoryItem(other.id, (other.qty || 1) * item.qty, `Other ${other.name} of ${item.product}`);
-      }
 
       // Remove cart items
       const cartItemIds = safeParse(metadata.cartItemIds, []);
@@ -159,6 +150,7 @@ function safeParse(value, fallback) {
   }
 }
 
+// Inventory functions (for later status change)
 async function deductInventoryItem(id, qty, name = "Unknown") {
   if (!id) return;
   const invRef = db.collection("Inventory").doc(id);
@@ -167,4 +159,41 @@ async function deductInventoryItem(id, qty, name = "Unknown") {
   const newQty = Math.max(invQty - qty, 0);
   await invRef.update({ quantity: newQty });
   console.log(`💸 Deducted ${qty} from ${name} (ID: ${id}). New quantity: ${newQty}`);
+}
+
+async function restoreInventoryItem(id, qty, name = "Unknown") {
+  if (!id) return;
+  const invRef = db.collection("Inventory").doc(id);
+  const invSnap = await invRef.get();
+  const invQty = invSnap.exists ? Number(invSnap.data().quantity || 0) : 0;
+  await invRef.update({ quantity: invQty + qty });
+  console.log(`💹 Restored ${qty} to ${name} (ID: ${id}). New quantity: ${invQty + qty}`);
+}
+
+// Call this when order status changes
+async function handleInventoryOnStatusChange(orderId, newStatus, oldStatus) {
+  const orderRef = db.collection("DeliveryOrders").doc(orderId);
+  const orderSnap = await orderRef.get();
+  if (!orderSnap.exists) return;
+
+  const order = orderSnap.data();
+  const items = order.items || [];
+
+  if (newStatus === "Preparing" && oldStatus !== "Preparing") {
+    for (const item of items) {
+      if (item.productId) await deductInventoryItem(item.productId, item.qty, item.product);
+      if (item.sizeId) await deductInventoryItem(item.sizeId, item.qty, `Size of ${item.product}`);
+      for (const addon of item.addons) await deductInventoryItem(addon.id, item.qty, `Addon ${addon.name} of ${item.product}`);
+      for (const ing of item.ingredients) await deductInventoryItem(ing.id, (ing.qty || 1) * item.qty, `Ingredient ${ing.name} of ${item.product}`);
+      for (const other of item.others) await deductInventoryItem(other.id, (other.qty || 1) * item.qty, `Other ${other.name} of ${item.product}`);
+    }
+  } else if (newStatus === "Cancelled" && oldStatus === "Preparing") {
+    for (const item of items) {
+      if (item.productId) await restoreInventoryItem(item.productId, item.qty, item.product);
+      if (item.sizeId) await restoreInventoryItem(item.sizeId, item.qty, `Size of ${item.product}`);
+      for (const addon of item.addons) await restoreInventoryItem(addon.id, item.qty, `Addon ${addon.name} of ${item.product}`);
+      for (const ing of item.ingredients) await restoreInventoryItem(ing.id, (ing.qty || 1) * item.qty, `Ingredient ${ing.name} of ${item.product}`);
+      for (const other of item.others) await restoreInventoryItem(other.id, (other.qty || 1) * item.qty, `Other ${other.name} of ${item.product}`);
+    }
+  }
 }
