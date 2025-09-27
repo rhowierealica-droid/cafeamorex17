@@ -1,5 +1,3 @@
-
-
 // netlify/functions/webhook-listener.js
 require("dotenv").config();
 const crypto = require("crypto");
@@ -15,43 +13,46 @@ if (!admin.apps.length) {
 }
 const db = admin.firestore();
 
+// Optional: Deduct inventory for GCash orders
+async function deductInventory(order) {
+  const deductItem = async (id, amount) => {
+    if (!id) return;
+    const invRef = db.collection("Inventory").doc(id);
+    const invSnap = await invRef.get();
+    const invQty = invSnap.exists ? Number(invSnap.data().quantity || 0) : 0;
+    await invRef.update({ quantity: Math.max(invQty - amount, 0) });
+  };
+
+  for (const item of order) {
+    for (const ing of item.ingredients || []) await deductItem(ing.id, (ing.qty || 1) * item.qty);
+    for (const other of item.others || []) await deductItem(other.id, (other.qty || 1) * item.qty);
+    if (item.sizeId) await deductItem(item.sizeId, item.qty);
+    for (const addon of item.addons || []) await deductItem(addon.id, item.qty);
+  }
+}
+
 exports.handler = async (event, context) => {
   if (event.httpMethod !== "POST") {
     return { statusCode: 405, body: "Method Not Allowed" };
   }
 
   try {
-    // ✅ Load secret from env
     const webhookSecret = process.env.WEBHOOK_SECRET_KEY;
     if (!webhookSecret) {
-      console.error("❌ Missing WEBHOOK_SECRET_KEY in environment variables");
+      console.error("❌ Missing WEBHOOK_SECRET_KEY");
       return { statusCode: 500, body: "Server misconfigured" };
     }
 
-    // 🔒 Verify PayMongo signature
     const sigHeader = event.headers["paymongo-signature"];
-    if (!sigHeader) {
-      console.error("❌ Missing PayMongo signature header");
-      return { statusCode: 400, body: "Missing signature header" };
-    }
+    if (!sigHeader) return { statusCode: 400, body: "Missing signature header" };
 
-    // Split header into key=value pairs (e.g. "t=...,te=...,li=...")
     const sigParts = sigHeader.split(",");
     const sigMap = {};
-    sigParts.forEach((p) => {
-      const [k, v] = p.split("=");
-      sigMap[k] = v;
-    });
-
-    // Use `te` if present, otherwise fallback to `v1`
+    sigParts.forEach((p) => { const [k, v] = p.split("="); sigMap[k] = v; });
     const signature = sigMap.te || sigMap.v1;
     const timestamp = sigMap.t;
-    if (!signature || !timestamp) {
-      console.error("❌ Could not extract signature/timestamp from header:", sigHeader);
-      return { statusCode: 400, body: "Invalid signature header format" };
-    }
+    if (!signature || !timestamp) return { statusCode: 400, body: "Invalid signature header format" };
 
-    // ✅ Build signed payload: timestamp + '.' + raw body
     const signedPayload = `${timestamp}.${event.body}`;
     const hmac = crypto.createHmac("sha256", webhookSecret);
     hmac.update(signedPayload, "utf8");
@@ -59,12 +60,9 @@ exports.handler = async (event, context) => {
 
     if (digest !== signature) {
       console.error("❌ Invalid webhook signature.");
-      console.error("Expected:", signature);
-      console.error("Got:", digest);
       return { statusCode: 401, body: "Invalid signature" };
     }
 
-    // ✅ Parse webhook body
     const body = JSON.parse(event.body);
     const eventType = body.data?.attributes?.type;
     const payment = body.data?.attributes?.data;
@@ -81,34 +79,40 @@ exports.handler = async (event, context) => {
 
       console.log(`✅ Payment confirmed for Order #${metadata.queueNumber}`);
 
-      // 💾 Save order in Firestore
+      // Ensure orderItems is saved correctly
+      const orderItems = Array.isArray(metadata.orderItems)
+        ? metadata.orderItems
+        : safeParse(metadata.orderItems, []);
+
+      // Save order in Firestore
       await db.collection("DeliveryOrders").add({
         userId: metadata.userId,
         customerName: metadata.customerName || "",
         address: metadata.address || "",
         queueNumber: metadata.queueNumber,
         orderType: "Delivery",
-        items: safeParse(metadata.orderItems, []),
-        deliveryFee: parseInt(metadata.deliveryFee) || 0,
-        total: parseInt(metadata.orderTotal) || 0,
+        items: orderItems,
+        deliveryFee: Number(metadata.deliveryFee) || 0,
+        total: Number(metadata.orderTotal) || 0,
         paymentMethod: "GCash",
         status: "Paid",
         createdAt: admin.firestore.FieldValue.serverTimestamp(),
         paymongoPaymentId: payment.id,
       });
 
-      // 🗑 Clear cart items if provided
-      const cartItemIds = safeParse(metadata.cartItemIds, []);
-      if (Array.isArray(cartItemIds)) {
-        for (const cartItemId of cartItemIds) {
-          await db
-            .collection("Cart")
-            .doc(cartItemId)
-            .delete()
-            .catch((err) => {
-              console.error(`❌ Failed to delete cart item ${cartItemId}`, err);
-            });
-        }
+      // Optional: Deduct inventory
+      await deductInventory(orderItems);
+
+      // Clear user's cart
+      const cartItemIds = Array.isArray(metadata.cartItemIds) ? metadata.cartItemIds : [];
+      for (const cartItemId of cartItemIds) {
+        await db
+          .collection("users")
+          .doc(metadata.userId)
+          .collection("cart")
+          .doc(cartItemId)
+          .delete()
+          .catch((err) => console.error(`❌ Failed to delete cart item ${cartItemId}`, err));
       }
     }
 
@@ -119,7 +123,7 @@ exports.handler = async (event, context) => {
   }
 };
 
-// ✅ Helper: safely parse JSON fields
+// Helper: safely parse JSON fields
 function safeParse(value, fallback) {
   try {
     if (!value) return fallback;
@@ -128,4 +132,3 @@ function safeParse(value, fallback) {
     return fallback;
   }
 }
-
