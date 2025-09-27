@@ -1,4 +1,3 @@
-
 // netlify/functions/create-checkout.js
 require('dotenv').config();
 const axios = require('axios');
@@ -13,7 +12,7 @@ exports.handler = async (event, context) => {
   }
 
   try {
-    const { amount, metadata, description } = JSON.parse(event.body);
+    let { amount, metadata, description } = JSON.parse(event.body);
 
     if (!PAYMONGO_SECRET_KEY) {
       return {
@@ -22,6 +21,11 @@ exports.handler = async (event, context) => {
           error: 'PAYMONGO_SECRET_KEY is not set in Netlify Environment Variables.'
         })
       };
+    }
+
+    // Ensure orderItems is stringified
+    if (metadata && metadata.orderItems) {
+      metadata.orderItems = JSON.stringify(metadata.orderItems);
     }
 
     // Metadata required for webhook listener
@@ -96,6 +100,3 @@ exports.handler = async (event, context) => {
     };
   }
 };
-
-
-
