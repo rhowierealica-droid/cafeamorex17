@@ -73,7 +73,7 @@ exports.handler = async (event, context) => {
       cartItemIds: JSON.stringify(metadata.cartItemIds)
     };
 
-    // Prepare line items
+    // Prepare line items for PayMongo
     const lineItems = [];
     rawOrderItems.forEach(item => {
       const qty = Number(item.qty || 1);
@@ -99,7 +99,7 @@ exports.handler = async (event, context) => {
       lineItems.push({ name: "Delivery Fee", currency: "PHP", amount: Math.round(deliveryFee * 100), quantity: 1 });
     }
 
-    // Create checkout session
+    // Create PayMongo checkout session
     const response = await axios.post(
       `${PAYMONGO_API}/checkout_sessions`,
       {
