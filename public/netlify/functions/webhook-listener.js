@@ -10,7 +10,6 @@ if (!admin.apps.length) {
     ),
   });
 }
-
 const db = admin.firestore();
 
 exports.handler = async (event, context) => {
@@ -26,22 +25,13 @@ exports.handler = async (event, context) => {
     const sigHeader = event.headers["paymongo-signature"];
     if (!sigHeader) return { statusCode: 400, body: "Missing signature header" };
 
-    const sigParts = sigHeader.split(",");
-    const sigMap = {};
-    sigParts.forEach((p) => {
-      const [k, v] = p.split("=");
-      sigMap[k] = v;
-    });
-
+    const sigMap = Object.fromEntries(sigHeader.split(",").map(p => p.split("=")));
     const signature = sigMap.te || sigMap.v1;
     const timestamp = sigMap.t;
     if (!signature || !timestamp) return { statusCode: 400, body: "Invalid signature header" };
 
     const signedPayload = `${timestamp}.${event.body}`;
-    const hmac = crypto.createHmac("sha256", webhookSecret);
-    hmac.update(signedPayload, "utf8");
-    const digest = hmac.digest("hex");
-
+    const digest = crypto.createHmac("sha256", webhookSecret).update(signedPayload, "utf8").digest("hex");
     if (digest !== signature) return { statusCode: 401, body: "Invalid signature" };
 
     const body = JSON.parse(event.body);
@@ -52,47 +42,25 @@ exports.handler = async (event, context) => {
 
     if (eventType === "payment.paid") {
       const metadata = payment?.attributes?.metadata || {};
-      if (!metadata.userId || !metadata.queueNumber) {
-        return { statusCode: 400, body: "Missing metadata" };
+      if (!metadata.userId || !metadata.queueNumber) return { statusCode: 400, body: "Missing metadata" };
+
+      // --- Prevent duplicate processing ---
+      const existingQuery = await db
+        .collection("DeliveryOrders")
+        .where("paymongoPaymentId", "==", payment.id)
+        .limit(1)
+        .get();
+
+      if (!existingQuery.empty) {
+        console.log(`⚠️ Order already processed for payment ${payment.id}`);
+        return { statusCode: 200, body: JSON.stringify({ received: true, skipped: true }) };
       }
 
-      console.log(`✅ Payment confirmed for Order #${metadata.queueNumber}`);
+      const orderItems = safeParse(metadata.orderItems, []);
 
-      // Safely parse order items
-      const rawItems = safeParse(metadata.orderItems, []);
-      const orderItems = rawItems.map(item => ({
-        id: item.id || "",
-        product: item.product || item.name || "Unnamed Product",
-        productId: item.productId || null,
-        size: item.size || null,
-        sizeId: item.sizeId || null,
-        qty: Number(item.qty || 1),
-        basePrice: Number(item.basePrice || 0),
-        sizePrice: Number(item.sizePrice || 0),
-        addonsPrice: Number(item.addonsPrice || 0),
-        total: Number(item.total || item.totalPrice || 0),
-        name: item.name || "Unnamed Product",
-        price: Number(item.unitPrice || 0),
-        addons: Array.isArray(item.addons) ? item.addons.map(a => ({
-          id: a.id || null,
-          name: a.name || "Addon",
-          price: Number(a.price || 0)
-        })) : [],
-        ingredients: Array.isArray(item.ingredients) ? item.ingredients.map(i => ({
-          id: i.id || null,
-          name: i.name || "Ingredient",
-          qty: Number(i.qty || 1),
-          unit: i.unit || "pcs"
-        })) : [],
-        others: Array.isArray(item.others) ? item.others.map(o => ({
-          id: o.id || null,
-          name: o.name || "Other",
-          qty: Number(o.qty || 1)
-        })) : []
-      }));
-
-      // Save order in Firestore
-      const orderRef = await db.collection("DeliveryOrders").add({
+      // --- Save order like COD/GCash ---
+      const orderRef = db.collection("DeliveryOrders").doc();
+      await orderRef.set({
         userId: metadata.userId,
         customerName: metadata.customerName || metadata.email || "Customer",
         email: metadata.email || null,
@@ -110,16 +78,16 @@ exports.handler = async (event, context) => {
 
       console.log("💾 Order saved with ID:", orderRef.id);
 
-      // Deduct inventory
+      // --- Deduct inventory safely ---
       for (const item of orderItems) {
         if (item.productId) await deductInventoryItem(item.productId, item.qty, item.product);
         if (item.sizeId) await deductInventoryItem(item.sizeId, item.qty, `Size of ${item.product}`);
-        for (const addon of item.addons) await deductInventoryItem(addon.id, item.qty, `Addon ${addon.name} of ${item.product}`);
-        for (const ing of item.ingredients) await deductInventoryItem(ing.id, (ing.qty || 1) * item.qty, `Ingredient ${ing.name} of ${item.product}`);
-        for (const other of item.others) await deductInventoryItem(other.id, (other.qty || 1) * item.qty, `Other ${other.name} of ${item.product}`);
+        for (const addon of item.addons || []) await deductInventoryItem(addon.id, item.qty, `Addon ${addon.name} of ${item.product}`);
+        for (const ing of item.ingredients || []) await deductInventoryItem(ing.id, (ing.qty || 1) * item.qty, `Ingredient ${ing.name} of ${item.product}`);
+        for (const other of item.others || []) await deductInventoryItem(other.id, (other.qty || 1) * item.qty, `Other ${other.name} of ${item.product}`);
       }
 
-      // Remove cart items
+      // --- Remove purchased cart items ---
       const cartItemIds = safeParse(metadata.cartItemIds, []);
       if (Array.isArray(cartItemIds) && metadata.userId) {
         for (const cartItemId of cartItemIds) {
@@ -134,30 +102,26 @@ exports.handler = async (event, context) => {
     }
 
     return { statusCode: 200, body: JSON.stringify({ received: true }) };
+
   } catch (error) {
     console.error("⚠️ Webhook handler error:", error);
     return { statusCode: 500, body: "Webhook handler failed" };
   }
 };
 
-// ----------------------
-// Helper Functions
-// ----------------------
+// Helper to safely parse JSON
 function safeParse(value, fallback) {
-  try {
-    if (!value) return fallback;
-    return typeof value === "string" ? JSON.parse(value) : value;
-  } catch {
-    return fallback;
-  }
+  try { return typeof value === "string" ? JSON.parse(value) : value || fallback; }
+  catch { return fallback; }
 }
 
+// Deduct inventory helper
 async function deductInventoryItem(id, qty, name = "Unknown") {
   if (!id) return;
   const invRef = db.collection("Inventory").doc(id);
   const invSnap = await invRef.get();
-  const invQty = invSnap.exists ? Number(invSnap.data().quantity || 0) : 0;
-  const newQty = Math.max(invQty - qty, 0);
+  const currentQty = invSnap.exists ? Number(invSnap.data().quantity || 0) : 0;
+  const newQty = Math.max(currentQty - qty, 0);
   await invRef.update({ quantity: newQty });
   console.log(`💸 Deducted ${qty} from ${name} (ID: ${id}). New quantity: ${newQty}`);
 }
