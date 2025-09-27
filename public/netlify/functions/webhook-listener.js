@@ -53,7 +53,7 @@ exports.handler = async (event, context) => {
         return { statusCode: 400, body: "Missing metadata" };
       }
 
-      // --- ATOMIC TRANSACTION: prevent duplicate order + create ---
+      // --- fix the loopin: prevent duplicate order using transaction ---
       const orderResult = await db.runTransaction(async (tx) => {
         const existingQuery = await tx.get(
           db.collection("DeliveryOrders").where("paymongoPaymentId", "==", payment.id).limit(1)
@@ -97,7 +97,7 @@ exports.handler = async (event, context) => {
           })) : []
         }));
 
-        // Create the order document
+        // --- Order save like in COD/CASh ---
         const orderRef = db.collection("DeliveryOrders").doc();
         tx.set(orderRef, {
           userId: metadata.userId,
@@ -115,7 +115,7 @@ exports.handler = async (event, context) => {
           paymongoPaymentId: payment.id
         });
 
-        // Deduct inventory immediately for GCash
+        // --- i fix the deduction: deduct inventory immediately ---
         for (const item of orderItems) {
           if (item.productId) await deductInventoryItem(item.productId, item.qty, item.product);
           if (item.sizeId) await deductInventoryItem(item.sizeId, item.qty, `Size of ${item.product}`);
@@ -133,7 +133,7 @@ exports.handler = async (event, context) => {
 
       console.log("💾 Order saved with ID:", orderResult.orderId);
 
-      // Clean up user cart after successful order
+      // --- Remove items from cart after successful order ---
       const cartItemIds = safeParse(metadata.cartItemIds, []);
       if (Array.isArray(cartItemIds) && metadata.userId) {
         for (const cartItemId of cartItemIds) {
