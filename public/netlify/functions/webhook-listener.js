@@ -53,7 +53,7 @@ exports.handler = async (event, context) => {
         return { statusCode: 400, body: "Missing metadata" };
       }
 
-      // --- ATOMIC TRANSACTION: idempotent check + order creation ---
+      // --- ATOMIC TRANSACTION: prevent duplicate order + create ---
       const orderResult = await db.runTransaction(async (tx) => {
         const existingQuery = await tx.get(
           db.collection("DeliveryOrders").where("paymongoPaymentId", "==", payment.id).limit(1)
@@ -64,7 +64,7 @@ exports.handler = async (event, context) => {
           return { skipped: true };
         }
 
-        // Safely parse order items
+        // Parse order items safely
         const rawItems = safeParse(metadata.orderItems, []);
         const orderItems = rawItems.map(item => ({
           id: item.id || "",
@@ -97,7 +97,7 @@ exports.handler = async (event, context) => {
           })) : []
         }));
 
-        // Create order
+        // Create the order document
         const orderRef = db.collection("DeliveryOrders").doc();
         tx.set(orderRef, {
           userId: metadata.userId,
@@ -115,6 +115,15 @@ exports.handler = async (event, context) => {
           paymongoPaymentId: payment.id
         });
 
+        // Deduct inventory immediately for GCash
+        for (const item of orderItems) {
+          if (item.productId) await deductInventoryItem(item.productId, item.qty, item.product);
+          if (item.sizeId) await deductInventoryItem(item.sizeId, item.qty, `Size of ${item.product}`);
+          for (const addon of item.addons) await deductInventoryItem(addon.id, item.qty, `Addon ${addon.name} of ${item.product}`);
+          for (const ing of item.ingredients) await deductInventoryItem(ing.id, (ing.qty || 1) * item.qty, `Ingredient ${ing.name} of ${item.product}`);
+          for (const other of item.others) await deductInventoryItem(other.id, (other.qty || 1) * item.qty, `Other ${other.name} of ${item.product}`);
+        }
+
         return { skipped: false, orderId: orderRef.id };
       });
 
@@ -124,7 +133,7 @@ exports.handler = async (event, context) => {
 
       console.log("💾 Order saved with ID:", orderResult.orderId);
 
-      // Remove cart items (after transaction)
+      // Clean up user cart after successful order
       const cartItemIds = safeParse(metadata.cartItemIds, []);
       if (Array.isArray(cartItemIds) && metadata.userId) {
         for (const cartItemId of cartItemIds) {
@@ -145,7 +154,7 @@ exports.handler = async (event, context) => {
   }
 };
 
-// Helper functions
+// Helper to safely parse JSON
 function safeParse(value, fallback) {
   try {
     if (!value) return fallback;
@@ -155,7 +164,7 @@ function safeParse(value, fallback) {
   }
 }
 
-// Inventory functions (for later status change)
+// Deduct inventory
 async function deductInventoryItem(id, qty, name = "Unknown") {
   if (!id) return;
   const invRef = db.collection("Inventory").doc(id);
@@ -166,6 +175,7 @@ async function deductInventoryItem(id, qty, name = "Unknown") {
   console.log(`💸 Deducted ${qty} from ${name} (ID: ${id}). New quantity: ${newQty}`);
 }
 
+// Restore inventory if needed
 async function restoreInventoryItem(id, qty, name = "Unknown") {
   if (!id) return;
   const invRef = db.collection("Inventory").doc(id);
@@ -173,32 +183,4 @@ async function restoreInventoryItem(id, qty, name = "Unknown") {
   const invQty = invSnap.exists ? Number(invSnap.data().quantity || 0) : 0;
   await invRef.update({ quantity: invQty + qty });
   console.log(`💹 Restored ${qty} to ${name} (ID: ${id}). New quantity: ${invQty + qty}`);
-}
-
-// Call this when order status changes
-async function handleInventoryOnStatusChange(orderId, newStatus, oldStatus) {
-  const orderRef = db.collection("DeliveryOrders").doc(orderId);
-  const orderSnap = await orderRef.get();
-  if (!orderSnap.exists) return;
-
-  const order = orderSnap.data();
-  const items = order.items || [];
-
-  if (newStatus === "Preparing" && oldStatus !== "Preparing") {
-    for (const item of items) {
-      if (item.productId) await deductInventoryItem(item.productId, item.qty, item.product);
-      if (item.sizeId) await deductInventoryItem(item.sizeId, item.qty, `Size of ${item.product}`);
-      for (const addon of item.addons) await deductInventoryItem(addon.id, item.qty, `Addon ${addon.name} of ${item.product}`);
-      for (const ing of item.ingredients) await deductInventoryItem(ing.id, (ing.qty || 1) * item.qty, `Ingredient ${ing.name} of ${item.product}`);
-      for (const other of item.others) await deductInventoryItem(other.id, (other.qty || 1) * item.qty, `Other ${other.name} of ${item.product}`);
-    }
-  } else if (newStatus === "Cancelled" && oldStatus === "Preparing") {
-    for (const item of items) {
-      if (item.productId) await restoreInventoryItem(item.productId, item.qty, item.product);
-      if (item.sizeId) await restoreInventoryItem(item.sizeId, item.qty, `Size of ${item.product}`);
-      for (const addon of item.addons) await restoreInventoryItem(addon.id, item.qty, `Addon ${addon.name} of ${item.product}`);
-      for (const ing of item.ingredients) await restoreInventoryItem(ing.id, (ing.qty || 1) * item.qty, `Ingredient ${ing.name} of ${item.product}`);
-      for (const other of item.others) await restoreInventoryItem(other.id, (other.qty || 1) * item.qty, `Other ${other.name} of ${item.product}`);
-    }
-  }
 }
