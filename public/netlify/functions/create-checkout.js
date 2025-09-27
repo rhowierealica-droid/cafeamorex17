@@ -2,7 +2,7 @@
 require('dotenv').config();
 const axios = require('axios');
 
-// Netlify environment variables
+// Netlify environments variables
 const PAYMONGO_SECRET_KEY = process.env.PAYMONGO_SECRET_KEY;
 const PAYMONGO_API = 'https://api.paymongo.com/v1';
 
@@ -101,4 +101,5 @@ exports.handler = async (event, context) => {
     };
   }
 };
+
 
