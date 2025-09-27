@@ -120,7 +120,7 @@ exports.handler = async (event, context) => {
       {
         data: {
           attributes: {
-            success_url: "https://fluffy-manatee-57fe7b.netlify.app/index.html",
+            success_url: "https://fluffy-manatee-57fe7b.netlify.app/menu.html", // updated success page
             cancel_url: "https://fluffy-manatee-57fe7b.netlify.app/cart.html",
             send_email_receipt: false,
             description: description || `Payment for Order #${metadata.queueNumber}`,
