@@ -93,7 +93,7 @@ exports.handler = async (event, context) => {
         deliveryFee: Number(metadata.deliveryFee) || 0,
         total: Number(metadata.orderTotal) || 0,
         paymentMethod: "GCash",
-        status: "Pending", // ✅ now uses Pending
+        status: "Pending",
         createdAt: admin.firestore.FieldValue.serverTimestamp(),
         paymongoPaymentId: payment.id,
       });
@@ -101,8 +101,8 @@ exports.handler = async (event, context) => {
       // Deduct inventory immediately
       await deductInventory(orderItems);
 
-      // Clear user's cart
-      const cartItemIds = Array.isArray(metadata.cartItemIds) ? metadata.cartItemIds : [];
+      // Clear only purchased items from user's cart
+      const cartItemIds = safeParse(metadata.cartItemIds, []);
       for (const cartItemId of cartItemIds) {
         await db
           .collection("users")
