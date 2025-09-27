@@ -23,9 +23,10 @@ exports.handler = async (event, context) => {
       };
     }
 
-    // Ensure orderItems is stringified
-    if (metadata && metadata.orderItems) {
-      metadata.orderItems = JSON.stringify(metadata.orderItems);
+    // Ensure orderItems and cartItemIds are stringified
+    if (metadata) {
+      if (metadata.orderItems) metadata.orderItems = JSON.stringify(metadata.orderItems);
+      if (metadata.cartItemIds) metadata.cartItemIds = JSON.stringify(metadata.cartItemIds);
     }
 
     // Metadata required for webhook listener
@@ -48,11 +49,11 @@ exports.handler = async (event, context) => {
       };
     }
 
-    // ✅ amount is already in centavos, don’t multiply again
+    // Amount is already in centavos, don’t multiply again
     const lineItems = [
       {
         currency: 'PHP',
-        amount, // already in centavos
+        amount, 
         name: `Order #${metadata.queueNumber}`,
         quantity: 1
       }
