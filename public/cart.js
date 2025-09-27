@@ -452,10 +452,10 @@ const response = await fetch("/.netlify/functions/create-checkout", {
             customerName: currentUser.displayName || currentUser.email || "Customer",
             queueNumber: queueNumber,
             address: selectedAddress,
-            orderItems: orderItems,
+  orderItems: JSON.stringify(orderItems),      // ✅ stringify
             deliveryFee: userDeliveryFee,
             orderTotal: orderTotal,
-            cartItemIds: selectedItemIds, // IDs of items to delete upon successful payment webhook
+  cartItemIds: JSON.stringify(selectedItemIds) // ✅ stringify
           }
         }),
       });
@@ -486,4 +486,5 @@ async function getNextQueueNumber() {
   return !snapshot.empty ? (snapshot.docs[0].data().queueNumber || 0) + 1 : 1;
 
 }
+
 
