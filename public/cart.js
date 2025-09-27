@@ -6,7 +6,7 @@ import {
 } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 import { getAuth, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
 
-// --- NOTE: Define deliveryFees object here or import it ---
+// --- NOTE: Defines deliveryFees object here or import it ---
 const deliveryFees = {
   "Alima": 50,
   "Aniban I": 60,
@@ -503,3 +503,4 @@ finalConfirmBtn?.addEventListener("click", async () => {
     alert("Order failed. Try again.");
   }
 });
+
