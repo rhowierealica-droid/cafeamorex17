@@ -7,7 +7,6 @@ import {
 import { getAuth, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
 
 // --- NOTE: Define deliveryFees object here or import it ---
-// Example (Use your actual fee structure):
 const deliveryFees = {
   "Alima": 50,
   "Aniban I": 60,
@@ -36,7 +35,7 @@ const addressForm = document.getElementById("address-form");
 const auth = getAuth();
 let currentUser = null;
 let cartItems = [];
-let selectedCartItems = new Set(); // <-- selected items for checkboxes
+let selectedCartItems = new Set();
 let unsubscribeCart = null;
 let selectedAddress = null;
 let userDeliveryFee = 0;
@@ -115,7 +114,7 @@ function loadCartRealtime() {
   if (unsubscribeCart) unsubscribeCart();
   unsubscribeCart = onSnapshot(cartRef, snapshot => {
     cartItems = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-    selectedCartItems.clear(); // reset selection
+    selectedCartItems.clear();
 
     if (cartItemsDiv) cartItemsDiv.innerHTML = "";
     if (!cartItems.length) {
@@ -125,7 +124,6 @@ function loadCartRealtime() {
       return;
     }
 
-    // Add "Select All" checkbox
     const selectAllDiv = document.createElement("div");
     selectAllDiv.innerHTML = `<label><input type="checkbox" id="select-all-checkbox"> Select All</label>`;
     if (cartItemsDiv) cartItemsDiv.appendChild(selectAllDiv);
@@ -393,6 +391,26 @@ async function deductInventory(order) {
 }
 
 // ----------------------
+// QUEUE NUMBER
+// ----------------------
+async function getNextQueueNumber(paymentMethod = "COD") {
+  const prefix = paymentMethod === "GCash" ? "G" : "C";
+  const q = query(collection(db, "DeliveryOrders"), orderBy("queueNumberNumeric", "desc"), limit(1));
+  const snapshot = await getDocs(q);
+  let lastNumeric = 0;
+
+  if (!snapshot.empty) {
+    const lastDoc = snapshot.docs[0].data();
+    if (lastDoc.queueNumber?.startsWith(prefix)) {
+      lastNumeric = Number(lastDoc.queueNumberNumeric || 0);
+    }
+  }
+
+  const nextNumeric = lastNumeric + 1;
+  return { queueNumber: prefix + String(nextNumeric).padStart(3, "0"), numeric: nextNumeric };
+}
+
+// ----------------------
 // FINAL CONFIRM ORDER
 // ----------------------
 finalConfirmBtn?.addEventListener("click", async () => {
@@ -403,7 +421,7 @@ finalConfirmBtn?.addEventListener("click", async () => {
   const paymentMethod = document.querySelector("input[name='payment']:checked")?.value || "COD";
 
   try {
-    const queueNumber = await getNextQueueNumber();
+    const { queueNumber, numeric } = await getNextQueueNumber(paymentMethod);
     const cartRef = collection(db, "users", currentUser.uid, "cart");
     const selectedItems = cartItems.filter(item => selectedCartItems.has(item.id));
     const selectedItemIds = Array.from(selectedCartItems);
@@ -432,6 +450,7 @@ finalConfirmBtn?.addEventListener("click", async () => {
         customerName: currentUser.displayName || currentUser.email || "Customer",
         address: selectedAddress,
         queueNumber,
+        queueNumberNumeric: numeric,
         orderType: "Delivery",
         items: orderItems,
         deliveryFee: userDeliveryFee,
@@ -459,6 +478,7 @@ finalConfirmBtn?.addEventListener("click", async () => {
             userId: currentUser.uid,
             customerName: currentUser.displayName || currentUser.email || "Customer",
             queueNumber,
+            queueNumberNumeric: numeric,
             address: selectedAddress,
             orderItems,
             deliveryFee: userDeliveryFee,
@@ -483,12 +503,3 @@ finalConfirmBtn?.addEventListener("click", async () => {
     alert("Order failed. Try again.");
   }
 });
-
-// ----------------------
-// QUEUE NUMBER
-// ----------------------
-async function getNextQueueNumber() {
-  const q = query(collection(db, "DeliveryOrders"), orderBy("queueNumber", "desc"), limit(1));
-  const snapshot = await getDocs(q);
-  return !snapshot.empty ? (snapshot.docs[0].data().queueNumber || 0) + 1 : 1;
-}
