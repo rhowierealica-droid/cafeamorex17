@@ -1,4 +1,3 @@
-create-checkout
 
 // netlify/functions/create-checkout.js
 require('dotenv').config();
@@ -97,5 +96,6 @@ exports.handler = async (event, context) => {
     };
   }
 };
+
 
 
