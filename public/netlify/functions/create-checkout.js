@@ -41,11 +41,16 @@ exports.handler = async (event, context) => {
       };
     }
 
-    // Serialize orderItems and cartItemIds for metadata, including all IDs
+    // Parse orderItems in case it's stringified
+    const rawOrderItems = typeof metadata.orderItems === "string" 
+      ? JSON.parse(metadata.orderItems) 
+      : metadata.orderItems;
+
+    // Serialize orderItems and cartItemIds for metadata
     const serializedMetadata = {
       ...metadata,
       orderItems: JSON.stringify(
-        metadata.orderItems.map(item => ({
+        rawOrderItems.map(item => ({
           id: item.id || '',
           productId: item.productId || '',
           sizeId: item.sizeId || '',
@@ -74,7 +79,7 @@ exports.handler = async (event, context) => {
     };
 
     // Prepare line items for PayMongo
-    const lineItems = metadata.orderItems.flatMap(item => {
+    const lineItems = rawOrderItems.flatMap(item => {
       const qty = Number(item.qty || 1);
       const baseAmount = Math.round((Number(item.basePrice || 0) + Number(item.sizePrice || 0)) * 100);
 
@@ -115,8 +120,8 @@ exports.handler = async (event, context) => {
       {
         data: {
           attributes: {
-            success_url: "https://thriving-blancmange-e2dc71.netlify.app/index.html",
-            cancel_url: "https://thriving-blancmange-e2dc71.netlify.app/cart.html",
+            success_url: "https://fluffy-manatee-57fe7b.netlify.app/index.html",
+            cancel_url: "https://fluffy-manatee-57fe7b.netlify.app/cart.html",
             send_email_receipt: false,
             description: description || `Payment for Order #${metadata.queueNumber}`,
             line_items: lineItems,
