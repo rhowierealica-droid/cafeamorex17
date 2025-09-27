@@ -71,18 +71,16 @@ exports.handler = async (event, context) => {
 
     if (eventType === "payment.paid") {
       const metadata = payment?.attributes?.metadata || {};
+      console.log("📦 Metadata received:", metadata);
 
       if (!metadata.userId || !metadata.queueNumber) {
         console.error("❌ Missing required metadata:", metadata);
         return { statusCode: 400, body: "Missing metadata" };
       }
 
-      console.log(`✅ Payment confirmed for Order #${metadata.queueNumber}`);
-
-      // Ensure orderItems is saved correctly
-      const orderItems = Array.isArray(metadata.orderItems)
-        ? metadata.orderItems
-        : safeParse(metadata.orderItems, []);
+      // Parse orderItems safely (stringified)
+      const orderItems = safeParse(metadata.orderItems, []);
+      console.log("📦 Parsed orderItems:", orderItems);
 
       // Save order in Firestore
       await db.collection("DeliveryOrders").add({
@@ -114,6 +112,8 @@ exports.handler = async (event, context) => {
           .delete()
           .catch((err) => console.error(`❌ Failed to delete cart item ${cartItemId}`, err));
       }
+
+      console.log(`✅ Order #${metadata.queueNumber} saved successfully with ${orderItems.length} items.`);
     }
 
     return { statusCode: 200, body: JSON.stringify({ received: true }) };
@@ -127,7 +127,7 @@ exports.handler = async (event, context) => {
 function safeParse(value, fallback) {
   try {
     if (!value) return fallback;
-    return JSON.parse(value);
+    return typeof value === "string" ? JSON.parse(value) : value;
   } catch {
     return fallback;
   }
