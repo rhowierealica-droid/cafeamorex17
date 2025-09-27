@@ -13,7 +13,7 @@ if (!admin.apps.length) {
 }
 const db = admin.firestore();
 
-// Optional: Deduct inventory for GCash orders
+// Deduct inventory function
 async function deductInventory(order) {
   const deductItem = async (id, amount) => {
     if (!id) return;
@@ -82,7 +82,7 @@ exports.handler = async (event, context) => {
       const orderItems = safeParse(metadata.orderItems, []);
       console.log("📦 Parsed orderItems:", orderItems);
 
-      // Save order in Firestore
+      // Save order in Firestore as Pending
       await db.collection("DeliveryOrders").add({
         userId: metadata.userId,
         customerName: metadata.customerName || "",
@@ -93,12 +93,12 @@ exports.handler = async (event, context) => {
         deliveryFee: Number(metadata.deliveryFee) || 0,
         total: Number(metadata.orderTotal) || 0,
         paymentMethod: "GCash",
-        status: "Paid",
+        status: "Pending", // ✅ now uses Pending
         createdAt: admin.firestore.FieldValue.serverTimestamp(),
         paymongoPaymentId: payment.id,
       });
 
-      // Optional: Deduct inventory
+      // Deduct inventory immediately
       await deductInventory(orderItems);
 
       // Clear user's cart
@@ -113,7 +113,7 @@ exports.handler = async (event, context) => {
           .catch((err) => console.error(`❌ Failed to delete cart item ${cartItemId}`, err));
       }
 
-      console.log(`✅ Order #${metadata.queueNumber} saved successfully with ${orderItems.length} items.`);
+      console.log(`✅ Order #${metadata.queueNumber} saved as Pending and inventory deducted.`);
     }
 
     return { statusCode: 200, body: JSON.stringify({ received: true }) };
