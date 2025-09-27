@@ -41,12 +41,12 @@ exports.handler = async (event, context) => {
       };
     }
 
-    // Parse orderItems in case it's stringified
-    const rawOrderItems = typeof metadata.orderItems === "string" 
-      ? JSON.parse(metadata.orderItems) 
-      : metadata.orderItems;
+    // Ensure orderItems is always an array
+    const rawOrderItems = Array.isArray(metadata.orderItems)
+      ? metadata.orderItems
+      : JSON.parse(metadata.orderItems || "[]");
 
-    // Serialize orderItems and cartItemIds for metadata
+    // Serialize orderItems and cartItemIds for PayMongo metadata
     const serializedMetadata = {
       ...metadata,
       orderItems: JSON.stringify(
@@ -78,32 +78,32 @@ exports.handler = async (event, context) => {
       cartItemIds: JSON.stringify(metadata.cartItemIds)
     };
 
-    // Prepare line items for PayMongo
-    const lineItems = rawOrderItems.flatMap(item => {
+    // Prepare line items for PayMongo (no duplicates)
+    const lineItems = [];
+    rawOrderItems.forEach(item => {
       const qty = Number(item.qty || 1);
       const baseAmount = Math.round((Number(item.basePrice || 0) + Number(item.sizePrice || 0)) * 100);
 
-      const itemsArray = [{
+      // Main product
+      lineItems.push({
         name: item.product || "Unnamed Product",
-        currency: 'PHP',
+        currency: "PHP",
         amount: baseAmount,
         quantity: qty
-      }];
+      });
 
       // Add-ons
       (item.addons || []).forEach(addon => {
-        itemsArray.push({
+        lineItems.push({
           name: `${item.product || "Product"} Add-on: ${addon.name || "Addon"}`,
-          currency: 'PHP',
+          currency: "PHP",
           amount: Math.round(Number(addon.price || 0) * 100),
           quantity: qty
         });
       });
-
-      return itemsArray;
     });
 
-    // Add delivery fee
+    // Add delivery fee if any
     const deliveryFee = Number(metadata.deliveryFee || 0);
     if (deliveryFee > 0) {
       lineItems.push({
