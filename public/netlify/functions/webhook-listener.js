@@ -1,8 +1,11 @@
+webhook
+
+// netlify/functions/webhook-listener.js
 require("dotenv").config();
 const crypto = require("crypto");
 const admin = require("firebase-admin");
 
-// Initialize Firebase Admin
+// ✅ Initialize Firebase Admin once
 if (!admin.apps.length) {
   admin.initializeApp({
     credential: admin.credential.cert(
@@ -18,22 +21,50 @@ exports.handler = async (event, context) => {
   }
 
   try {
+    // ✅ Load secret from env
     const webhookSecret = process.env.WEBHOOK_SECRET_KEY;
-    if (!webhookSecret) return { statusCode: 500, body: "Server misconfigured" };
+    if (!webhookSecret) {
+      console.error("❌ Missing WEBHOOK_SECRET_KEY in environment variables");
+      return { statusCode: 500, body: "Server misconfigured" };
+    }
 
-    // Verify PayMongo signature
+    // 🔒 Verify PayMongo signature
     const sigHeader = event.headers["paymongo-signature"];
-    if (!sigHeader) return { statusCode: 400, body: "Missing signature header" };
+    if (!sigHeader) {
+      console.error("❌ Missing PayMongo signature header");
+      return { statusCode: 400, body: "Missing signature header" };
+    }
 
-    const sigMap = Object.fromEntries(sigHeader.split(",").map(p => p.split("=")));
+    // Split header into key=value pairs (e.g. "t=...,te=...,li=...")
+    const sigParts = sigHeader.split(",");
+    const sigMap = {};
+    sigParts.forEach((p) => {
+      const [k, v] = p.split("=");
+      sigMap[k] = v;
+    });
+
+    // Use `te` if present, otherwise fallback to `v1`
     const signature = sigMap.te || sigMap.v1;
     const timestamp = sigMap.t;
-    if (!signature || !timestamp) return { statusCode: 400, body: "Invalid signature header" };
+    if (!signature || !timestamp) {
+      console.error("❌ Could not extract signature/timestamp from header:", sigHeader);
+      return { statusCode: 400, body: "Invalid signature header format" };
+    }
 
+    // ✅ Build signed payload: timestamp + '.' + raw body
     const signedPayload = `${timestamp}.${event.body}`;
-    const digest = crypto.createHmac("sha256", webhookSecret).update(signedPayload, "utf8").digest("hex");
-    if (digest !== signature) return { statusCode: 401, body: "Invalid signature" };
+    const hmac = crypto.createHmac("sha256", webhookSecret);
+    hmac.update(signedPayload, "utf8");
+    const digest = hmac.digest("hex");
 
+    if (digest !== signature) {
+      console.error("❌ Invalid webhook signature.");
+      console.error("Expected:", signature);
+      console.error("Got:", digest);
+      return { statusCode: 401, body: "Invalid signature" };
+    }
+
+    // ✅ Parse webhook body
     const body = JSON.parse(event.body);
     const eventType = body.data?.attributes?.type;
     const payment = body.data?.attributes?.data;
@@ -42,86 +73,58 @@ exports.handler = async (event, context) => {
 
     if (eventType === "payment.paid") {
       const metadata = payment?.attributes?.metadata || {};
-      if (!metadata.userId || !metadata.queueNumber) return { statusCode: 400, body: "Missing metadata" };
 
-      // --- Prevent duplicate processing ---
-      const existingQuery = await db
-        .collection("DeliveryOrders")
-        .where("paymongoPaymentId", "==", payment.id)
-        .limit(1)
-        .get();
-
-      if (!existingQuery.empty) {
-        console.log(`⚠️ Order already processed for payment ${payment.id}`);
-        return { statusCode: 200, body: JSON.stringify({ received: true, skipped: true }) };
+      if (!metadata.userId || !metadata.queueNumber) {
+        console.error("❌ Missing required metadata:", metadata);
+        return { statusCode: 400, body: "Missing metadata" };
       }
 
-      const orderItems = safeParse(metadata.orderItems, []);
+      console.log(`✅ Payment confirmed for Order #${metadata.queueNumber}`);
 
-      // --- Save order like COD/GCash ---
-      const orderRef = db.collection("DeliveryOrders").doc();
-      await orderRef.set({
+      // 💾 Save order in Firestore
+      await db.collection("DeliveryOrders").add({
         userId: metadata.userId,
-        customerName: metadata.customerName || metadata.email || "Customer",
-        email: metadata.email || null,
+        customerName: metadata.customerName || "",
         address: metadata.address || "",
-        queueNumber: metadata.queueNumber.toString(),
+        queueNumber: metadata.queueNumber,
         orderType: "Delivery",
-        items: orderItems,
-        deliveryFee: parseFloat(metadata.deliveryFee) || 0,
-        total: parseFloat(metadata.orderTotal) || 0,
+        items: safeParse(metadata.orderItems, []),
+        deliveryFee: parseInt(metadata.deliveryFee) || 0,
+        total: parseInt(metadata.orderTotal) || 0,
         paymentMethod: "GCash",
-        status: "Pending",
+        status: "Paid",
         createdAt: admin.firestore.FieldValue.serverTimestamp(),
-        paymongoPaymentId: payment.id
+        paymongoPaymentId: payment.id,
       });
 
-      console.log("💾 Order saved with ID:", orderRef.id);
-
-      // --- Deduct inventory safely ---
-      for (const item of orderItems) {
-        if (item.productId) await deductInventoryItem(item.productId, item.qty, item.product);
-        if (item.sizeId) await deductInventoryItem(item.sizeId, item.qty, `Size of ${item.product}`);
-        for (const addon of item.addons || []) await deductInventoryItem(addon.id, item.qty, `Addon ${addon.name} of ${item.product}`);
-        for (const ing of item.ingredients || []) await deductInventoryItem(ing.id, (ing.qty || 1) * item.qty, `Ingredient ${ing.name} of ${item.product}`);
-        for (const other of item.others || []) await deductInventoryItem(other.id, (other.qty || 1) * item.qty, `Other ${other.name} of ${item.product}`);
-      }
-
-      // --- Remove purchased cart items ---
+      // 🗑 Clear cart items if provided
       const cartItemIds = safeParse(metadata.cartItemIds, []);
-      if (Array.isArray(cartItemIds) && metadata.userId) {
+      if (Array.isArray(cartItemIds)) {
         for (const cartItemId of cartItemIds) {
-          try {
-            await db.collection("users").doc(metadata.userId).collection("cart").doc(cartItemId).delete();
-            console.log(`🗑️ Removed cart item ${cartItemId}`);
-          } catch (err) {
-            console.error(`❌ Failed to delete cart item ${cartItemId}`, err);
-          }
+          await db
+            .collection("Cart")
+            .doc(cartItemId)
+            .delete()
+            .catch((err) => {
+              console.error(`❌ Failed to delete cart item ${cartItemId}`, err);
+            });
         }
       }
     }
 
     return { statusCode: 200, body: JSON.stringify({ received: true }) };
-
   } catch (error) {
     console.error("⚠️ Webhook handler error:", error);
     return { statusCode: 500, body: "Webhook handler failed" };
   }
 };
 
-// Helper to safely parse JSON
+// ✅ Helper: safely parse JSON fields
 function safeParse(value, fallback) {
-  try { return typeof value === "string" ? JSON.parse(value) : value || fallback; }
-  catch { return fallback; }
-}
-
-// Deduct inventory helper
-async function deductInventoryItem(id, qty, name = "Unknown") {
-  if (!id) return;
-  const invRef = db.collection("Inventory").doc(id);
-  const invSnap = await invRef.get();
-  const currentQty = invSnap.exists ? Number(invSnap.data().quantity || 0) : 0;
-  const newQty = Math.max(currentQty - qty, 0);
-  await invRef.update({ quantity: newQty });
-  console.log(`💸 Deducted ${qty} from ${name} (ID: ${id}). New quantity: ${newQty}`);
+  try {
+    if (!value) return fallback;
+    return JSON.parse(value);
+  } catch {
+    return fallback;
+  }
 }
