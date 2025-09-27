@@ -53,73 +53,78 @@ exports.handler = async (event, context) => {
         return { statusCode: 400, body: "Missing metadata" };
       }
 
-      // --- IDMPOTENT CHECK: skip if order already exists ---
-      const existingOrderQuery = await db
-        .collection("DeliveryOrders")
-        .where("paymongoPaymentId", "==", payment.id)
-        .limit(1)
-        .get();
+      // --- ATOMIC TRANSACTION: idempotent check + order creation ---
+      const orderResult = await db.runTransaction(async (tx) => {
+        const existingQuery = await tx.get(
+          db.collection("DeliveryOrders").where("paymongoPaymentId", "==", payment.id).limit(1)
+        );
 
-      if (!existingOrderQuery.empty) {
-        console.log(`⚠️ Order for payment ${payment.id} already exists. Skipping.`);
+        if (!existingQuery.empty) {
+          console.log(`⚠️ Order for payment ${payment.id} already exists. Skipping.`);
+          return { skipped: true };
+        }
+
+        // Safely parse order items
+        const rawItems = safeParse(metadata.orderItems, []);
+        const orderItems = rawItems.map(item => ({
+          id: item.id || "",
+          product: item.product || item.name || "Unnamed Product",
+          productId: item.productId || null,
+          size: item.size || null,
+          sizeId: item.sizeId || null,
+          qty: Number(item.qty || 1),
+          basePrice: Number(item.basePrice || 0),
+          sizePrice: Number(item.sizePrice || 0),
+          addonsPrice: Number(item.addonsPrice || 0),
+          total: Number(item.total || item.totalPrice || 0),
+          name: item.name || "Unnamed Product",
+          price: Number(item.unitPrice || 0),
+          addons: Array.isArray(item.addons) ? item.addons.map(a => ({
+            id: a.id || null,
+            name: a.name || "Addon",
+            price: Number(a.price || 0)
+          })) : [],
+          ingredients: Array.isArray(item.ingredients) ? item.ingredients.map(i => ({
+            id: i.id || null,
+            name: i.name || "Ingredient",
+            qty: Number(i.qty || 1),
+            unit: i.unit || "pcs"
+          })) : [],
+          others: Array.isArray(item.others) ? item.others.map(o => ({
+            id: o.id || null,
+            name: o.name || "Other",
+            qty: Number(o.qty || 1)
+          })) : []
+        }));
+
+        // Create order
+        const orderRef = db.collection("DeliveryOrders").doc();
+        tx.set(orderRef, {
+          userId: metadata.userId,
+          customerName: metadata.customerName || metadata.email || "Customer",
+          email: metadata.email || null,
+          address: metadata.address || "",
+          queueNumber: metadata.queueNumber.toString(),
+          orderType: "Delivery",
+          items: orderItems,
+          deliveryFee: parseFloat(metadata.deliveryFee) || 0,
+          total: parseFloat(metadata.orderTotal) || 0,
+          paymentMethod: "GCash",
+          status: "Pending",
+          createdAt: admin.firestore.FieldValue.serverTimestamp(),
+          paymongoPaymentId: payment.id
+        });
+
+        return { skipped: false, orderId: orderRef.id };
+      });
+
+      if (orderResult.skipped) {
         return { statusCode: 200, body: JSON.stringify({ received: true, skipped: true }) };
       }
 
-      console.log(`✅ Payment confirmed for Order #${metadata.queueNumber}`);
+      console.log("💾 Order saved with ID:", orderResult.orderId);
 
-      // Safely parse order items
-      const rawItems = safeParse(metadata.orderItems, []);
-      const orderItems = rawItems.map(item => ({
-        id: item.id || "",
-        product: item.product || item.name || "Unnamed Product",
-        productId: item.productId || null,
-        size: item.size || null,
-        sizeId: item.sizeId || null,
-        qty: Number(item.qty || 1),
-        basePrice: Number(item.basePrice || 0),
-        sizePrice: Number(item.sizePrice || 0),
-        addonsPrice: Number(item.addonsPrice || 0),
-        total: Number(item.total || item.totalPrice || 0),
-        name: item.name || "Unnamed Product",
-        price: Number(item.unitPrice || 0),
-        addons: Array.isArray(item.addons) ? item.addons.map(a => ({
-          id: a.id || null,
-          name: a.name || "Addon",
-          price: Number(a.price || 0)
-        })) : [],
-        ingredients: Array.isArray(item.ingredients) ? item.ingredients.map(i => ({
-          id: i.id || null,
-          name: i.name || "Ingredient",
-          qty: Number(i.qty || 1),
-          unit: i.unit || "pcs"
-        })) : [],
-        others: Array.isArray(item.others) ? item.others.map(o => ({
-          id: o.id || null,
-          name: o.name || "Other",
-          qty: Number(o.qty || 1)
-        })) : []
-      }));
-
-      // Save order in Firestore as Pending
-      const orderRef = await db.collection("DeliveryOrders").add({
-        userId: metadata.userId,
-        customerName: metadata.customerName || metadata.email || "Customer",
-        email: metadata.email || null,
-        address: metadata.address || "",
-        queueNumber: metadata.queueNumber.toString(),
-        orderType: "Delivery",
-        items: orderItems,
-        deliveryFee: parseFloat(metadata.deliveryFee) || 0,
-        total: parseFloat(metadata.orderTotal) || 0,
-        paymentMethod: "GCash",
-        status: "Pending", // inventory will be deducted later
-        createdAt: admin.firestore.FieldValue.serverTimestamp(),
-        paymongoPaymentId: payment.id
-      });
-
-      console.log("💾 Order saved with ID:", orderRef.id);
-
-      // Remove cart items
+      // Remove cart items (after transaction)
       const cartItemIds = safeParse(metadata.cartItemIds, []);
       if (Array.isArray(cartItemIds) && metadata.userId) {
         for (const cartItemId of cartItemIds) {
