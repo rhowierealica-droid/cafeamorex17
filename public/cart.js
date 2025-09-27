@@ -7,7 +7,6 @@ import {
 import { getAuth, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
 
 // --- NOTE: Define deliveryFees object here or import it ---
-// Example (Use your actual fee structure):
 const deliveryFees = {
     "Alima": 50,
     "Aniban I": 60,
@@ -36,7 +35,7 @@ const addressForm = document.getElementById("address-form");
 const auth = getAuth();
 let currentUser = null;
 let cartItems = [];
-let selectedCartItems = new Set(); // <-- selected items for checkboxes
+let selectedCartItems = new Set(); 
 let unsubscribeCart = null;
 let selectedAddress = null;
 let userDeliveryFee = 0;
@@ -111,7 +110,7 @@ function loadCartRealtime() {
 
   unsubscribeCart = onSnapshot(cartRef, snapshot => {
     cartItems = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-    selectedCartItems.clear(); // reset selection
+    selectedCartItems.clear();
     if (cartItemsDiv) cartItemsDiv.innerHTML = "";
 
     if (!cartItems.length) {
@@ -121,7 +120,7 @@ function loadCartRealtime() {
       return;
     }
 
-    // Add "Select All" checkbox
+    // Select All checkbox
     const selectAllDiv = document.createElement("div");
     selectAllDiv.innerHTML = `<label><input type="checkbox" id="select-all-checkbox"> Select All</label>`;
     if (cartItemsDiv) cartItemsDiv.appendChild(selectAllDiv);
@@ -133,15 +132,13 @@ function loadCartRealtime() {
         } else {
           selectedCartItems.clear();
         }
-        renderCartItems(); // re-render to sync checkboxes
+        renderCartItems();
         updateCartTotal();
         updateModalTotals();
       });
     }
 
-
     function renderCartItems() {
-      // Remove existing product divs except Select All
       if (cartItemsDiv) cartItemsDiv.querySelectorAll(".cart-item").forEach(el => el.remove());
       
       cartItems.forEach(item => {
@@ -175,7 +172,6 @@ function loadCartRealtime() {
           } else {
             selectedCartItems.delete(item.id);
           }
-          // Update Select All checkbox
           if (selectAllCheckbox) selectAllCheckbox.checked = selectedCartItems.size === cartItems.length;
           updateCartTotal();
           updateModalTotals();
@@ -269,7 +265,7 @@ function populateModalCart() {
 // ----------------------
 confirmOrderBtn?.addEventListener("click", () => {
   if (!currentUser) return alert("Please log in.");
-  if (selectedCartItems.size === 0) return alert("Select items to checkout."); // CRITICAL CHECK
+  if (selectedCartItems.size === 0) return alert("Select items to checkout."); 
   if (modal) modal.style.display = "block";
   loadSavedAddresses();
 });
@@ -286,7 +282,6 @@ async function loadSavedAddresses() {
     if (userDoc) {
       const defaultAddr = [userDoc.houseNumber, userDoc.barangay, userDoc.city, userDoc.province, userDoc.region].filter(Boolean).join(", ");
       if (defaultAddr) {
-        // Use userDoc's fee, falling back to deliveryFees object
         const fee = Number((userDoc.deliveryFee ?? deliveryFees[userDoc.barangay]) || 0);
         cartAddresses.push({ fullAddress: defaultAddr, deliveryFee: fee });
         const div = document.createElement("div");
@@ -323,7 +318,6 @@ async function loadSavedAddresses() {
       });
     }
 
-
     updateCartTotal();
     updateModalTotals();
   } catch (err) {
@@ -341,7 +335,7 @@ addressForm?.addEventListener("submit", async e => {
   const city = document.getElementById("city")?.value;
   const barangay = document.getElementById("barangay")?.value;
   const houseNumber = document.getElementById("houseNumber")?.value || "";
-  const deliveryFee = deliveryFees[barangay] || 0; // Uses the defined object
+  const deliveryFee = deliveryFees[barangay] || 0;
 
   try {
     await addDoc(collection(db, "users", currentUser.uid, "addresses"), { region, province, city, barangay, houseNumber, deliveryFee });
@@ -389,9 +383,8 @@ finalConfirmBtn?.addEventListener("click", async () => {
     const queueNumber = await getNextQueueNumber();
     const cartRef = collection(db, "users", currentUser.uid, "cart");
 
-    // Filter to include ONLY SELECTED items for the order
     const selectedItems = cartItems.filter(item => selectedCartItems.has(item.id));
-    const selectedItemIds = Array.from(selectedCartItems); // IDs to delete upon success
+    const selectedItemIds = Array.from(selectedCartItems); 
 
     const orderItems = selectedItems.map(item => ({
       product: item.name,
@@ -412,7 +405,6 @@ finalConfirmBtn?.addEventListener("click", async () => {
     const orderTotalInCentavos = Math.round(orderTotal * 100);
 
     if (paymentMethod === "COD") {
-      // --- CASH ON DELIVERY (COD) FLOW ---
       await addDoc(collection(db, "DeliveryOrders"), {
         userId: currentUser.uid,
         customerName: currentUser.displayName || currentUser.email || "Customer",
@@ -427,7 +419,6 @@ finalConfirmBtn?.addEventListener("click", async () => {
         createdAt: serverTimestamp()
       });
 
-      // Deduct inventory and clear ONLY the selected cart items
       await deductInventory(orderItems);
       for (const itemId of selectedItemIds) {
         await deleteDoc(doc(cartRef, itemId));
@@ -436,26 +427,22 @@ finalConfirmBtn?.addEventListener("click", async () => {
       alert(`Order placed! Queue #${queueNumber}. (Payment: COD)`);
       if (modal) modal.style.display = "none";
     } else if (paymentMethod === "GCash") {
-      // --- PAYMONGO GCASH FLOW ---
-      
-      // 1. Call your Node.js backend server to create the checkout session
-const response = await fetch("/.netlify/functions/create-checkout", {
+      const response = await fetch("/.netlify/functions/create-checkout", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          amount: orderTotalInCentavos, // PayMongo requires amount in centavos
+          amount: orderTotalInCentavos,
           currency: "PHP",
           description: `Order #${queueNumber} by ${currentUser.email}`,
-          // Pass crucial data to the server, which then passes it to PayMongo Metadata
           metadata: { 
             userId: currentUser.uid,
             customerName: currentUser.displayName || currentUser.email || "Customer",
             queueNumber: queueNumber,
             address: selectedAddress,
-  orderItems: JSON.stringify(orderItems),      // ✅ stringify
+            orderItems: JSON.stringify(orderItems),
             deliveryFee: userDeliveryFee,
             orderTotal: orderTotal,
-  cartItemIds: JSON.stringify(selectedItemIds) // ✅ stringify
+            cartItemIds: JSON.stringify(selectedItemIds)
           }
         }),
       });
@@ -463,11 +450,10 @@ const response = await fetch("/.netlify/functions/create-checkout", {
       const data = await response.json();
 
       if (response.ok && data?.checkout_url) {
-        // 2. Redirect the user to the PayMongo Checkout Page
         alert("Redirecting to GCash payment page...");
         window.location.href = data.checkout_url;
       } else {
-        alert(`Failed to create GCash payment: ${data.error || 'Unknown error'}. Check your server console.`);
+        alert(`Failed to create GCash payment: ${data.error || 'Unknown error'}.`);
         console.error("PayMongo Checkout Error:", data.error || data);
       }
     }
@@ -484,7 +470,4 @@ async function getNextQueueNumber() {
   const q = query(collection(db, "DeliveryOrders"), orderBy("queueNumber", "desc"), limit(1));
   const snapshot = await getDocs(q);
   return !snapshot.empty ? (snapshot.docs[0].data().queueNumber || 0) + 1 : 1;
-
 }
-
-
