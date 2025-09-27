@@ -3,7 +3,7 @@ require("dotenv").config();
 const crypto = require("crypto");
 const admin = require("firebase-admin");
 
-// ✅ Initialize Firebase Admin once
+//  Initialize Firebase Admin once
 if (!admin.apps.length) {
   admin.initializeApp({
     credential: admin.credential.cert(
@@ -132,3 +132,4 @@ function safeParse(value, fallback) {
     return fallback;
   }
 }
+
