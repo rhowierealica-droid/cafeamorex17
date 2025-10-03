@@ -44,11 +44,10 @@ tabs.forEach(tab => {
 });
 
 // ==========================
-// Order Tracking & Feedback
+// Order Tracking & Action Buttons
 // ==========================
 function listenOrders() {
   if (!currentUser) return;
-
   if (unsubscribeOrders) unsubscribeOrders();
 
   unsubscribeOrders = onSnapshot(collection(db, "DeliveryOrders"), snapshot => {
@@ -86,8 +85,10 @@ function listenOrders() {
       orderHeader.className = "order-header";
 
       const orderTitle = document.createElement("h3");
-      orderTitle.textContent = `Order #${order.queueNumber} - Status: ${order.status}`;
-      if (order.estimatedTime) orderTitle.textContent += ` | ETA: ${order.estimatedTime}`;
+      let titleText = `Order #${order.queueNumber} - Status: ${order.status}`;
+      if (order.estimatedTime) titleText += ` | ETA: ${order.estimatedTime}`;
+      if (order.refundRequest) titleText += ` | Refund: ${order.refundStatus || "Requested"}`;
+      orderTitle.textContent = titleText;
 
       orderHeader.appendChild(orderTitle);
       orderContainer.appendChild(orderHeader);
@@ -97,13 +98,11 @@ function listenOrders() {
 
       order.items?.forEach(p => {
         if (!p) return;
-
         const qty = p.qty || p.quantity || 1;
         const productName = p.product || p.name || "Unknown Product";
         const addonsText = (p.addons && p.addons.length > 0)
           ? p.addons.map(a => `${a.name}: ₱${a.price}`).join(", ")
           : "No add-ons";
-
         const productPrice = ((p.sizePrice || 0) + (p.addonsPrice || 0)) * qty;
 
         const div = document.createElement("div");
@@ -128,14 +127,65 @@ function listenOrders() {
       totalDiv.innerHTML = `<h4>Total Price: ₱${orderTotal}</h4>`;
       itemsContainer.appendChild(totalDiv);
 
-      if (order.status === "Completed" && !order.feedback && currentTab === "To Receive") {
-        const btn = document.createElement("button");
-        btn.textContent = "Received Order";
-        btn.className = "action-btn";
-        btn.onclick = () => showConfirmModal(order.id);
-        itemsContainer.appendChild(btn);
+      const paymentMethod = order.paymentMethod?.toLowerCase() || "";
+
+      // ==========================
+      // Pending Tab Refund / Cancel
+      // ==========================
+      if (currentTab === "Pending") {
+        if (paymentMethod === "gcash") {
+          const btn = document.createElement("button");
+          if (order.refundRequest) {
+            btn.textContent = "Refund Requested";
+            btn.disabled = true;
+            btn.style.backgroundColor = "#ccc";
+            btn.style.cursor = "not-allowed";
+          } else {
+            btn.textContent = "Request Refund";
+            btn.onclick = () => handleRefundRequest(order.id);
+          }
+          btn.className = "action-btn";
+          itemsContainer.appendChild(btn);
+        } else if (paymentMethod === "COD") {
+          const btn = document.createElement("button");
+          btn.textContent = "Cancel";
+          btn.className = "action-btn";
+          btn.onclick = () => handleCancelOrder(order.id);
+          itemsContainer.appendChild(btn);
+        }
       }
 
+      // ==========================
+      // To Receive Tab Refund + Received
+      // ==========================
+      if (currentTab === "To Receive") {
+        if (paymentMethod === "gcash") {
+          const refundBtn = document.createElement("button");
+          if (order.refundRequest) {
+            refundBtn.textContent = `Refund: ${order.refundStatus || "Requested"}`;
+            refundBtn.disabled = true;
+            refundBtn.style.backgroundColor = "#ccc";
+            refundBtn.style.cursor = "not-allowed";
+          } else {
+            refundBtn.textContent = "Request Refund";
+            refundBtn.onclick = () => handleRefundRequest(order.id);
+          }
+          refundBtn.className = "action-btn";
+          itemsContainer.appendChild(refundBtn);
+        }
+
+        if (order.status === "Completed" && !order.feedback) {
+          const receivedBtn = document.createElement("button");
+          receivedBtn.textContent = "Received Order";
+          receivedBtn.className = "action-btn";
+          receivedBtn.onclick = () => showConfirmModal(order.id);
+          itemsContainer.appendChild(receivedBtn);
+        }
+      }
+
+      // ==========================
+      // To Rate Tab Feedback
+      // ==========================
       if (order.status === "Completed by Customer" && !order.feedback && currentTab === "To Rate") {
         const btn = document.createElement("button");
         btn.textContent = "To Rate";
@@ -148,6 +198,19 @@ function listenOrders() {
       orderItemsDiv.appendChild(orderContainer);
     });
   });
+}
+
+// ==========================
+// Refund & Cancel Handlers
+// ==========================
+async function handleRefundRequest(orderId) {
+  await updateDoc(doc(db, "DeliveryOrders", orderId), { refundRequest: true, refundStatus: "Requested" });
+  alert("Refund request submitted. Waiting for admin approval.");
+}
+
+async function handleCancelOrder(orderId) {
+  await updateDoc(doc(db, "DeliveryOrders", orderId), { status: "Canceled" });
+  alert("Order canceled successfully.");
 }
 
 // ==========================
@@ -250,9 +313,6 @@ function openFeedbackModal(orderId, items) {
     });
   });
 
-  // ==========================
-  // Submit feedback with star values
-  // ==========================
   form.onsubmit = async (e) => {
     e.preventDefault();
     const feedbacks = [];
@@ -262,7 +322,6 @@ function openFeedbackModal(orderId, items) {
       const text = itemDiv.querySelector("textarea").value;
       feedbacks.push(text);
 
-      // Correctly get star value for each product
       const stars = itemDiv.querySelectorAll(".star");
       let starValue = 0;
       stars.forEach((s, i) => {
