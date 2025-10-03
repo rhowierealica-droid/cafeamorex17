@@ -1,0 +1,56 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Café Amore - Rider Orders</title>
+  <link rel="stylesheet" href="driver.css">
+    <link rel="stylesheet" href="admin-nav.css">
+
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/js/all.min.js"></script>
+</head>
+<body>
+  
+    <!-- Sidebar -->
+    <aside class="sidebar" id="sidebar">
+      <div class="logo">
+        <img src="logo.png" alt="Café Amore Logo">
+        <span class="brand">Café Amore</span>
+      </div>
+
+      
+
+      <div class="profile-card">
+        <div class="profile-avatar"><i class="fas fa-user-circle"></i></div>
+        <div class="profile-info">
+          <p class="profile-name">Admin</p>
+          <p class="edit-text">Edit Profile</p>
+        </div>
+      </div>
+
+      <div class="logout"><i class="fas fa-sign-out-alt"></i> Log Out</div>
+    </aside>
+
+    <!-- Hamburger -->
+    <div class="hamburger" id="hamburger"><i class="fas fa-bars"></i></div>
+
+  <main class="main-content">
+    <header>
+      <h1>My Deliveries</h1>
+      
+    </header>
+
+    <!-- Tabs -->
+    <div class="tabs">
+      <button class="tab-btn active" data-status="Delivery">Delivery</button>
+      <button class="tab-btn" data-status="Completed">Completed</button>
+    </div>
+
+    <section class="orders-container" id="ordersContainer">
+      <p>Loading orders...</p>
+    </section>
+  </main>
+
+  <script type="module" src="driver.js"></script>
+</body>
+</html>

@@ -1,0 +1,136 @@
+body {
+  font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+  background: #fdf6f0;
+  color: #4b3621;
+  margin: 0;
+  padding: 0;
+}
+
+.main-content {
+  margin-left: 240px;
+  padding: 30px;
+}
+
+.main-content h1 {
+  color: #6f4e37;
+  text-align: center;
+  margin-bottom: 15px;
+}
+
+/* Tabs */
+.tabs {
+  display: flex;
+  justify-content: center;
+  margin-bottom: 20px;
+}
+
+.tab-btn {
+  padding: 8px 18px;
+  margin: 0 5px;
+  border-radius: 12px;
+  border: none;
+  cursor: pointer;
+  background-color: #d0c4b6;
+  color: #4b3621;
+  font-weight: bold;
+  transition: 0.2s;
+}
+
+.tab-btn.active,
+.tab-btn:hover {
+  background-color: #6f4e37;
+  color: white;
+}
+
+/* Orders container */
+.orders-container {
+  display: flex;
+  flex-direction: column;
+  gap: 15px;
+  max-width: 700px;
+  margin: 0 auto;
+}
+
+/* Order Card */
+.order-card {
+  background: #fffaf0;
+  border-radius: 12px;
+  box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+  padding: 15px;
+  cursor: pointer;
+  transition: all 0.3s ease;
+}
+
+.order-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 10px;
+}
+
+.order-header p {
+  margin: 5px 0;
+  font-weight: bold;
+}
+
+.header-info {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+/* Fix phone number color */
+.header-info a {
+  color: #4b3621;       /* Matches text color */
+  text-decoration: none; /* Remove underline */
+}
+
+.header-info a:hover {
+  text-decoration: underline; /* Optional hover effect */
+  color: #6f4e37;            /* Optional hover color */
+}
+
+.expand-arrow {
+  font-size: 20px;
+  transition: transform 0.3s ease;
+}
+
+.order-card.expanded .expand-arrow {
+  transform: rotate(90deg);
+}
+
+.order-products {
+  padding-left: 10px;
+  border-left: 2px solid #6f4e37;
+  max-height: 0;
+  overflow: hidden;
+  transition: max-height 0.3s ease;
+}
+
+.order-card.expanded .order-products {
+  max-height: 1000px;
+}
+
+.call-btn,
+.complete-btn {
+  background-color: #6f4e37;
+  color: white;
+  border: none;
+  padding: 8px 12px;
+  border-radius: 5px;
+  cursor: pointer;
+  margin-top: 10px;
+  width: fit-content;
+}
+
+.complete-btn {
+  background-color: #6f4e37;
+}
+
+.call-btn:hover {
+  background-color: #4b3621;
+}
+
+.complete-btn:hover {
+  background-color: #6f4e37;
+}
