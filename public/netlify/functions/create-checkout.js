@@ -1,103 +1,103 @@
-// create-checkout.js (Local Express Route Handler)
-
+// netlify/functions/create-checkout.js
+require('dotenv').config();
 const axios = require('axios');
-const path = require('path');
 
-// This function will be called by the main server file (e.g., server.cjs)
-module.exports = (app, PAYMONGO_SECRET_KEY, PAYMONGO_API) => {
+// Netlify environments variables
+const PAYMONGO_SECRET_KEY = process.env.PAYMONGO_SECRET_KEY;
+const PAYMONGO_API = 'https://api.paymongo.com/v1';
 
-    // ---------------------
-    // 4. Create Checkout Session
-    // ---------------------
-    app.post("/create-checkout", async (req, res) => {
-        const { amount, description, metadata } = req.body;
+exports.handler = async (event, context) => {
+  if (event.httpMethod !== "POST") {
+    return { statusCode: 405, body: "Method Not Allowed" };
+  }
 
-        if (!PAYMONGO_SECRET_KEY)
-            return res.status(500).json({ error: "PAYMONGO_SECRET_KEY not set" });
+  try {
+    let { amount, metadata, description } = JSON.parse(event.body);
 
-        // NOTE: Adjusted check to look for metadata.orderItems existence
-        if (!amount || amount < 100 || !metadata?.userId || !metadata?.queueNumber || !metadata?.orderItems)
-            return res.status(400).json({ error: "Invalid order details or missing orderItems" });
+    if (!PAYMONGO_SECRET_KEY) {
+      return {
+        statusCode: 500,
+        body: JSON.stringify({
+          error: 'PAYMONGO_SECRET_KEY is not set in Netlify Environment Variables.'
+        })
+      };
+    }
 
-        const lineItems = metadata.orderItems.flatMap(item => {
-            const qty = Number(item.qty || 1);
-            const baseAmount = Math.round(
-                (Number(item.basePrice || 0) + Number(item.sizePrice || 0)) * 100
-            );
+    // Ensure orderItems and cartItemIds are stringified
+    if (metadata) {
+      if (metadata.orderItems) metadata.orderItems = JSON.stringify(metadata.orderItems);
+      if (metadata.cartItemIds) metadata.cartItemIds = JSON.stringify(metadata.cartItemIds);
+    }
 
-            const itemsArray = [
-                {
-                    name: item.product || "Unnamed Product",
-                    currency: "PHP",
-                    amount: baseAmount,
-                    quantity: qty,
-                },
-            ];
+    // Metadata required for webhook listener
+    const requiredFields = [
+      'userId', 'queueNumber', 'customerName',
+      'address', 'orderItems', 'deliveryFee',
+      'orderTotal', 'cartItemIds'
+    ];
+    const missingFields = requiredFields.filter(
+      f => !(metadata && metadata[f] !== undefined)
+    );
 
-            (item.addons || []).forEach(addon => {
-                itemsArray.push({
-                    name: `${item.product || "Product"} Add-on: ${addon.name || "Addon"}`,
-                    currency: "PHP",
-                    amount: Math.round(Number(addon.price || 0) * 100),
-                    quantity: qty,
-                });
-            });
+    if (!amount || amount < 1 || missingFields.length > 0) {
+      return {
+        statusCode: 400,
+        body: JSON.stringify({
+          error: 'Invalid order details or metadata missing.',
+          missingFields
+        })
+      };
+    }
 
-            return itemsArray;
-        });
+    // Amount is already in centavos, don’t multiply again
+    const lineItems = [
+      {
+        currency: 'PHP',
+        amount, 
+        name: `Order #${metadata.queueNumber}`,
+        quantity: 1
+      }
+    ];
 
-        const deliveryFee = Number(metadata.deliveryFee || 0);
-        if (deliveryFee > 0) {
-            lineItems.push({
-                name: "Delivery Fee",
-                currency: "PHP",
-                amount: Math.round(deliveryFee * 100),
-                quantity: 1,
-            });
+    const response = await axios.post(
+      `${PAYMONGO_API}/checkout_sessions`,
+      {
+        data: {
+          attributes: {
+            success_url: "https://grand-madeleine-e2fe55.netlify.app/customer-status.html",
+            cancel_url: "https://grand-madeleine-e2fe55.netlify.app/cart.htmll",
+            send_email_receipt: false,
+            description,
+            line_items: lineItems,
+            payment_method_types: ['gcash'],
+            metadata
+          }
         }
-
-        try {
-            const response = await axios.post(
-                `${PAYMONGO_API}/checkout_sessions`,
-                {
-                    data: {
-                        attributes: {
-                            // These are local success/cancel URLs, update if necessary
-                            success_url: "http://192.168.1.5:5500/CafeAmoreSite/public/index.html",
-                            cancel_url: "http://192.168.1.5:5500/CafeAmoreSite/public/cart.html",
-                            send_email_receipt: false,
-                            description: description || `Payment for Order #${metadata.queueNumber}`,
-                            line_items: lineItems,
-                            payment_method_types: ["gcash"],
-                            metadata: {
-                                ...metadata,
-                                // IMPORTANT: Stringify complex objects for PayMongo metadata
-                                orderItems: JSON.stringify(metadata.orderItems),
-                                cartItemIds: JSON.stringify(metadata.cartItemIds),
-                            },
-                        },
-                    },
-                },
-                {
-                    headers: {
-                        Authorization: `Basic ${Buffer.from(PAYMONGO_SECRET_KEY + ":").toString("base64")}`,
-                        "Content-Type": "application/json",
-                        Accept: "application/json",
-                    },
-                }
-            );
-
-            res.json({ checkout_url: response.data.data.attributes.checkout_url });
-        } catch (error) {
-            console.error(
-                "❌ PayMongo Checkout Error:",
-                error.response?.data || error.message
-            );
-            res.status(500).json({
-                error: "Failed to create checkout session",
-                details: error.response?.data || error.message,
-            });
+      },
+      {
+        headers: {
+          'Authorization': `Basic ${Buffer.from(PAYMONGO_SECRET_KEY + ':').toString('base64')}`,
+          'Content-Type': 'application/json',
+          'Accept': 'application/json'
         }
-    });
+      }
+    );
 
+    return {
+      statusCode: 200,
+      body: JSON.stringify({
+        checkout_url: response.data.data.attributes.checkout_url
+      })
+    };
+
+  } catch (error) {
+    console.error('PayMongo Checkout Error:', error.response?.data || error.message);
+    return {
+      statusCode: 500,
+      body: JSON.stringify({
+        error: 'Failed to create PayMongo checkout session.',
+        details: error.response?.data || error.message
+      })
+    };
+  }
 };
