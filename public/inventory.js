@@ -1,10 +1,15 @@
 import { db } from './firebase-config.js';
-import { collection, addDoc, onSnapshot, updateDoc, doc, deleteDoc } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+import { 
+  collection, addDoc, onSnapshot, updateDoc, doc, deleteDoc,
+  writeBatch, getDoc 
+} from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+import { getAuth, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
 
 let currentCategory = "";
 let editingItemId = null;
 
 // --- DOM Elements ---
+const auth = getAuth();
 const popupForm = document.getElementById("popupForm");
 const popupTitle = document.getElementById("popupTitle");
 const itemNameInput = document.getElementById("itemName");
@@ -15,6 +20,15 @@ const messagePopup = document.getElementById("messagePopup");
 const messageTitle = document.getElementById("messageTitle");
 const messageText = document.getElementById("messageText");
 const messageActions = document.getElementById("messageActions");
+
+// Redirect if not logged in
+onAuthStateChanged(auth, async (user) => {
+  if (!user) {
+    window.location.replace("login.html"); 
+    return;
+  }
+  await init();
+});
 
 const tables = {
   "Ingredients": document.querySelector("#ingredientsTable tbody"),
@@ -139,6 +153,7 @@ onSnapshot(collection(db,"Inventory"), snapshot => {
       <td style="font-weight:bold;color:${color}">${status}</td>
       <td>
         <button class="editBtn">Edit</button>
+        <button class="updateBtn">Add Stock</button>
         <button class="deleteBtn">Delete</button>
         <button class="toggleBtn">${item.active?"Disable":"Enable"}</button>
       </td>
@@ -161,6 +176,46 @@ onSnapshot(collection(db,"Inventory"), snapshot => {
       });
       popupForm.style.display = "flex";
     });
+
+    // --- Add Stock (Popup Version) ---
+tr.querySelector(".updateBtn").addEventListener("click", () => {
+  const addStockPopup = document.createElement("div");
+  addStockPopup.classList.add("popup");
+  addStockPopup.style.display = "flex";
+
+  addStockPopup.innerHTML = `
+    <div class="popup-content">
+      <h3 style="color:#6f4e37;">Add Stock for ${item.name}</h3>
+      <input type="number" id="addQtyInput" min="1" placeholder="Enter quantity to add" style="margin:10px 0; padding:6px;">
+      <div class="popup-actions">
+        <button id="confirmAddStock">Add</button>
+        <button id="cancelAddStock">Cancel</button>
+      </div>
+    </div>
+  `;
+
+  document.body.appendChild(addStockPopup);
+
+  // Confirm
+  document.getElementById("confirmAddStock").addEventListener("click", async () => {
+    const addQtyInput = document.getElementById("addQtyInput");
+    const addQty = parseFloat(addQtyInput.value);
+    if (!isNaN(addQty) && addQty > 0) {
+      const newQuantity = Number(item.quantity) + addQty;
+      await updateDoc(doc(db, "Inventory", docSnap.id), { quantity: newQuantity });
+      document.body.removeChild(addStockPopup);
+      console.log(`✅ Added ${addQty} to ${item.name}.`);
+    } else {
+      alert("Please enter a valid quantity!");
+    }
+  });
+
+  // Cancel
+  document.getElementById("cancelAddStock").addEventListener("click", () => {
+    document.body.removeChild(addStockPopup);
+  });
+});
+
 
     // --- Delete item ---
     tr.querySelector(".deleteBtn").addEventListener("click", () => {
@@ -187,3 +242,32 @@ onSnapshot(collection(db,"Inventory"), snapshot => {
     tbody.appendChild(tr);
   });
 });
+
+// =====================================================
+// 🔄 AUTOMATIC INVENTORY DEDUCTION FOR ORDERS (No Outgoing)
+// =====================================================
+export async function deductInventoryForOrder(orderItems) {
+  if (!orderItems || !Array.isArray(orderItems)) return;
+  const batch = writeBatch(db);
+
+  for (const item of orderItems) {
+    const productId = item.productId || item.id;
+    const qtyOrdered = Number(item.quantity) || 0;
+    if (!productId || qtyOrdered <= 0) continue;
+
+    const invRef = doc(db, "Inventory", productId);
+    const invSnap = await getDoc(invRef);
+    if (!invSnap.exists()) continue;
+
+    const invData = invSnap.data();
+    const currentQty = Number(invData.quantity) || 0;
+
+    // Prevent negative stock
+    const newQty = Math.max(0, currentQty - qtyOrdered);
+
+    batch.update(invRef, { quantity: newQty });
+  }
+
+  await batch.commit();
+  console.log("✅ Inventory automatically deducted for order (no outgoing).");
+}
