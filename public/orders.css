@@ -1,5 +1,5 @@
 /* ==========================
-Reset
+   Reset
 ========================== */
 * {
   box-sizing: border-box;
@@ -9,7 +9,7 @@ Reset
 }
 
 /* ==========================
-Body
+   Body
 ========================== */
 body {
   min-height: 100vh;
@@ -21,7 +21,7 @@ body {
 }
 
 /* ==========================
-Main Content
+   Main Content
 ========================== */
 .main-content {
   flex: 1;
@@ -37,7 +37,7 @@ h2 {
 }
 
 /* ==========================
-Container
+   Container
 ========================== */
 .container {
   display: flex;
@@ -47,7 +47,7 @@ Container
 }
 
 /* ==========================
-Product List
+   Product List
 ========================== */
 .product-list {
   flex: 2;
@@ -60,47 +60,39 @@ Product List
   background: #fff5f0;
   border-radius: 15px;
   padding: 15px;
-  display: flex;               /* add this */
-  flex-direction: column;      /* stack name, price, etc. vertically */
-  justify-content: center;     /* vertical center */
-  align-items: center;         /* horizontal center */
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
   text-align: center;
   cursor: pointer;
   box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
-  transition: transform 0.2s, box-shadow 0.2s;
-  min-height: 100px; 
-  position: relative;          /* needed for the "Unavailable" badge */
+  transition: transform 0.2s, box-shadow 0.2s, opacity 0.3s;
+  min-height: 100px;
+  position: relative;
 }
-
 
 .product-box:hover {
   transform: translateY(-3px);
   box-shadow: 0 8px 12px rgba(0, 0, 0, 0.15);
 }
 
+/* 🛑 UPDATED: Style for out-of-stock products */
 .product-box.disabled {
   opacity: 0.6;
+  background-color: #fceaea; /* Lighter red tint */
   cursor: not-allowed;
-  position: relative;
-}
-
-/* Badge instead of covering text */
-.product-box.disabled::after {
-  content: "Unavailable";
-  position: absolute;
-  bottom: 8px;   /* was -10px */
-  right: 8px;
-  background: rgba(255, 0, 0, 0.85);
-  color: white;
-  padding: 3px 8px;
-  border-radius: 6px;
-  font-size: 12px;
-  font-weight: bold;
+  box-shadow: none;
+  transform: none;
   pointer-events: none;
 }
 
+/* NOTE: The logic for low/out-of-stock colors is now handled by inline styles in the JS.
+   We remove the old static .out-of-stock-badge CSS here, as the JS renders dynamic stock info.
+*/
+
 /* ==========================
-Order Receipt
+   Order Receipt
 ========================== */
 .order-receipt {
   flex: 1;
@@ -158,7 +150,7 @@ Order Receipt
 }
 
 /* ==========================
-Popup Styling (Form)
+   Popup Styling (Form)
 ========================== */
 .popup {
   display: none;
@@ -200,6 +192,12 @@ Popup Styling (Form)
   background-color: #50382b;
 }
 
+/* Disabled button state */
+.popup-content button:disabled {
+  background-color: #a0a0a0;
+  cursor: not-allowed;
+}
+
 input[type="number"] {
   width: 60px;
   padding: 5px;
@@ -227,50 +225,44 @@ input[type="number"] {
 }
 
 /* ==========================
-Popup Message (Success/Error)
+   Popup Message (Toast)
 ========================== */
-#messagePopup {
+/* 🛑 UPDATED: Smoother animation and cleaner placement */
+.message-popup {
   position: fixed;
-  top: 20px;
+  top: -50px;
   left: 50%;
-  transform: translateX(-50%) translateY(-20px);
-  background: #4caf50; /* default = success green */
-  color: #fff;
+  transform: translateX(-50%);
   padding: 12px 20px;
+  color: #fff;
   border-radius: 8px;
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
-  display: none;
   z-index: 9999;
   font-weight: bold;
   opacity: 0;
-  transition: opacity 0.4s ease, transform 0.4s ease;
-  min-width: 200px;
+  transition: top 0.4s ease-out, opacity 0.4s ease-out;
+  min-width: 250px;
   text-align: center;
 }
 
 /* Show state */
-#messagePopup.show {
-  display: block;
+.message-popup.show {
+  top: 20px;
   opacity: 1;
-  transform: translateX(-50%) translateY(0);
 }
 
-/* Success & Error variations */
-#messagePopup.success {
-  background: #4caf50; /* Green */
-}
-
-#messagePopup.error {
-  background: #e53935; /* Red */
-}
+/* NOTE: Background colors for success/error are set dynamically by the JS for simplicity,
+   but you can define default ones here if you prefer:
+.message-popup { background: #4caf50; } 
+*/
 
 /* ==========================
-Responsive
+   Responsive
 ========================== */
 @media screen and (max-width: 900px) {
   .main-content {
     padding: 15px;
-    margin-left: 0; /* ✅ remove sidebar space on small screens */
+    margin-left: 0;
   }
 
   .container {
