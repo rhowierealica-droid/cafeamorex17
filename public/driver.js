@@ -52,9 +52,9 @@ function renderOrders() {
             <div class="order-header">
                 <div class="header-info">
                     <p>Queue #: ${order.queueNumber || 'N/A'}</p>
-                    <p>Customer: ${order.customerName || 'N/A'}</p>
+                    <p>Customer: ${order.firstName && order.lastName ? order.firstName + " " + order.lastName : order.customerName || 'N/A'}</p>
                     <p>Address: ${order.address || 'N/A'}</p>
-                    <p>Phone: <a href="tel:${order.customerPhone || ''}">${order.customerPhone || 'N/A'}</a></p>
+                    <p>Phone: <a href="tel:${order.phoneNumber || order.customerPhone || ''}">${order.phoneNumber || order.customerPhone || 'N/A'}</a></p>
                     <p>Payment: ${order.paymentMethod || 'N/A'}</p>
                 </div>
                 <span class="expand-arrow">&#9654;</span>
@@ -64,7 +64,7 @@ function renderOrders() {
             </div>
             <div class="order-actions">
                 ${order.status === "Delivery" ? `<button class="complete-btn" onclick="markCompleted('${order.id}')">Mark Completed</button>` : ''}
-                ${order.customerPhone ? `<button class="call-btn" onclick="window.location.href='tel:${order.customerPhone}'">Call Customer</button>` : ''}
+                ${(order.phoneNumber || order.customerPhone) ? `<button class="call-btn" onclick="window.location.href='tel:${order.phoneNumber || order.customerPhone}'">Call Customer</button>` : ''}
             </div>
         `;
 
