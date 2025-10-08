@@ -2,14 +2,14 @@
 // Imports
 // ==========================
 import { db } from './firebase-config.js';
-import { collection, onSnapshot, doc, updateDoc, arrayUnion } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+import { collection, onSnapshot, doc, updateDoc, arrayUnion, getDoc, writeBatch } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 import { getAuth, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
 
 // ==========================
 // DOM Elements
 // ==========================
 const orderItemsDiv = document.getElementById("order-items");
-const tabs = document.querySelectorAll(".status-tabs .tab");
+const tabs = document.querySelectorAll(".tabs .tab-btn");
 let currentTab = "Pending"; // default tab
 
 // ==========================
@@ -26,8 +26,7 @@ onAuthStateChanged(auth, user => {
     currentUserEmail = user.email;
     listenOrders();
   } else {
-    orderItemsDiv && (orderItemsDiv.innerHTML = "<p>Please log in to view your orders.</p>");
-    if (unsubscribeOrders) unsubscribeOrders();
+    window.location.href = "login.html"; 
   }
 });
 
@@ -64,9 +63,13 @@ function listenOrders() {
 
     const filteredOrders = userOrders.filter(order => {
       const status = order.status || "";
+      const refundStatus = order.refundStatus || "";
+
       if (currentTab === "To Rate") return status === "Completed by Customer" && !order.feedback;
       if (currentTab === "To Receive") return status === "Completed" && !order.feedback;
       if (currentTab === "Completed") return status === "Completed" || status === "Completed by Customer";
+      if (currentTab === "Refund") return ["Requested", "Accepted", "Denied"].includes(refundStatus);
+
       return status === currentTab;
     });
 
@@ -87,7 +90,7 @@ function listenOrders() {
       const orderTitle = document.createElement("h3");
       let titleText = `Order #${order.queueNumber} - Status: ${order.status}`;
       if (order.estimatedTime) titleText += ` | ETA: ${order.estimatedTime}`;
-      if (order.refundRequest) titleText += ` | Refund: ${order.refundStatus || "Requested"}`;
+      if (currentTab === "Refund") titleText += ` | Refund: ${order.refundStatus || "Requested"}`;
       orderTitle.textContent = titleText;
 
       orderHeader.appendChild(orderTitle);
@@ -100,18 +103,20 @@ function listenOrders() {
         if (!p) return;
         const qty = p.qty || p.quantity || 1;
         const productName = p.product || p.name || "Unknown Product";
+        const size = p.size || "Medium";
+        const sizePrice = p.sizePrice || 0;
         const addonsText = (p.addons && p.addons.length > 0)
           ? p.addons.map(a => `${a.name}: ₱${a.price}`).join(", ")
           : "No add-ons";
-        const productPrice = ((p.sizePrice || 0) + (p.addonsPrice || 0)) * qty;
+        const addonsPrice = p.addonsPrice || 0;
+        const totalPrice = (sizePrice + addonsPrice) * qty;
 
         const div = document.createElement("div");
         div.classList.add("order-item-card");
         div.innerHTML = `
           ${p.image ? `<img src="${p.image}" alt="${productName}" style="width:60px;height:60px;object-fit:cover;margin-right:10px;border-radius:6px;">` : ""}
-          <h4>${productName} (${p.size || "Medium"}) : ₱${p.sizePrice}</h4>
-          <p>Add-ons: ${addonsText}</p>
-          <p>Price for this Product: ₱${productPrice}</p>
+          <h4>${productName} (${size}) x${qty} - ₱${totalPrice}</h4>
+          <p>Add-ons: ${addonsText} (₱${addonsPrice})</p>
         `;
         itemsContainer.appendChild(div);
       });
@@ -119,7 +124,9 @@ function listenOrders() {
       const orderTotal = order.items?.reduce((sum, p) => {
         if (!p) return sum;
         const qty = p.qty || p.quantity || 1;
-        return sum + (((p.sizePrice || 0) + (p.addonsPrice || 0)) * qty);
+        const sizePrice = p.sizePrice || 0;
+        const addonsPrice = p.addonsPrice || 0;
+        return sum + ((sizePrice + addonsPrice) * qty);
       }, 0) || 0;
 
       const totalDiv = document.createElement("div");
@@ -127,50 +134,38 @@ function listenOrders() {
       totalDiv.innerHTML = `<h4>Total Price: ₱${orderTotal}</h4>`;
       itemsContainer.appendChild(totalDiv);
 
-      const paymentMethod = order.paymentMethod?.toLowerCase() || "";
+      const paymentMethod = (order.paymentMethod || "").toLowerCase();
 
-      // ==========================
       // Pending Tab Refund / Cancel
-      // ==========================
       if (currentTab === "Pending") {
-        if (paymentMethod === "gcash") {
+        if (paymentMethod.includes("e-payment") || paymentMethod === "g" || paymentMethod === "gcash") {
           const btn = document.createElement("button");
-          if (order.refundRequest) {
-            btn.textContent = "Refund Requested";
-            btn.disabled = true;
-            btn.style.backgroundColor = "#ccc";
-            btn.style.cursor = "not-allowed";
-          } else {
-            btn.textContent = "Request Refund";
-            btn.onclick = () => handleRefundRequest(order.id);
-          }
+          btn.textContent = order.refundRequest ? `Refund: ${order.refundStatus}` : "Request Refund";
+          btn.disabled = !!order.refundRequest;
           btn.className = "action-btn";
+          btn.style.backgroundColor = order.refundRequest ? "#ccc" : "";
+          btn.style.cursor = order.refundRequest ? "not-allowed" : "pointer";
+          btn.addEventListener("click", () => openRefundModal(order.id, order.items));
           itemsContainer.appendChild(btn);
-        } else if (paymentMethod === "COD") {
+        } else if (paymentMethod === "cash" || paymentMethod === "c") {
           const btn = document.createElement("button");
           btn.textContent = "Cancel";
-          btn.className = "action-btn";
-          btn.onclick = () => handleCancelOrder(order.id);
+          btn.className = "action-btn cancel-refund-btn";
+          btn.addEventListener("click", () => handleCancelOrder(order.id, order.items));
           itemsContainer.appendChild(btn);
         }
       }
 
-      // ==========================
       // To Receive Tab Refund + Received
-      // ==========================
       if (currentTab === "To Receive") {
-        if (paymentMethod === "gcash") {
+        if (paymentMethod.includes("e-payment") || paymentMethod === "g" || paymentMethod === "gcash") {
           const refundBtn = document.createElement("button");
-          if (order.refundRequest) {
-            refundBtn.textContent = `Refund: ${order.refundStatus || "Requested"}`;
-            refundBtn.disabled = true;
-            refundBtn.style.backgroundColor = "#ccc";
-            refundBtn.style.cursor = "not-allowed";
-          } else {
-            refundBtn.textContent = "Request Refund";
-            refundBtn.onclick = () => handleRefundRequest(order.id);
-          }
-          refundBtn.className = "action-btn";
+          refundBtn.textContent = order.refundRequest ? `Refund: ${order.refundStatus}` : "Request Refund";
+          refundBtn.disabled = !!order.refundRequest;
+          refundBtn.className = "action-btn cancel-refund-btn"; 
+          refundBtn.style.backgroundColor = order.refundRequest ? "#ccc" : "";
+          refundBtn.style.cursor = order.refundRequest ? "not-allowed" : "pointer";
+          refundBtn.addEventListener("click", () => openRefundModal(order.id, order.items));
           itemsContainer.appendChild(refundBtn);
         }
 
@@ -178,19 +173,33 @@ function listenOrders() {
           const receivedBtn = document.createElement("button");
           receivedBtn.textContent = "Received Order";
           receivedBtn.className = "action-btn";
-          receivedBtn.onclick = () => showConfirmModal(order.id);
+          receivedBtn.addEventListener("click", () => showConfirmModal(order.id));
           itemsContainer.appendChild(receivedBtn);
         }
       }
 
-      // ==========================
+      // Refund Tab Button with color coding
+      if (currentTab === "Refund") {
+        const refundBtn = document.createElement("button");
+        refundBtn.textContent = order.refundStatus;
+        refundBtn.disabled = true;
+        refundBtn.className = "action-btn";
+        refundBtn.style.cursor = "not-allowed";
+
+        if (order.refundStatus === "Requested") refundBtn.style.backgroundColor = "yellow";
+        else if (order.refundStatus === "Accepted") refundBtn.style.backgroundColor = "green";
+        else if (order.refundStatus === "Denied") refundBtn.style.backgroundColor = "red";
+        else refundBtn.style.backgroundColor = "#ccc"; 
+
+        itemsContainer.appendChild(refundBtn);
+      }
+
       // To Rate Tab Feedback
-      // ==========================
       if (order.status === "Completed by Customer" && !order.feedback && currentTab === "To Rate") {
         const btn = document.createElement("button");
         btn.textContent = "To Rate";
         btn.className = "action-btn";
-        btn.onclick = () => openFeedbackModal(order.id, order.items);
+        btn.addEventListener("click", () => openFeedbackModal(order.id, order.items));
         itemsContainer.appendChild(btn);
       }
 
@@ -201,16 +210,72 @@ function listenOrders() {
 }
 
 // ==========================
-// Refund & Cancel Handlers
+// Return Items to Inventory
 // ==========================
-async function handleRefundRequest(orderId) {
-  await updateDoc(doc(db, "DeliveryOrders", orderId), { refundRequest: true, refundStatus: "Requested" });
-  alert("Refund request submitted. Waiting for admin approval.");
+async function returnItemsToInventory(orderItems) {
+  if (!orderItems || orderItems.length === 0) return;
+  const inventoryUpdates = {};
+
+  for (const item of orderItems) {
+    if (!item) continue;
+    const productQtyOrdered = item.qty || item.quantity || 1;
+    if (productQtyOrdered <= 0) continue;
+
+    const aggregateItem = (id, consumptionPerProduct) => {
+      if (!id) return;
+      const totalConsumption = consumptionPerProduct * productQtyOrdered;
+      inventoryUpdates[id] = (inventoryUpdates[id] || 0) + totalConsumption;
+    };
+
+    aggregateItem(item.sizeId, item.sizeQty || 1);
+    item.ingredients?.forEach(ing => aggregateItem(ing.id, ing.qty || 1));
+    item.addons?.forEach(addon => aggregateItem(addon.id, addon.qty || 1));
+    item.others?.forEach(other => aggregateItem(other.id, other.qty || 1));
+  }
+
+  const batch = writeBatch(db);
+  const inventoryCollection = collection(db, "Inventory");
+
+  for (const [inventoryId, qtyToReturn] of Object.entries(inventoryUpdates)) {
+    const inventoryRef = doc(inventoryCollection, inventoryId);
+    try {
+      const inventorySnap = await getDoc(inventoryRef);
+      if (inventorySnap.exists()) {
+        const currentQuantity = inventorySnap.data().quantity || 0;
+        batch.update(inventoryRef, { quantity: currentQuantity + qtyToReturn });
+        console.log(`Returning ${qtyToReturn} units to Inventory ID: ${inventoryId}`);
+      } else {
+        console.warn(`Inventory item ID ${inventoryId} not found.`);
+      }
+    } catch (error) {
+      console.error(`Error fetching inventory item ${inventoryId}:`, error);
+    }
+  }
+
+  try {
+    await batch.commit();
+    console.log("All items returned to inventory successfully.");
+  } catch (error) {
+    console.error("Error committing inventory batch:", error);
+    throw new Error("Failed to update inventory during cancellation.");
+  }
 }
 
-async function handleCancelOrder(orderId) {
-  await updateDoc(doc(db, "DeliveryOrders", orderId), { status: "Canceled" });
-  alert("Order canceled successfully.");
+// ==========================
+// Cancel Order
+// ==========================
+async function handleCancelOrder(orderId, orderItems) {
+  if (!confirm("Are you sure you want to cancel this order? Stock will be returned to inventory.")) return;
+
+  try {
+    await returnItemsToInventory(orderItems);
+    await updateDoc(doc(db, "DeliveryOrders", orderId), { status: "Canceled" });
+    alert("Order canceled successfully and stock returned.");
+    listenOrders();
+  } catch (err) {
+    console.error("Error canceling order:", err);
+    alert("Failed to cancel order. Please try again.");
+  }
 }
 
 // ==========================
@@ -239,9 +304,9 @@ function showConfirmModal(orderId) {
   modalContent.querySelector("#confirm-yes").onclick = async () => {
     await updateDoc(doc(db, "DeliveryOrders", orderId), { status: "Completed by Customer" });
     closeModal();
-    tabs.forEach(t => t.classList.remove("active"));
     currentTab = "To Rate";
-    document.querySelector(`.tab[data-status="To Rate"]`).classList.add("active");
+    tabs.forEach(t => t.classList.remove("active"));
+    document.querySelector(`.tab-btn[data-status="To Rate"]`).classList.add("active");
     listenOrders();
   };
 
@@ -250,7 +315,64 @@ function showConfirmModal(orderId) {
 }
 
 // ==========================
-// Feedback Modal with Star Rating
+// Refund Modal
+// ==========================
+function openRefundModal(orderId, orderItems) {
+  const modal = document.getElementById("refund-modal");
+  const refundForm = modal.querySelector("#refund-form");
+  const refundItemsDiv = modal.querySelector("#refund-items");
+
+  refundItemsDiv.innerHTML = "";
+
+  orderItems.forEach((item, index) => {
+    if (!item) return;
+    const productName = item.product || item.name || "Unknown Product";
+    const qty = item.qty || item.quantity || 1;
+    const size = item.size || "Medium";
+    const totalPrice = ((item.sizePrice || 0) + (item.addonsPrice || 0)) * qty;
+
+    const div = document.createElement("div");
+    div.className = "refund-item";
+    div.innerHTML = `
+      <label>
+        <input type="checkbox" name="refund" value="${index}">
+        ${productName} (${size}) x${qty} - ₱${totalPrice}
+      </label>
+    `;
+    refundItemsDiv.appendChild(div);
+  });
+
+  modal.style.display = "flex";
+
+  modal.querySelector(".close-btn").onclick = () => modal.style.display = "none";
+  modal.onclick = e => { if (e.target === modal) modal.style.display = "none"; }
+
+  refundForm.onsubmit = async (e) => {
+    e.preventDefault();
+    const selectedIndexes = Array.from(refundForm.querySelectorAll('input[name="refund"]:checked')).map(input => parseInt(input.value));
+    if (selectedIndexes.length === 0) {
+      alert("Please select at least one product to refund.");
+      return;
+    }
+    const selectedItems = selectedIndexes.map(i => orderItems[i]);
+    try {
+      await updateDoc(doc(db, "DeliveryOrders", orderId), {
+        refundRequest: true,
+        refundStatus: "Requested",
+        refundItems: selectedItems
+      });
+      alert("Refund request submitted. Waiting for admin approval.");
+      modal.style.display = "none";
+      listenOrders();
+    } catch (err) {
+      console.error("Error submitting refund:", err);
+      alert("Failed to submit refund. Please try again.");
+    }
+  };
+}
+
+// ==========================
+// Feedback Modal
 // ==========================
 function openFeedbackModal(orderId, items) {
   const modal = document.createElement("div");
