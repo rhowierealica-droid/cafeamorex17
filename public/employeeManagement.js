@@ -1,9 +1,12 @@
 import { db } from './firebase-config.js';
 import { doc, setDoc, getDocs, collection, deleteDoc, query, where, updateDoc } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+import { getAuth, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
+
 
 // ==========================
 // DOM Elements
 // ==========================
+const auth = getAuth();  // ← this was missing
 const employeeForm = document.getElementById('employeeForm');
 const employeeTableBody = document.querySelector('#employeeTable tbody');
 const credentialsDiv = document.getElementById('credentials');
@@ -20,6 +23,16 @@ const confirmNo = document.getElementById('confirmNo');
 
 let confirmAction = null; // function to execute when yes is clicked
 
+// Redirect if not logged in
+onAuthStateChanged(auth, async (user) => {
+  if (!user) {
+    window.location.replace("login.html"); // redirect
+    return;
+  }
+
+  // User is logged in -> initialize the app
+  await init();
+});
 // ==========================
 // Modal Controls
 // ==========================
@@ -35,7 +48,7 @@ function sanitizeName(name) { return name.toLowerCase().replace(/[^a-z0-9]/g, ''
 
 function generateEmail(firstName, lastName) {
     const f = sanitizeName(firstName), l = sanitizeName(lastName);
-    return `${f}.${l}${Math.floor(100 + Math.random() * 900)}@company.com`;
+    return `${f}.${l}${Math.floor(100 + Math.random() * 900)}@cafeamore.com`;
 }
 
 async function isEmailTaken(email) {
@@ -92,7 +105,7 @@ employeeForm.addEventListener('submit', async e => {
 });
 
 // ==========================
-// Load Employees (only Bartender, Cashier, Driver)
+// Load Employees (only Cashier, Driver)
 // ==========================
 async function loadEmployees() {
     employeeTableBody.innerHTML = "";
@@ -102,14 +115,18 @@ async function loadEmployees() {
         const data = docSnap.data();
 
         // Only show specific roles
-        if (["Bartender", "Cashier", "Driver"].includes(data.role)) {
+        if (["Cashier", "Driver"].includes(data.role)) {
             const tr = document.createElement('tr');
+
+            // Hide password in table
+            const hiddenPassword = '******';
+
             tr.innerHTML = `
                 <td>${data.firstName}</td>
                 <td>${data.lastName}</td>
                 <td>${data.role}</td>
                 <td>${data.email}</td>
-                <td>${data.password}</td>
+                <td>${hiddenPassword}</td>
                 <td>
                     <button class="resetBtn" data-uid="${docSnap.id}">Reset Password</button>
                     <button class="deleteBtn" data-uid="${docSnap.id}">Delete</button>
