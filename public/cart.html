@@ -6,7 +6,10 @@
   <title>Cart | Café Amore</title>
 
   <link rel="stylesheet" href="cart.css">
-  <link rel="stylesheet" href="customer-side.css"> <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
+  <link rel="stylesheet" href="customer-side.css"> 
+    <link rel="stylesheet" href="OrderStatusNotif.css"> 
+
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
 
   <script type="module" src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js"></script>
   <script type="module" src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js"></script>
@@ -14,7 +17,21 @@
 </head>
 <body>
 
-  <div class="hamburger hidden" id="hamburger"><i class="fas fa-bars"></i></div>
+  <!-- Notification Bell -->
+<div id="notifBellContainer" style="display: none;">
+  <i class="fas fa-bell"></i>
+  <span class="badge">0</span>
+</div>
+<div id="notifDropdown"></div>
+
+<!-- Top Bar for Mobile -->
+<div class="top-bar">
+  <div class="hamburger" id="hamburger"><i class="fas fa-bars"></i></div>
+  <div class="mobile-logo">
+    <img src="logo.png" alt="Café Amore Logo">
+    <span class="brand">Café Amore</span>
+  </div>
+</div>
 
   <aside class="sidebar" id="sidebar">
     <div class="close-btn hidden" id="closeBtn">&times;</div>
@@ -25,13 +42,14 @@
     <nav>
       <ul>
         <li class="menu-link"><i class="fas fa-utensils"></i> Menu</li>
-        <li class="cart-link"><i class="fas fa-shopping-cart"></i> Cart</li>
+        <li class="cart-link active"><i class="fas fa-shopping-cart"></i> Cart</li>
         <li class="order-status-link"><i class="fas fa-truck"></i> Order Status</li>
         <li class="favorites-link"><i class="fas fa-heart"></i> Favorites</li>
-        <li class="history-link"><i class="fas fa-history"></i> History</li>
+      <!-- <li class="history-link"><i class="fas fa-history"></i> History</li> -->
       </ul>
     </nav>
     <div class="login-link"><i class="fas fa-sign-in-alt"></i> Login</div>
+
     <div class="profile-card">
       <div class="profile-avatar"><i class="fas fa-user-circle"></i></div>
       <div class="profile-info">
@@ -39,14 +57,14 @@
         <p class="edit-text">Edit Profile</p>
       </div>
     </div>
+
     <div class="logout"><i class="fas fa-sign-out-alt"></i> Log Out</div>
   </aside>
 
   <main class="cart-main">
     <div class="cart-container">
       <h1>Your Cart</h1>
-      <div id="cart-items">
-        </div>
+      <div id="cart-items"></div>
       <div class="cart-summary">
         <p>Total: ₱<span id="cart-total">0.00</span></p>
         <button id="confirm-order-btn">Review Address and Payment</button>
@@ -54,23 +72,16 @@
     </div>
   </main>
 
+  
   <div id="confirmOrderModal" class="modal">
     <div class="modal-content">
       <span class="close-modal">&times;</span>
       <h2>Confirm Order</h2>
 
-      <div class="modal-section">
-        <h3>Order Summary</h3>
-        <div id="modal-cart-items">
-          </div>
-        <p>Delivery Fee: ₱<span id="modal-delivery-fee">0.00</span></p>
-        <p>Total: ₱<span id="modal-grand-total">0.00</span></p>
-      </div>
-
+      <!-- 1️⃣ Delivery Address first -->
       <div class="modal-section">
         <h3>Delivery Address</h3>
-        <div id="saved-address">
-          </div>
+        <div id="saved-address" class="address-container"></div>
         <button type="button" id="add-address-btn">+ Add New Address</button>
 
         <div id="address-form-div" style="display:none; margin-top:15px;">
@@ -163,16 +174,46 @@
         </div>
       </div>
 
+      <!-- 2️⃣ Order Summary next -->
+      <div class="modal-section">
+        <h3>Order Summary</h3>
+        <div id="modal-cart-items"></div>
+        <p>Delivery Fee: ₱<span id="modal-delivery-fee">0.00</span></p>
+        <p>Total: ₱<span id="modal-grand-total">0.00</span></p>
+      </div>
+
+      <!-- 3️⃣ Payment Method last -->
       <div class="modal-section">
         <h3>Payment Method</h3>
-        <label><input type="radio" name="payment" value="COD" checked> Cash on Delivery</label><br>
-        <label><input type="radio" name="payment" value="GCash"> GCash (PayMongo)</label><br>
+        <label><input type="radio" name="payment" value="Cash" checked> Cash on Delivery</label><br>
+        <label><input type="radio" name="payment" value="E-Payment"> GCash </label><br>
       </div>
 
       <button id="final-confirm-btn">Confirm & Place Order</button>
     </div>
   </div>
 
+  <!-- ✅ Toast message container -->
+  <div id="toast" style="
+    visibility: hidden;
+    min-width: 250px;
+    margin-left: -125px;
+    background-color: red;
+    color: #fff;
+    text-align: center;
+    border-radius: 5px;
+    padding: 16px;
+    position: fixed;
+    z-index: 1000;
+    left: 50%;
+    bottom: 30px;
+    font-size: 17px;
+  ">
+    Select items to checkout.
+  </div>
+
   <script type="module" src="cart.js"></script>
-  <script type="module" src="customer-side.js"></script> </body>
+  <script type="module" src="customer-side.js"></script>
+  <script type="module" src="OrderStatusNotif.js"></script>
+</body>
 </html>
