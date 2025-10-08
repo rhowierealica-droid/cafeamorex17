@@ -5,11 +5,15 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Café Amore - Sales Dashboard</title>
 
-  <!-- Font Awesome for icons -->
+  <!-- Font Awesome -->
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
   
   <!-- Chart.js -->
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  
+  <!-- Flatpickr -->
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css">
+  <script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
   
   <!-- CSS -->
   <link rel="stylesheet" href="sales.css">
@@ -27,7 +31,7 @@
     <nav>
       <div class="close-btn" id="closeBtn"><i class="fas fa-times"></i></div>
       <ul>
-        <li class="active"><i class="fa-duotone fa-light fa-house"></i> Home</li>
+        <li class="active"><i class="fas fa-house"></i> Home</li>
         <li><i class="fas fa-utensils"></i> Menu Management</li>
         <li><i class="fas fa-clipboard-list"></i> Orders</li>
         <li><i class="fas fa-inbox"></i> Incoming Orders</li>
@@ -56,18 +60,36 @@
   <div class="main-content">
     <h1>Sales Dashboard</h1>
 
-    <!-- Filter -->
+    <!-- Filters Section -->
     <div class="filter-section">
-      <label for="salesFilter">Filter Sales:</label>
+      <label for="salesFilter">Time:</label>
       <select id="salesFilter">
         <option value="today">Today</option>
         <option value="week">This Week</option>
         <option value="month">This Month</option>
-        <option value="3months">Last 3 Months</option>
-        <option value="6months">Last 6 Months</option>
         <option value="year">This Year</option>
         <option value="all">All</option>
+        <option value="custom">Custom Range</option>
       </select>
+
+      <input type="text" id="customRange" placeholder="Select date range" style="display:none;" />
+
+      <label for="paymentFilter">Payment:</label>
+      <select id="paymentFilter">
+        <option value="all">All</option>
+        <option value="Cash">Cash</option>
+        <option value="E-Payment">E-Payment</option>
+      </select>
+
+      <label for="channelFilter">Channel:</label>
+      <select id="channelFilter">
+        <option value="all">All</option>
+        <option value="In-store">In-store</option>
+        <option value="Online">Online</option>
+      </select>
+
+      <label for="productFilter">Product:</label>
+      <input type="text" id="productFilter" placeholder="Search product" />
     </div>
 
     <!-- Dashboard Cards -->
@@ -86,14 +108,14 @@
       </div>
     </div>
 
-    <!-- Sales Chart & Payment Cards Side by Side -->
+    <!-- Chart & Payment Cards -->
     <div class="chart-wrapper">
       <!-- Chart Section -->
       <div class="chart-section">
         <canvas id="salesChart"></canvas>
       </div>
 
-      <!-- Payment Totals + Best Sellers inside payment column -->
+      <!-- Payment Cards & Top Sellers -->
       <div class="payment-cards">
         <div class="card payment-card">
           <h3>Cash Payments</h3>
@@ -104,7 +126,7 @@
           <p id="ePayTotal">₱0.00</p>
         </div>
 
-        <!-- Top 5 Best Sellers under E-Payments -->
+        <!-- Top 5 Best Sellers -->
         <div class="payment-best-sellers">
           <h2>Top 5 Best Sellers</h2>
           <table>
@@ -116,7 +138,7 @@
               </tr>
             </thead>
             <tbody id="bestSellersTable">
-              <!-- Filled by JS -->
+              <!-- JS fills this -->
             </tbody>
           </table>
         </div>
@@ -124,14 +146,12 @@
     </div>
   </div>
 
+  <!-- Scripts -->
   <script type="module" src="sales.js"></script>
   <script type="module" src="admin-nav.js"></script>
-   <!-- Notification module -->
-  
   <script type="module">
     import { initOrderBadge } from './notification.js';
     initOrderBadge();
   </script>
-
 </body>
 </html>
