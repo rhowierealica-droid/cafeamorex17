@@ -11,7 +11,7 @@
 body {
   background: #fdf6f0;
   color: #4b3621;
-  overflow-x: hidden; /* prevent horizontal scroll */
+  overflow-x: hidden;
 }
 
 /* ======================= */
@@ -19,9 +19,9 @@ body {
 /* ======================= */
 .container {
   flex: 1;
-  width: calc(100% - 250px); /* full width minus sidebar */
+  width: calc(100% - 250px);
   height: 100vh;
-  margin-left: 250px; /* sidebar space for large screens */
+  margin-left: 250px;
   padding: 20px;
   background: #fff8f0;
   border-radius: 10px;
@@ -39,12 +39,12 @@ h1 {
 
 .table-section {
   margin-bottom: 25px;
-  overflow-x: auto; /* horizontal scroll if table is wide */
+  overflow-x: auto;
 }
 
 table {
   width: 100%;
-  min-width: 600px; /* ensures table layout is stable */
+  min-width: 600px;
   border-collapse: collapse;
   margin-bottom: 8px;
   border-radius: 6px;
@@ -65,6 +65,9 @@ th {
   font-weight: bold;
 }
 
+/* ======================= */
+/* Add Button               */
+/* ======================= */
 .add-btn {
   background: #6f4e37;
   color: white;
@@ -81,7 +84,52 @@ th {
 }
 
 /* ======================= */
-/* Popup Styling            */
+/* Action Buttons Styling   */
+/* ======================= */
+table button {
+  border: none;
+  padding: 6px 10px;
+  border-radius: 6px;
+  cursor: pointer;
+  color: white;
+  font-size: 13px;
+  font-weight: 600;
+  transition: all 0.3s ease;
+  margin: 2px;
+}
+
+/* --- Individual Button Colors --- */
+.editBtn {
+  background: #704225;
+}
+.editBtn:hover {
+  background: #563b28;
+}
+
+.updateBtn {
+  background: #4b3621;
+}
+.updateBtn:hover {
+  background: #704225;
+}
+
+.deleteBtn {
+  background: #c0392b;
+}
+.deleteBtn:hover {
+  background: #992d22;
+}
+
+.toggleBtn {
+  background: #f3d9b1;
+  color: #4b3621;
+}
+.toggleBtn:hover {
+  background: #bfa174;
+}
+
+/* ======================= */
+/* Popup Styling (General)  */
 /* ======================= */
 .popup {
   display: none;
@@ -95,7 +143,7 @@ th {
 
 .popup-content {
   background: #fff8f0;
-  padding: 16px;
+  padding: 20px;
   border-radius: 10px;
   min-width: 280px;
   max-width: 400px;
@@ -107,23 +155,26 @@ th {
 .popup-content input,
 .popup-content select {
   width: 100%;
-  margin: 6px 0;
-  padding: 6px;
+  margin: 8px 0;
+  padding: 8px;
   border-radius: 5px;
   border: 1px solid #ccc;
   font-size: 14px;
 }
 
+/* ======================= */
+/* Popup Buttons            */
+/* ======================= */
 .popup-actions {
   display: flex;
   justify-content: space-between;
-  margin-top: 12px;
+  margin-top: 15px;
 }
 
 .popup-actions button {
   flex: 1;
   margin: 0 4px;
-  padding: 6px 10px;
+  padding: 8px 10px;
   border: none;
   border-radius: 5px;
   cursor: pointer;
@@ -136,7 +187,6 @@ th {
   background: #6f4e37;
   color: white;
 }
-
 .popup-actions button:first-child:hover {
   background: #563b28;
 }
@@ -145,7 +195,6 @@ th {
   background: #c0392b;
   color: white;
 }
-
 .popup-actions button:last-child:hover {
   background: #992d22;
 }
@@ -155,9 +204,9 @@ th {
 /* ======================= */
 @media (max-width: 1024px) {
   .container {
-    width: 100vw; /* full width */
-    margin-left: 0; /* remove sidebar offset */
-    border-radius: 0; /* optional: remove corners */
+    width: 100vw;
+    margin-left: 0;
+    border-radius: 0;
   }
 
   table {
@@ -168,5 +217,10 @@ th {
 @media (max-width: 768px) {
   table {
     min-width: 400px;
+  }
+
+  table button {
+    font-size: 12px;
+    padding: 5px 8px;
   }
 }
