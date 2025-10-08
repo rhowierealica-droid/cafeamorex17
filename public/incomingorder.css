@@ -1,5 +1,5 @@
 /* ======================= */
-/* Reset & Body Styling     */
+/* Reset & Body Styling    */
 /* ======================= */
 * {
   margin: 0;
@@ -19,7 +19,7 @@ body {
 }
 
 /* ======================= */
-/* Main Content Styling     */
+/* Main Content Styling    */
 /* ======================= */
 .main-content {
   width: calc(100% - 240px); /* stretch to the right edge, considering sidebar width */
@@ -41,7 +41,7 @@ body {
 }
 
 /* ======================= */
-/* Orders Table Styling     */
+/* Orders Table Styling    */
 /* ======================= */
 .orders-section {
   width: 100%; 
@@ -53,34 +53,6 @@ body {
   overflow-x: auto;
 }
 
-/* ======================= */
-/* Tab Styling              */
-/* ======================= */
-.tabs {
-  display: flex;
-  justify-content: center;
-  margin-bottom: 15px;
-}
-
-.tab-btn {
-  padding: 8px 18px;
-  margin: 0 5px;
-  border-radius: 12px;
-  border: none;
-  cursor: pointer;
-  background-color: #d0c4b6;
-  color: #4b3621;
-  font-weight: bold;
-  transition: all 0.2s ease;
-}
-
-.tab-btn.active,
-.tab-btn:hover {
-  background-color: #6f4e37;
-  color: white;
-}
-
-/* Table */
 .orders-section table {
   width: 100%;
   border-collapse: collapse;
@@ -107,14 +79,44 @@ body {
 }
 
 .orders-section select {
-  padding: 5px;
+  padding: 5px 8px;
   border-radius: 6px;
   border: 1px solid #d0c4b6;
   background: #fff;
   color: #4b3621;
 }
 
-/* Buttons inside table */
+/* ======================= */
+/* Tab Styling             */
+/* ======================= */
+.tabs {
+  display: flex;
+  justify-content: center;
+  margin-bottom: 15px;
+  flex-wrap: wrap;
+}
+
+.tab-btn {
+  padding: 8px 18px;
+  margin: 5px 5px;
+  border-radius: 12px;
+  border: none;
+  cursor: pointer;
+  background-color: #d0c4b6;
+  color: #4b3621;
+  font-weight: bold;
+  transition: all 0.2s ease;
+}
+
+.tab-btn.active,
+.tab-btn:hover {
+  background-color: #6f4e37;
+  color: white;
+}
+
+/* ======================= */
+/* Buttons Styling         */
+/* ======================= */
 .orders-section button {
   padding: 6px 12px;
   border: none;
@@ -123,6 +125,7 @@ body {
   cursor: pointer;
   font-weight: bold;
   transition: 0.2s;
+  font-size: 0.85em;
 }
 
 .accept-btn { background-color: #4caf50; color: white; }
@@ -134,8 +137,32 @@ body {
 .complete-btn { background-color: #2196f3; color: white; }
 .complete-btn:hover { background-color: #1976d2; }
 
+.cancel-refund-btn {
+  background-color: #f44336;
+  color: white;
+}
+.cancel-refund-btn:hover {
+  background-color: #d32f2f;
+}
+
 /* ======================= */
-/* Popup Styling            */
+/* Status Badges           */
+/* ======================= */
+.refund-badge {
+  font-size: 0.8em;
+  padding: 2px 6px;
+  border-radius: 6px;
+  margin-left: 5px;
+  color: white;
+  font-weight: bold;
+}
+
+.refund-accepted { background-color: #4caf50; }
+.refund-pending { background-color: #ff9800; }
+.refund-failed { background-color: #f44336; }
+
+/* ======================= */
+/* Popup Styling           */
 /* ======================= */
 .popup {
   display: none;
@@ -146,6 +173,7 @@ body {
   z-index: 1300;
   justify-content: center;
   align-items: center;
+  animation: fadeIn 0.2s ease-in-out;
 }
 
 .popup-content {
@@ -157,11 +185,13 @@ body {
   text-align: center;
   box-shadow: 0 6px 15px rgba(0,0,0,0.2);
   position: relative;
+  animation: slideUp 0.2s ease-in-out;
 }
 
 .popup-content h3 {
   margin-bottom: 15px;
   color: #6f4e37;
+  font-size: 1.2em;
 }
 
 .popup-content button {
@@ -181,7 +211,74 @@ body {
 }
 
 /* ======================= */
-/* Responsiveness           */
+/* Refund Amount Input     */
+/* ======================= */
+#refundInput {
+  width: 100%;
+  padding: 10px 12px;
+  margin-top: 8px;
+  border-radius: 10px;
+  border: 1px solid #d0c4b6;
+  font-size: 1em;
+  color: #4b3621;
+  outline: none;
+  transition: all 0.2s ease;
+  box-shadow: inset 0 2px 5px rgba(0,0,0,0.05);
+}
+
+#refundInput:focus {
+  border-color: #6f4e37;
+  box-shadow: 0 0 5px rgba(111,78,55,0.3);
+}
+
+.popup-content label {
+  font-weight: bold;
+  color: #6f4e37;
+  font-size: 0.95em;
+}
+
+/* Refund Popup Buttons */
+#acceptRefundBtn {
+  background-color: #6f4e37; /* Brown */
+  color: white;
+}
+
+#acceptRefundBtn:hover {
+  background-color: #50382b;
+}
+
+#declineRefundBtn {
+  background-color: #f44336; /* Red */
+  color: white;
+}
+
+#declineRefundBtn:hover {
+  background-color: #d32f2f;
+}
+
+/* ======================= */
+/* Center Accept/Decline Buttons */
+/* ======================= */
+#popupButtonsContainer {
+  display: flex;
+  justify-content: center; /* center buttons */
+  gap: 20px; /* space between buttons */
+  flex-wrap: wrap;
+  margin-top: 15px;
+}
+
+/* ======================= */
+/* Animations              */
+/* ======================= */
+@keyframes fadeIn {
+  from { opacity: 0; } to { opacity: 1; }
+}
+@keyframes slideUp {
+  from { transform: translateY(20px); opacity: 0; } to { transform: translateY(0); opacity: 1; }
+}
+
+/* ======================= */
+/* Responsiveness          */
 /* ======================= */
 @media (max-width: 1024px) {
   .main-content {
