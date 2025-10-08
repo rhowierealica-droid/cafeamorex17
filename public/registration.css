@@ -32,9 +32,7 @@ body {
   background: #fff8f0;
   transition: transform 0.3s;
 }
-.login-container:hover {
-  transform: translateY(-5px);
-}
+.login-container:hover { transform: translateY(-5px); }
 
 /* Left Panel */
 .login-left {
@@ -47,28 +45,18 @@ body {
   padding: 50px;
   text-align: center;
 }
-.coffee-img { 
-  width: 220px; 
-  margin-bottom: 25px; 
-  border-radius: 15px;
-  box-shadow: 0 8px 25px rgba(0,0,0,0.15);
-  transition: transform 0.3s, box-shadow 0.3s; 
-}
-.coffee-img:hover { 
-  transform: scale(1.08); 
-  box-shadow: 0 12px 30px rgba(0,0,0,0.25);
-}
+
+
 .login-left h2 { 
   font-size: 2.2em; 
   color: #a65b35; 
   margin-bottom: 15px; 
-  letter-spacing: 1px;
 }
 .login-left p { 
   font-size: 1em; 
   color: #552915; 
   line-height: 1.6; 
-  max-width: 300px;
+  max-width: 320px;
 }
 
 /* Right Panel */
@@ -87,20 +75,21 @@ body {
 }
 .login-box h2 { 
   font-size: 2em; 
-  margin-bottom: 15px; 
+  margin-bottom: 10px; 
   color: #fff8f0;
 }
 .login-box p { 
   color: #f2e6dc; 
-  margin-bottom: 25px; 
+  margin-bottom: 20px; 
   font-size: 0.95em;
 }
 
 /* Inputs */
-.login-box input, .login-box select {
+.login-box input, 
+.login-box select {
   width: 100%;
-  padding: 15px;
-  margin-bottom: 10px;
+  padding: 14px;
+  margin-bottom: 12px;
   border-radius: 12px;
   border: none;
   outline: none;
@@ -114,8 +103,9 @@ body {
   background: #fff; 
   color: #552915;
 }
-.login-box input:focus, .login-box select:focus {
-  box-shadow: 0 0 8px rgba(255, 165, 83, 0.5);
+.login-box input:focus, 
+.login-box select:focus {
+  box-shadow: 0 0 8px rgba(255, 165, 83, 0.6);
 }
 .input-error { border: 2px solid #ff6961; }
 .error-msg { 
@@ -129,11 +119,53 @@ body {
 
 /* Disabled Inputs */
 .login-box input[disabled] { 
-  background: #e0e0e0; 
-  color: #7a7a7a; 
+  background: #eaeaea; 
+  color: #777; 
   cursor: not-allowed; 
   border: 1px solid #ccc; 
   font-style: italic; 
+}
+
+/* OTP button inline */
+.input-group {
+  display: flex;
+  flex-direction: column;
+  margin-bottom: 12px;
+}
+#sendOtpBtn {
+  margin-top: 8px;
+  padding: 10px;
+  border: none;
+  border-radius: 10px;
+  background: #a65b35;
+  color: #fff;
+  cursor: pointer;
+  transition: 0.3s;
+}
+#sendOtpBtn:hover { 
+  background: #fff8f0; 
+  color: #552915; 
+  border: 1px solid #552915; 
+}
+
+/* ✅ OTP Input Field Fix */
+#otpPopup input[type="text"], 
+#otpPopup input[type="number"],
+#otpInput {
+  width: 80%;
+  max-width: 250px;
+  padding: 14px;
+  margin: 12px auto;
+  display: block;
+  border-radius: 12px;
+  border: 1px solid #ccc;
+  font-size: 1.2em;
+  text-align: center;
+  background: #fff;
+  color: #552915;
+}
+#otpPopup input:focus {
+  box-shadow: 0 0 8px rgba(255, 165, 83, 0.6);
 }
 
 /* Buttons */
@@ -191,17 +223,20 @@ body {
 }
 
 /* Popup Modals */
-.message-popup, .terms-popup {
+.message-popup, 
+#termsPopup, 
+#otpPopup {
   display: none;
   position: fixed;
-  top: 0; left: 0;
-  width: 100%; height: 100%;
+  top: 8%; left: 0;
+  bottom: 100%;
+  width: 100%; height: 90%;
   background: rgba(0,0,0,0.55);
   justify-content: center;
   align-items: center;
-  z-index: 1000;
+  z-index: 3000; /* ↑ increased so messages appear above OTP popup */
 }
-.message-content, .terms-content {
+.message-content {
   background: #fff8f0;
   padding: 30px 25px;
   border-radius: 20px;
@@ -213,66 +248,133 @@ body {
   animation: popupFade 0.3s ease-out;
   display: flex;
   flex-direction: column;
+  gap: 20px;
+}
+
+/* ✅ Terms & Conditions Popup */
+.terms-content {
+  background: #fffefb;
+  padding: 35px 30px;
+  border-radius: 22px;
+  width: 600px;       /* wider */
+  max-width: 95%;
+  max-height: 80vh;   /* taller */
+  text-align: left;   /* better for reading */
+  color: #3d1f0f;
+  box-shadow: 0 25px 60px rgba(0,0,0,0.3);
+  animation: popupFade 0.3s ease-out;
+  display: flex;
+  flex-direction: column;
   gap: 25px;
-  max-height: 80vh;
-  overflow-y: auto;
 }
+
+/* Scrollable Terms Body */
 .terms-body {
-  text-align: left;
-  max-height: 300px;
+  max-height: 55vh;
   overflow-y: auto;
-  padding-right: 5px;
+  padding-right: 10px;
+  line-height: 1.7;
+  font-size: 0.95em;
 }
+
+/* Section Titles */
+.terms-body h3, 
+.terms-body h2 {
+  margin-top: 18px;
+  margin-bottom: 8px;
+  color: #a65b35;
+  font-size: 1.1em;
+}
+
+/* Paragraphs and Lists */
+.terms-body p {
+  margin-bottom: 12px;
+}
+.terms-body ul {
+  margin: 8px 0 15px 20px;
+  padding-left: 15px;
+}
+.terms-body li {
+  margin-bottom: 8px;
+}
+
+/* Actions */
 .terms-actions {
   display: flex;
   justify-content: flex-end;
-  gap: 15px;
+  gap: 12px;
 }
-
-/* Popup Buttons */
-#popupOkBtn,
-#termsOkBtn,
-#termsCancelBtn {
-  padding: 14px 28px;
+.message-content button, 
+.terms-actions button {
+  padding: 10px 16px;
+  border-radius: 10px;
   border: none;
-  border-radius: 12px;
   cursor: pointer;
   font-weight: bold;
-  transition: all 0.3s;
-}
-#popupOkBtn,
-#termsOkBtn {
   background: #a65b35;
   color: #fff;
+  transition: 0.3s;
 }
-#popupOkBtn:hover,
-#termsOkBtn:hover { background: #552915; }
-#termsCancelBtn {
-  background: #e0e0e0;
-  color: #552915;
+.message-content button:hover, 
+.terms-actions button:hover {
+  background: #fff8f0; 
+  color: #552915; 
+  border: 1px solid #552915;
 }
-#termsCancelBtn:hover { background: #c9c9c9; }
+
+/* ✅ Override Special Buttons */
+#verifyOtpBtn {
+  background: #28a745 !important; /* green */
+  color: #fff !important;
+}
+#verifyOtpBtn:hover {
+  background: #218838 !important;
+}
+.cancel-btn {
+  background: #dc3545 !important; /* red */
+  color: #fff !important;
+}
+.cancel-btn:hover {
+  background: #b52a37 !important;
+}
+
+/* OTP Error inside popup */
+#otpPopup .error-msg {
+  display: block; /* ensure it shows on top */
+  margin-top: 5px;
+  font-size: 0.9em;
+  text-align: center;
+  z-index: 3500; /* extra high to appear above OTP popup overlay */
+  position: relative; /* needed for stacking context */
+}
 
 /* Animation */
 @keyframes popupFade {
-  from { transform: translateY(-20px); opacity: 0; }
-  to { transform: translateY(0); opacity: 1; }
+  from { transform: scale(0.9); opacity: 0; }
+  to { transform: scale(1); opacity: 1; }
 }
 
 /* Responsive */
-@media(max-width:1024px){
-  .login-left,.login-right{padding:35px 20px}
-}
-@media(max-width:768px){
-  .login-container{flex-direction:column;border-radius:20px}
-  .login-left,.login-right{width:100%;padding:25px}
-  .coffee-img{width:180px}
-  .row{flex-direction:column}
-}
-@media(max-width:500px){
-  .login-left h2,.login-box h2{font-size:1.5em}
-  .login-left p,.login-box p,.register-text{font-size:0.85em}
-  .login-box input,.login-box select{padding:12px}
-  .signin-btn{padding:14px;font-size:0.95em}
-  .checkbox-group label{font-size:0.85em}
+@media (max-width: 768px) {
+  .login-container {
+    flex-direction: column;
+    max-width: 500px;
+  }
+  .login-left, .login-right { 
+    padding: 30px; 
+    flex: none;
+  }
+  .row { flex-direction: column; gap: 0; }
+
+  /* Fullscreen terms popup on small devices */
+  .terms-content {
+    width: 95%;
+    height: 95%;
+    max-height: 95%;
+    border-radius: 15px;
+    padding: 20px;
+  }
+  .terms-body {
+    max-height: 70vh;
+  }
 }
