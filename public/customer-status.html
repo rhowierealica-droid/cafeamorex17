@@ -3,15 +3,33 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Café Amore - Orders</title>
+  <title>Café Amore - Customer Orders</title>
+
+  <!-- CSS -->
   <link rel="stylesheet" href="customer-status.css">
   <link rel="stylesheet" href="customer-side.css">
+  <link rel="stylesheet" href="OrderStatusNotif.css">
+
+  <!-- Font Awesome -->
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
 </head>
 <body>
 
-  <!-- Hamburger (mobile) -->
-  <div class="hamburger hidden" id="hamburger"><i class="fas fa-bars"></i></div>
+ <!-- Top Bar for Mobile -->
+<div class="top-bar">
+  <div class="hamburger" id="hamburger"><i class="fas fa-bars"></i></div>
+  <div class="mobile-logo">
+    <img src="logo.png" alt="Café Amore Logo">
+    <span class="brand">Café Amore</span>
+  </div>
+</div>
+
+  <!-- Notification Bell -->
+  <div id="notifBellContainer">
+    <i class="fas fa-bell"></i>
+    <span class="badge">0</span>
+  </div>
+  <div id="notifDropdown"></div>
 
   <!-- Sidebar Navigation -->
   <aside class="sidebar" id="sidebar">
@@ -26,7 +44,7 @@
         <li class="cart-link"><i class="fas fa-shopping-cart"></i> Cart</li>
         <li class="order-status-link"><i class="fas fa-truck"></i> Order Status</li>
         <li class="favorites-link"><i class="fas fa-heart"></i> Favorites</li>
-        <li class="history-link"><i class="fas fa-history"></i> History</li>
+        <!-- <li class="history-link"><i class="fas fa-history"></i> History</li> -->
       </ul>
     </nav>
     <div class="login-link"><i class="fas fa-sign-in-alt"></i> Login</div>
@@ -45,15 +63,17 @@
     <section class="orders-container">
       <h1>My Orders</h1>
 
-      <!-- Status Tabs -->
-      <div class="status-tabs">
-        <div class="tab active" data-status="Pending"><i class="fas fa-clipboard-list"></i><span>Pending</span></div>
-        <div class="tab" data-status="Preparing"><i class="fas fa-utensils"></i><span>Preparing</span></div>
-        <div class="tab" data-status="Delivery"><i class="fas fa-truck"></i><span>Delivery</span></div>
-        <div class="tab" data-status="To Receive"><i class="fas fa-box"></i><span>To Receive</span></div>
-        <div class="tab" data-status="To Rate"><i class="fas fa-star star"></i><span>To Rate</span></div>
-        <div class="tab" data-status="Completed"><i class="fas fa-check-circle"></i><span>Completed</span></div>
-        <div class="tab" data-status="Canceled"><i class="fas fa-times-circle"></i><span>Canceled</span></div>
+      <!-- Tabs (Updated to button style like Incoming Orders) -->
+      <div class="tabs">
+        <button class="tab-btn active" data-status="Pending"><i class="fas fa-clipboard-list"></i> Pending</button>
+        <button class="tab-btn" data-status="Preparing"><i class="fas fa-utensils"></i> Preparing</button>
+        <button class="tab-btn" data-status="Delivery"><i class="fas fa-truck"></i> Delivery</button>
+        <button class="tab-btn" data-status="To Receive"><i class="fas fa-box"></i> To Receive</button>
+        <button class="tab-btn" data-status="To Rate"><i class="fas fa-star"></i> To Rate</button>
+        <button class="tab-btn" data-status="Completed"><i class="fas fa-check-circle"></i> Completed</button>
+        <button class="tab-btn" data-status="Canceled"><i class="fas fa-times-circle"></i> Canceled</button>
+        <button class="tab-btn" data-status="Refund"><i class="fas fa-money-bill-wave"></i> Refund</button>
+
       </div>
 
       <!-- Orders List -->
@@ -72,6 +92,19 @@
       </form>
     </div>
   </div>
+
+  <!-- Refund Modal -->
+<div id="refund-modal" class="modal">
+  <div class="modal-content">
+    <span class="close-btn">&times;</span>
+    <h2>Select Products to Refund</h2>
+    <form id="refund-form">
+      <div id="refund-items"></div>
+      <button type="submit" class="action-btn">Submit Refund Request</button>
+    </form>
+  </div>
+</div>
+
 
   <!-- JS Modules -->
   <script type="module" src="customer-status.js"></script>
