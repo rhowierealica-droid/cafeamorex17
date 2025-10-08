@@ -144,8 +144,8 @@ body {
   text-decoration: underline;
 }
 
-/* Forgot Password & Message Popup */
-.forgot-popup, .message-popup {
+/* Popups: Forgot Password, Message, OTP */
+.forgot-popup, .message-popup, .otp-popup {
   display: none;
   position: fixed;
   top: 0; left: 0;
@@ -156,7 +156,7 @@ body {
   align-items: center;
   z-index: 1000;
 }
-.forgot-content, .message-content {
+.forgot-content, .message-content, .otp-content {
   background: #fff8f0;
   padding: 30px 25px;
   border-radius: 20px;
@@ -167,6 +167,8 @@ body {
   position: relative;
   animation: popupFade 0.3s ease-out;
 }
+
+/* Close button */
 .close-btn {
   position: absolute;
   top: 12px;
@@ -176,28 +178,43 @@ body {
   color: #552915;
   cursor: pointer;
 }
-.forgot-content h3, .message-content h3 {
+
+/* Popup headings and text */
+.forgot-content h3, .message-content h3, .otp-content h3 {
   font-size: 1.6em;
   margin-bottom: 15px;
   color: #a65b35;
 }
-.forgot-content p, .message-content p {
+.forgot-content p, .message-content p, .otp-content p {
   font-size: 0.95em;
   margin-bottom: 20px;
   color: #552915;
 }
-.forgot-content input {
+
+/* Popup inputs */
+.forgot-content input, .otp-content input {
   width: 100%;
   padding: 12px;
-  margin-bottom: 20px;
+  margin-bottom: 10px;
   border-radius: 10px;
   border: 1px solid #c4a484;
   font-size: 0.95em;
 }
-.forgot-content input:focus {
+.forgot-content input:focus, .otp-content input:focus {
   border-color: #a65b35;
 }
-#sendReset {
+
+/* OTP Error Message */
+#otpError {
+  display: none;
+  font-size: 0.9em;
+  color: red;
+  text-align: left;
+  margin-bottom: 15px;
+}
+
+/* Popup buttons */
+#sendReset, #verifyOtpBtn {
   width: 100%;
   padding: 12px;
   background: #a65b35;
@@ -208,7 +225,23 @@ body {
   cursor: pointer;
   transition: 0.3s;
 }
-#sendReset:hover {
+#sendReset:hover, #verifyOtpBtn:hover {
+  background: #552915;
+}
+
+/* OK Button for Message Popup */
+.ok-btn {
+  width: 100%;
+  padding: 12px;
+  background: #a65b35;
+  color: #fff;
+  border: none;
+  border-radius: 10px;
+  font-weight: bold;
+  cursor: pointer;
+  transition: 0.3s;
+}
+.ok-btn:hover {
   background: #552915;
 }
 
@@ -220,46 +253,20 @@ body {
 
 /* Responsive */
 @media (max-width: 1024px) {
-  .login-wrapper {
-    padding: 30px 15px;
-  }
-  .login-left, .login-right {
-    padding: 30px 20px;
-  }
+  .login-wrapper { padding: 30px 15px; }
+  .login-left, .login-right { padding: 30px 20px; }
 }
 @media (max-width: 768px) {
-  .login-container {
-    flex-direction: column;
-  }
-  .login-left, .login-right {
-    width: 100%;
-    padding: 25px;
-  }
-  .login-left .coffee-img {
-    width: 150px;
-  }
+  .login-container { flex-direction: column; }
+  .login-left, .login-right { width: 100%; padding: 25px; }
+  .login-left .coffee-img { width: 150px; }
 }
 @media (max-width: 500px) {
-  .login-left h2 {
-    font-size: 1.5em;
-  }
-  .login-left p {
-    font-size: 0.9em;
-  }
-  .login-box h2 {
-    font-size: 1.5em;
-  }
-  .login-box p, .register-text {
-    font-size: 0.85em;
-  }
-  .login-box input {
-    padding: 10px;
-  }
-  .signin-btn {
-    padding: 12px;
-  }
-  .forgot-content {
-    padding: 25px 15px;
-    width: 90%;
-  }
+  .login-left h2 { font-size: 1.5em; }
+  .login-left p { font-size: 0.9em; }
+  .login-box h2 { font-size: 1.5em; }
+  .login-box p, .register-text { font-size: 0.85em; }
+  .login-box input { padding: 10px; }
+  .signin-btn { padding: 12px; }
+  .forgot-content, .otp-content { padding: 25px 15px; width: 90%; }
 }
