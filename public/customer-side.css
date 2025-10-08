@@ -1,6 +1,8 @@
 /* ==========================
    Sidebar Base
 ========================== */
+
+
 .sidebar {
   position: fixed;
   top: 0;
@@ -8,7 +10,7 @@
   width: 240px;
   height: 100%;
   background: #f3e9dc;
-  padding-top: 20px;
+  padding-top: 0; /* removed extra padding */
   padding-bottom: 20px;
   z-index: 2000;
   display: flex;
@@ -25,8 +27,8 @@
   display: flex;
   align-items: center;
   gap: 10px;
-  padding: 0 18px;
-  margin-bottom: 15px;
+  padding: 20px 18px; /* small padding for spacing from top */
+  margin: 0;
   cursor: pointer;
 }
 .sidebar .logo img { width: 40px; height: 40px; }
@@ -63,23 +65,46 @@
 .profile-card {
   margin-top: auto;
   padding: 15px 18px;
-  display: none; /* hidden by default */
+  display: none;
   align-items: center;
   gap: 12px;
   border-top: 1px solid #ddd;
   transition: background 0.25s;
   cursor: pointer;
 }
-.profile-card:hover { background: #e6d6c0; }
-.profile-avatar i { font-size: 2em; color: #552915; }
-.profile-info .profile-name { font-weight: bold; color: #4b3621; }
-.profile-info .edit-text { font-size: 0.85em; color: #777; }
+.profile-card:hover { 
+  background: #552915; 
+}
+
+/* Profile Avatar & Info */
+.profile-avatar i { 
+  font-size: 2em; 
+  color: #552915; 
+  transition: color 0.25s;
+}
+.profile-info .profile-name { 
+  font-weight: bold; 
+  color: #4b3621; 
+  transition: color 0.25s;
+}
+.profile-info .edit-text { 
+  font-size: 0.85em; 
+  color: #777; 
+  transition: color 0.25s;
+}
 .profile-info .edit-text:hover { color: #552915; }
+
+/* Make avatar icon and text white on hover */
+.profile-card:hover .profile-avatar i,
+.profile-card:hover .profile-info .profile-name,
+.profile-card:hover .profile-info .edit-text {
+  color: #fff;
+}
 
 /* Logout */
 .logout {
   padding: 14px 18px;
-  display: none; /* hidden by default */
+  display: none;
   align-items: center;
   gap: 10px;
   font-weight: 700;
@@ -94,7 +119,7 @@
 .login-link {
   margin-top: auto;
   padding: 14px 18px;
-  display: none; /* hidden by default */
+  display: none;
   align-items: center;
   gap: 10px;
   font-weight: 700;
@@ -108,36 +133,99 @@
 /* Hamburger */
 .hamburger {
   position: fixed;
-  top: 15px;
+  top: 20px;
   left: 15px;
   font-size: 2em;
   color: #552915;
   cursor: pointer;
-  z-index: 2001;
+  z-index: 2003;
   display: none;
 }
 
 /* Close button (mobile) */
 .sidebar .close-btn {
-  font-size: 1.3em;
-  padding: 10px 18px;
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  font-size: 1.5em;
   cursor: pointer;
-  text-align: right;
   color: #552915;
   transition: color 0.25s, opacity 0.25s;
   opacity: 0;
+  z-index: 2010;
 }
 .sidebar .close-btn:hover { color: #fff; }
-
-/* Responsive */
-@media (max-width: 1024px) {
-  .hamburger { display: block; }
-  .sidebar { transform: translateX(-240px); }
-  .sidebar.active { transform: translateX(0); }
-  .sidebar .close-btn { opacity: 1; }
-}
 
 /* Scrollbar */
 .sidebar::-webkit-scrollbar { width: 6px; }
 .sidebar::-webkit-scrollbar-thumb { background: #c8b7a1; border-radius: 3px; }
 .sidebar::-webkit-scrollbar-thumb:hover { background: #b39c82; }
+
+/* ==========================
+   Top Bar (Mobile)
+========================== */
+.top-bar {
+  display: none;
+  width: 100%;
+  padding: 10px 20px;
+  display: flex;
+  align-items: center;
+  justify-content: center; /* center logo */
+  position: fixed;
+  top: 0;
+  left: 0;
+  z-index: 2002;
+  border-bottom: 2px solid #704225;
+  background-color: #fff8f0;
+  box-sizing: border-box;
+}
+
+/* Place hamburger on left within top bar */
+.top-bar .hamburger {
+  position: absolute; /* move left without affecting center logo */
+  left: 15px;
+  font-size: 1.8em;
+  color: #552915;
+  cursor: pointer;
+}
+
+/* Logo inside top bar */
+.top-bar .mobile-logo {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.top-bar .mobile-logo img {
+  width: 40px;
+  height: 40px;
+}
+
+/* ==========================
+   Overlay for sidebar
+========================== */
+#overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: rgba(0,0,0,0.5);
+  z-index: 200;
+  display: none;
+  transition: opacity 0.25s ease-in-out;
+}
+#overlay.active {
+  display: block;
+}
+
+/* ==========================
+   Responsive
+========================== */
+@media (max-width: 1024px) {
+  .hamburger { display: block; }
+  .sidebar { transform: translateX(-240px); padding-top: 20px; }
+  .sidebar.active { transform: translateX(0); }
+  .sidebar .close-btn { opacity: 1; }
+  .top-bar { display: flex; }
+  main.menu-container { margin-left: 0; padding-top: 60px; }
+}
