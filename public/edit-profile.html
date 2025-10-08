@@ -6,21 +6,55 @@
   <title>Café Amore | Edit Profile</title>
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
   <link rel="stylesheet" href="edit-profile.css">
-  
+  <link rel="stylesheet" href="customer-side.css">
 </head>
 <body>
 
-  <!-- Profile Wrapper -->
+  <div class="top-bar">
+    <div class="hamburger" id="hamburger"><i class="fas fa-bars"></i></div>
+    <div class="mobile-logo">
+      <img src="logo.png" alt="Café Amore Logo">
+      <span class="brand">Café Amore</span>
+    </div>
+  </div>
+
+  <aside class="sidebar" id="sidebar">
+    <div class="logo">
+      <img src="logo.png" alt="Café Amore Logo">
+      <span class="brand">Café Amore</span>
+    </div>
+    <nav>
+      <ul>
+        <li class="menu-link"><i class="fas fa-utensils"></i> Menu</li>
+        <li class="cart-link"><i class="fas fa-shopping-cart"></i> Cart</li>
+        <li class="order-status-link"><i class="fas fa-truck"></i> Order Status</li>
+        <li class="favorites-link"><i class="fas fa-heart"></i> Favorites</li>
+       <!-- <li class="history-link"><i class="fas fa-history"></i> History</li> -->
+      </ul>
+    </nav>
+
+    <div class="login-link"><i class="fas fa-sign-in-alt"></i> Login</div>
+    <div class="profile-card">
+      <div class="profile-avatar"><i class="fas fa-user-circle"></i></div>
+      <div class="profile-info">
+        <p class="profile-name">Customer</p>
+        <p class="edit-text">Edit Profile</p>
+      </div>
+    </div>
+    <div class="logout"><i class="fas fa-sign-out-alt"></i> Log Out</div>
+    <div class="close-btn hidden" id="closeBtn">&times;</div>
+  </aside>
+
   <div class="profile-wrapper">
     <div class="profile-container">
       <h2>Edit Profile</h2>
 
-      <!-- Tabs -->
       <div class="tabs">
         <button class="tab-btn active" data-tab="infoTab">Information</button>
         <button class="tab-btn" data-tab="addressTab">Address</button>
         <button class="tab-btn" data-tab="emailTab">Email</button>
         <button class="tab-btn" data-tab="passwordTab">Password</button>
+        <button class="tab-btn" data-tab="phoneTab">Phone</button>
       </div>
 
       <!-- Information Tab -->
@@ -52,79 +86,6 @@
               <label for="barangay">Barangay</label>
               <select id="barangay" disabled>
                 <option value="">Choose Barangay</option>
-                <!-- Barangay options -->
-                  <option>Alima</option>
-                  <option>Aniban I</option>
-                  <option>Aniban II</option>
-                  <option>Aniban III</option>
-                  <option>Aniban IV</option>
-                  <option>Aniban V</option>
-                  <option>Banalo</option>
-                  <option>Bayanan</option>
-                  <option>Campo Santo</option>
-                  <option>Daang Bukid</option>
-                  <option>Digman</option>
-                  <option>Dulong Bayan</option>
-                  <option>Habay I</option>
-                  <option>Habay II</option>
-                  <option>Ligas I</option>
-                  <option>Ligas II</option>
-                  <option>Ligas III</option>
-                  <option>Mabolo I</option>
-                  <option>Mabolo II</option>
-                  <option>Mabolo III</option>
-                  <option>Maliksi I</option>
-                  <option>Maliksi II</option>
-                  <option>Maliksi III</option>
-                  <option>Mambog I</option>
-                  <option>Mambog II</option>
-                  <option>Mambog III</option>
-                  <option>Mambog IV</option>
-                  <option>Mambog V</option>
-                  <option>Molino I</option>
-                  <option>Molino II</option>
-                  <option>Molino III</option>
-                  <option>Molino IV</option>
-                  <option>Molino V</option>
-                  <option>Molino VI</option>
-                  <option>Molino VII</option>
-                  <option>Niog I</option>
-                  <option>Niog II</option>
-                  <option>Niog III</option>
-                  <option>P.F. Espiritu I (Panapaan)</option>
-                  <option>P.F. Espiritu II</option>
-                  <option>P.F. Espiritu III</option>
-                  <option>P.F. Espiritu IV</option>
-                  <option>P.F. Espiritu V</option>
-                  <option>P.F. Espiritu VI</option>
-                  <option>P.F. Espiritu VII</option>
-                  <option>P.F. Espiritu VIII</option>
-                  <option>Queens Row Central</option>
-                  <option>Queens Row East</option>
-                  <option>Queens Row West</option>
-                  <option>Real I</option>
-                  <option>Real II</option>
-                  <option>Salinas I</option>
-                  <option>Salinas II</option>
-                  <option>Salinas III</option>
-                  <option>Salinas IV</option>
-                  <option>San Nicolas I</option>
-                  <option>San Nicolas II</option>
-                  <option>San Nicolas III</option>
-                  <option>Sineguelasan</option>
-                  <option>Tabing Dagat (Poblacion)</option>
-                  <option>Talaba I</option>
-                  <option>Talaba II</option>
-                  <option>Talaba III</option>
-                  <option>Talaba IV</option>
-                  <option>Talaba V</option>
-                  <option>Talaba VI</option>
-                  <option>Talaba VII</option>
-                  <option>Zapote I</option>
-                  <option>Zapote II</option>
-                  <option>Zapote III</option>
-                  <option>Zapote IV</option>
-                  <option>Zapote V</option>
               </select>
             </div>
             <div class="input-group">
@@ -157,13 +118,10 @@
       <!-- Email Tab -->
       <div class="tab-content" id="emailTab" style="display:none;">
         <form id="emailForm">
-          <!-- Masked current email -->
           <div class="input-group">
             <label for="email">Current Email</label>
             <input type="email" id="email" disabled>
           </div>
-
-          <!-- Inline editable email fields -->
           <div class="email-edit-fields" style="display:none;">
             <div class="input-group">
               <label for="currentEmailInput">Enter Current Email</label>
@@ -178,7 +136,6 @@
               <input type="password" id="currentPassword" placeholder="Enter current password">
             </div>
           </div>
-
           <div class="button-group">
             <button type="button" class="edit-btn" id="editEmailBtn">Edit</button>
             <button type="submit" class="save-btn" id="saveEmailBtn" style="display:none;">Save</button>
@@ -187,30 +144,83 @@
         </form>
       </div>
 
-      <!-- Password Tab -->
-      <!-- Password Tab -->
-      <div class="tab-content" id="passwordTab" style="display:none;">
-        <form id="passwordForm">
+     <!-- Password Tab -->
+<div class="tab-content" id="passwordTab" style="display:none;">
+  <form id="passwordForm">
+    <div class="password-edit-fields">
+      <div class="input-group">
+        <label for="currentPasswordForChange">Enter Current Password</label>
+        <input type="password" id="currentPasswordForChange" placeholder="Enter current password" disabled>
+      </div>
+      <div class="input-group">
+        <label for="password">New Password</label>
+        <input type="password" id="password" placeholder="Enter new password" disabled>
+      </div>
+      <div class="input-group">
+        <label for="confirmPassword">Confirm Password</label>
+        <input type="password" id="confirmPassword" placeholder="Confirm new password" disabled>
+      </div>
+    </div>
+    <div class="button-group">
+      <button type="button" class="edit-btn" id="editPasswordBtn">Edit</button>
+      <button type="submit" class="save-btn" id="savePasswordBtn" style="display:none;">Save</button>
+      <button type="button" class="cancel-btn" id="cancelPasswordBtn" style="display:none;">Cancel</button>
+    </div>
+  </form>
+</div>
+
+      <!-- Phone Tab -->
+      <div class="tab-content" id="phoneTab" style="display:none;">
+        <form id="phoneForm">
           <div class="input-group">
-            <label for="password">New Password</label>
-            <input type="password" id="password" placeholder="Enter new password" disabled>
+            <label for="phone">Current Phone</label>
+            <input type="text" id="phone" disabled>
           </div>
-          <div class="input-group">
-            <label for="confirmPassword">Confirm Password</label>
-            <input type="password" id="confirmPassword" placeholder="Confirm new password" disabled>
+          <div class="phone-edit-fields" style="display:none;">
+            <div class="input-group">
+              <label for="currentPhoneInput">Enter Current Phone</label>
+              <input type="text" id="currentPhoneInput" placeholder="09xxxxxxxxx">
+            </div>
+            <div class="input-group">
+              <label for="newPhone">Enter New Phone</label>
+              <input type="text" id="newPhone" placeholder="09xxxxxxxxx">
+            </div>
+            <div class="input-group">
+              <label for="currentPhonePassword">Enter Current Password</label>
+              <input type="password" id="currentPhonePassword" placeholder="Enter current password">
+            </div>
           </div>
           <div class="button-group">
-            <button type="button" class="edit-btn" id="editPasswordBtn">Edit</button>
-            <button type="submit" class="save-btn" id="savePasswordBtn" style="display:none;">Save</button>
-            <button type="button" class="cancel-btn" id="cancelPasswordBtn" style="display:none;">Cancel</button>
+            <button type="button" class="edit-btn" id="editPhoneBtn">Edit</button>
+            <button type="submit" class="save-btn" id="savePhoneBtn" style="display:none;">Save</button>
+            <button type="button" class="cancel-btn" id="cancelPhoneBtn" style="display:none;">Cancel</button>
           </div>
         </form>
-      
       </div>
 
     </div>
   </div>
+   <!-- reCAPTCHA container (required for phone auth) -->
+  <div id="recaptcha-container"></div>
+
+  <!-- OTP Verification Popup -->
+  <div id="otpPopup">
+    <div class="otp-container">
+      <h3>Enter OTP</h3>
+      <input type="text" id="otpCode" placeholder="Enter OTP">
+      <div id="otpError"></div>
+      <button type="button" id="verifyOtpBtn">Verify OTP</button>
+    </div>
+  </div>
 
   <script type="module" src="edit-profile.js"></script>
+  <script type="module" src="customer-side.js"></script>
+</body>
+</html>
+
+
+
+  <script type="module" src="edit-profile.js"></script>
+  <script type="module" src="customer-side.js"></script>
 </body>
 </html>
