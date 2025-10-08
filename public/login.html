@@ -63,10 +63,25 @@
   <!-- Message Popup -->
   <div id="messagePopup" class="message-popup">
     <div class="message-content">
-      <span id="closeMessage" class="close-btn">&times;</span>
       <p id="messageText"></p>
+      <button id="okMessage" class="ok-btn">OK</button>
     </div>
   </div>
+
+  <!-- OTP Popup -->
+  <div id="otpPopup" class="otp-popup">
+    <div class="otp-content">
+      <span id="closeOtpBtn" class="close-btn">&times;</span>
+      <h3>Enter OTP</h3>
+      <p>We sent a code to your phone number ending in <span id="maskedPhone"></span></p>
+      <input type="text" id="otpCode" placeholder="Enter OTP" required>
+      <p id="otpError" class="otp-error" style="color: red; display: none; margin-top: 5px;"></p> <!-- Inline error message -->
+      <button id="verifyOtpBtn">Verify OTP</button>
+    </div>
+  </div>
+
+  <!-- Invisible reCAPTCHA -->
+  <div id="recaptcha-container"></div>
 
   <!-- JS -->
   <script type="module" src="login.js"></script>
