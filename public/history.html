@@ -8,11 +8,20 @@
   <!-- CSS -->
   <link rel="stylesheet" href="history.css">
   <link rel="stylesheet" href="customer-side.css"> <!-- Sidebar CSS -->
+    <link rel="stylesheet" href="OrderStatusNotif.css">
+
 
   <!-- Font Awesome -->
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
 </head>
 <body>
+
+  <!-- Notification Bell -->
+<div id="notifBellContainer">
+  <i class="fas fa-bell"></i>
+  <span class="badge">0</span>
+</div>
+<div id="notifDropdown"></div>
 
   <!-- Hamburger (for small screens) -->
   <div class="hamburger hidden" id="hamburger"><i class="fas fa-bars"></i></div>
@@ -70,5 +79,6 @@
   <!-- JS -->
   <script type="module" src="history.js"></script>
   <script type="module" src="customer-side.js"></script> <!-- Sidebar toggle -->
+  <script type="module" src="OrderStatusNotif.js"></script>
 </body>
 </html>
