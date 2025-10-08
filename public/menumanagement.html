@@ -14,7 +14,6 @@
 </head>
 <body>
 
-  
   <!-- Sidebar -->
   <aside class="sidebar" id="sidebar">
     <div class="logo">
@@ -76,57 +75,68 @@
     <div class="popup-content">
       <h3 id="popupTitle">Add Product</h3>
       <form id="popupForm">
-        <label for="productName">Product Name:</label>
-        <input type="text" id="productName" required>
+        <div class="form-scroll">
+          <label for="productName">Product Name:</label>
+          <input type="text" id="productName" required>
 
-        <label for="productDescription">Description:</label>
-        <textarea id="productDescription" placeholder="Describe the product" rows="3" required></textarea>
+          <label for="productDescription">Description:</label>
+          <textarea id="productDescription" placeholder="Describe the product" rows="3" required></textarea>
 
-        <label for="productCategory">Category:</label>
-        <select id="productCategory" required>
-          <option value="">Select Category</option>
-          <option value="Ice Espresso">Ice Espresso</option>
-          <option value="Non-Coffee">Non-Coffee</option>
-          <option value="Iced Cold Brew">Iced Cold Brew</option>
-          <option value="Hot Coffee">Hot Coffee</option>
-          <option value="Sandwich">Sandwich</option>
-        </select>
+          <label for="productCategory">Category:</label>
+          <select id="productCategory" required>
+            <option value="">Select Category</option>
+            <option value="Ice Espresso">Ice Espresso</option>
+            <option value="Non-Coffee">Non-Coffee</option>
+            <option value="Iced Cold Brew">Iced Cold Brew</option>
+            <option value="Hot Coffee">Hot Coffee</option>
+            <option value="Sandwich">Sandwich</option>
+          </select>
 
-        <!-- Upload Image -->
-        <label for="productImage">Upload Image:</label>
-        <input type="file" id="productImage" accept="image/*" required>
+          <!-- Upload Image -->
+          <label for="productImage">Upload Image:</label>
+          <input type="file" id="productImage" accept="image/*" required>
 
-        <!-- Preview Image -->
-        <div id="imagePreview" style="margin-top:10px; text-align:center;">
-          <img id="previewImage" src="" alt="Preview" style="max-width:120px; display:none; border-radius:8px;">
+          <!-- Preview Image -->
+          <div id="imagePreview" class="image-preview">
+            <img id="previewImage" src="" alt="Preview">
+          </div>
+
+          <!-- Inventory Sections -->
+          <div class="popup-section">Ingredients</div>
+          <div id="ingredientsContainer"><div id="ingredientsList"></div></div>
+
+          <div class="popup-section">Add-ons</div>
+          <div id="addonsContainer"><div id="addonsList"></div></div>
+
+          <div class="popup-section">Others</div>
+          <div id="othersContainer"><div id="othersList"></div></div>
+
+          <!-- Sizes Section -->
+          <div class="popup-section">Sizes</div>
+          <div id="sizesContainer"><div id="sizesList"></div></div>
+
+          <!-- Per-size dynamic sections -->
+          <div id="perSizeContainer"></div>
         </div>
 
-        <!-- Inventory Sections -->
-        <div class="popup-section">Ingredients</div>
-        <div id="ingredientsContainer">
-          <div id="ingredientsList"></div>
-        </div>
-
-        <div class="popup-section">Sizes</div>
-        <div id="sizesContainer">
-          <div id="sizesList"></div>
-        </div>
-
-        <div class="popup-section">Add-ons</div>
-        <div id="addonsContainer">
-          <div id="addonsList"></div>
-        </div>
-
-        <div class="popup-section">Others</div>
-        <div id="othersContainer">
-          <div id="othersList"></div>
-        </div>
-
-        <div class="popup-actions" style="text-align: center; margin-top: 15px;">
+        <!-- Sticky buttons -->
+        <div class="popup-buttons">
           <button type="submit">Save</button>
           <button type="button" id="cancelBtn">Cancel</button>
         </div>
       </form>
+    </div>
+  </div>
+
+  <!-- Delete Confirmation Popup -->
+  <div id="deletePopup" class="popup">
+    <div class="popup-content">
+      <h3>Confirm Delete</h3>
+      <p>Are you sure you want to delete this product?</p>
+      <div class="popup-buttons">
+        <button id="confirmDeleteBtn" class="delete-btn">Delete</button>
+        <button id="cancelDeleteBtn" type="button" class="cancel-btn">Cancel</button>
+      </div>
     </div>
   </div>
 
