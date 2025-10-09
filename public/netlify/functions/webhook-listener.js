@@ -86,7 +86,7 @@ exports.handler = async (event, context) => {
   // -------------------- Payment Paid Events --------------------
   if (eventType === "payment.paid" || eventType === "checkout_session.payment.paid") {
     const metadata = dataObject?.attributes?.metadata || {};
-    const orderItems = safeParse(metadata.items || metadata.orderItems);
+    const orderItems = safeParse(metadata.items);
     const cartItemIds = safeParse(metadata.cartItemIds);
 
     if (!metadata.userId || !metadata.queueNumber) {
@@ -94,7 +94,7 @@ exports.handler = async (event, context) => {
     }
 
     const deliveryFee = Number(metadata.deliveryFee || 0);
-    const totalAmount = Number(metadata.total || metadata.orderTotal) ||
+    const totalAmount = Number(metadata.total || 0) ||
       orderItems.reduce((sum, i) => sum + (Number(i.total || 0) || 0), 0) + deliveryFee;
 
     // -------------------- Save Order --------------------
