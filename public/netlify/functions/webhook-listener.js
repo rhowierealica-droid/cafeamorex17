@@ -1,5 +1,4 @@
 require('dotenv').config();
-const axios = require('axios');
 const admin = require('firebase-admin');
 const crypto = require('crypto');
 
@@ -37,10 +36,9 @@ exports.handler = async (event, context) => {
     return { statusCode: 405, body: "Method Not Allowed" };
   }
 
-  const PAYMONGO_SECRET_KEY = process.env.PAYMONGO_SECRET_KEY;
   const WEBHOOK_SECRET = process.env.WEBHOOK_SECRET;
-
   let payload;
+
   try {
     payload = JSON.parse(event.body);
   } catch (err) {
@@ -68,7 +66,6 @@ exports.handler = async (event, context) => {
   if (eventType === "payment.refunded" || eventType === "payment.refund.updated") {
     console.log("💸 Refund event received:", dataObject?.id);
 
-    // Optional: update Firestore order status if needed
     if (db && dataObject?.attributes?.payment_id) {
       const paymentId = dataObject.attributes.payment_id;
       const deliveryOrdersRef = db.collection("DeliveryOrders");
@@ -86,10 +83,15 @@ exports.handler = async (event, context) => {
   // -------------------- Payment Paid Events --------------------
   if (eventType === "payment.paid" || eventType === "checkout_session.payment.paid") {
     const metadata = dataObject?.attributes?.metadata || {};
-    const orderItems = safeParse(metadata.orderItems);
+    const orderItems = safeParse(metadata.items); // ✅ read correct key
     const cartItemIds = safeParse(metadata.cartItemIds);
 
-    if (!metadata.userId || !metadata.queueNumber) return { statusCode: 400, body: "Missing metadata" };
+    if (!metadata.userId || !metadata.queueNumber) {
+      return { statusCode: 400, body: "Missing metadata" };
+    }
+
+    // Ensure total is correct
+    const totalAmount = Number(metadata.orderTotal) || orderItems.reduce((sum, i) => sum + (i.total || 0), 0) + Number(metadata.deliveryFee || 0);
 
     // Save order to Firestore
     const orderRef = await db.collection("DeliveryOrders").add({
@@ -101,16 +103,17 @@ exports.handler = async (event, context) => {
       orderType: "Delivery",
       items: orderItems,
       deliveryFee: Number(metadata.deliveryFee) || 0,
-      total: Number(metadata.orderTotal) || 0,
+      total: totalAmount,
       paymentMethod: "E-Payment",
       status: "Pending",
       createdAt: admin.firestore.FieldValue.serverTimestamp(),
       paymongoPaymentId: dataObject.id,
+      cartItemIds: cartItemIds
     });
 
     console.log("💾 Order saved with ID:", orderRef.id);
 
-    // TODO: Deduct inventory and clear cart here if needed
+    // TODO: Deduct inventory, etc., if needed
 
     return { statusCode: 200, body: JSON.stringify({ received: true, orderId: orderRef.id }) };
   }
