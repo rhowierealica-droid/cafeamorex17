@@ -1,170 +1,125 @@
+require('dotenv').config();
 const admin = require('firebase-admin');
-const axios = require('axios');
-const crypto = require('crypto'); // Used for Buffer and base64 encoding
+const crypto = require('crypto');
 
-// ----------------------------------------------------
-// 1. FIREBASE ADMIN INITIALIZATION
-// ----------------------------------------------------
+// ---------------------
+// Initialize Firebase Admin SDK
+// ---------------------
 let db;
-
-if (!admin.apps.length) {
-    try {
-        // Netlify stores the Service Account JSON as a single string environment variable
-        // The previously corrected FIREBASE_ADMIN_CONFIG variable handles the JSON.parse
-        const serviceAccount = JSON.parse(process.env.FIREBASE_ADMIN_CONFIG);
-        
-        admin.initializeApp({
-            credential: admin.credential.cert(serviceAccount)
-        });
-        db = admin.firestore();
-        console.log("✅ Firebase Admin Initialized.");
-    } catch (e) {
-        console.error("❌ FIREBASE ADMIN INIT FAILED:", e.message);
-        // db will remain undefined if initialization fails
-    }
-} else {
-    // If already initialized (e.g., in development or warm start)
-    db = admin.firestore();
+try {
+  const serviceAccount = JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT_KEY);
+  admin.initializeApp({
+    credential: admin.credential.cert(serviceAccount),
+  });
+  db = admin.firestore();
+  console.log("✅ Firebase Admin SDK initialized.");
+} catch (e) {
+  console.error("⚠️ Firebase Admin SDK initialization failed:", e.message);
 }
 
-// ----------------------------------------------------
-// 2. MAIN NETLIFY HANDLER FUNCTION
-// ----------------------------------------------------
+// ---------------------
+// Helper Functions
+// ---------------------
+function safeParse(value, fallback = []) {
+  try {
+    return typeof value === 'string' ? JSON.parse(value) : value || fallback;
+  } catch {
+    return fallback;
+  }
+}
+
+// ---------------------
+// Netlify Function Handler
+// ---------------------
 exports.handler = async (event, context) => {
-    // Only allow POST requests
-    if (event.httpMethod !== "POST") {
-        return { statusCode: 405, body: "Method Not Allowed" };
+  if (event.httpMethod !== "POST") {
+    return { statusCode: 405, body: "Method Not Allowed" };
+  }
+
+  const WEBHOOK_SECRET = process.env.WEBHOOK_SECRET;
+  let payload;
+
+  try {
+    payload = JSON.parse(event.body);
+  } catch (err) {
+    return { statusCode: 400, body: "Invalid JSON payload" };
+  }
+
+  // --------------------- Signature Verification ---------------------
+  try {
+    const sigHeader = event.headers["paymongo-signature"] || "";
+    if (WEBHOOK_SECRET && sigHeader) {
+      const v1 = sigHeader.split(",").find(p => p.startsWith("v1="))?.replace("v1=", "");
+      const expectedHash = crypto.createHmac("sha256", WEBHOOK_SECRET).update(event.body).digest("hex");
+      if (v1 !== expectedHash) console.warn("⚠️ Signature mismatch");
+    } else {
+      console.warn("⚠️ Skipping signature verification (local test)");
+    }
+  } catch (err) {
+    console.warn("⚠️ Signature verification failed:", err.message);
+  }
+
+  const eventType = payload?.data?.attributes?.type;
+  const dataObject = payload?.data?.attributes?.data;
+
+  // -------------------- Refund Events --------------------
+  if (eventType === "payment.refunded" || eventType === "payment.refund.updated") {
+    console.log("💸 Refund event received:", dataObject?.id);
+
+    if (db && dataObject?.attributes?.payment_id) {
+      const paymentId = dataObject.attributes.payment_id;
+      const deliveryOrdersRef = db.collection("DeliveryOrders");
+      const snapshot = await deliveryOrdersRef.where("paymongoPaymentId", "==", paymentId).limit(1).get();
+      if (!snapshot.empty) {
+        const orderRef = snapshot.docs[0].ref;
+        await orderRef.update({ status: "Refunded", paymongoRefundId: dataObject.id });
+        console.log(`✅ Updated order ${orderRef.id} status to Refunded`);
+      }
     }
 
-    // Check for Firebase initialization failure
-    if (!db) {
-        return { statusCode: 500, body: JSON.stringify({ error: "Firebase not initialized." }) };
+    return { statusCode: 200, body: JSON.stringify({ received: true, processedRefund: true }) };
+  }
+
+  // -------------------- Payment Paid Events --------------------
+  if (eventType === "payment.paid" || eventType === "checkout_session.payment.paid") {
+    const metadata = dataObject?.attributes?.metadata || {};
+    const orderItems = safeParse(metadata.items || metadata.orderItems);
+    const cartItemIds = safeParse(metadata.cartItemIds);
+
+    if (!metadata.userId || !metadata.queueNumber) {
+      return { statusCode: 400, body: "Missing metadata" };
     }
 
-    let orderRef = null; // Declare outside try block so it's accessible in catch
+    // Calculate total if not provided
+    const totalAmount = Number(metadata.orderTotal) || 
+      orderItems.reduce((sum, i) => sum + (i.total || 0), 0) + Number(metadata.deliveryFee || 0);
 
-    try {
-        // 1. Parse Request Body
-        const reqBody = JSON.parse(event.body);
-        const { paymongoPaymentId, amount } = reqBody; 
-        
-        // 2. Get Environment Variables & Validate Input
-        const PAYMONGO_SECRET_KEY = process.env.PAYMONGO_SECRET_KEY;
-        const PAYMONGO_API = process.env.PAYMONGO_API_BASE_URL || "https://api.paymongo.com/v1";
+    // Save order to Firestore
+    const orderRef = await db.collection("DeliveryOrders").add({
+      userId: metadata.userId,
+      customerName: metadata.customerName || "",
+      customerEmail: metadata.customerEmail || "", // optional for receipts
+      address: metadata.address || "",
+      queueNumber: metadata.queueNumber,
+      queueNumberNumeric: Number(metadata.queueNumberNumeric) || 0,
+      orderType: "Delivery",
+      items: orderItems,
+      deliveryFee: Number(metadata.deliveryFee) || 0,
+      total: totalAmount,
+      paymentMethod: "E-Payment",
+      status: "Pending",
+      createdAt: admin.firestore.FieldValue.serverTimestamp(),
+      paymongoPaymentId: dataObject.id,
+      cartItemIds: cartItemIds
+    });
 
-        if (!PAYMONGO_SECRET_KEY || !paymongoPaymentId || !amount || Number(amount) <= 0) {
-            return { 
-                statusCode: 400, 
-                body: JSON.stringify({ error: "Invalid refund details or missing secret key." }) 
-            };
-        }
-        
-        const amountInCentavos = Math.round(Number(amount) * 100);
-        
-        // 3. Find Order in Firestore
-        const deliveryOrdersRef = db.collection("DeliveryOrders");
-        const inStoreOrdersRef = db.collection("InStoreOrders");
-        
-        let previousStatus = "Completed"; // Default status if order is not found/no previous status
+    console.log("💾 Order saved with ID:", orderRef.id);
 
-        let querySnapshot = await deliveryOrdersRef.where('paymongoPaymentId', '==', paymongoPaymentId).limit(1).get();
-        
-        if (querySnapshot.empty) {
-            querySnapshot = await inStoreOrdersRef.where('paymongoPaymentId', '==', paymongoPaymentId).limit(1).get();
-            if (!querySnapshot.empty) {
-                orderRef = querySnapshot.docs[0].ref;
-            }
-        } else {
-            orderRef = querySnapshot.docs[0].ref;
-        }
-        
-        if (orderRef) {
-            // Store current status to revert to in case of PayMongo failure
-            previousStatus = (await orderRef.get()).data()?.status || previousStatus; 
-            
-            // Immediate status update to signal "Refund in progress"
-            await orderRef.update({
-                status: "Refund Pending", // Status while waiting for PayMongo response/webhook
-                refundRequest: true,
-                // Add the amount being refunded to the DB for tracking
-                refundAmount: amount, 
-                refundRequestedAt: admin.firestore.FieldValue.serverTimestamp()
-            });
-            console.log(`✅ Order ${orderRef.id} status updated to: Refund Pending`);
-        } else {
-            console.warn(`⚠️ Order not found for Payment ID: ${paymongoPaymentId}. Continuing with PayMongo request.`);
-        }
+    // TODO: Deduct inventory if needed
 
-        // 4. Initiate Refund with PayMongo
-        const paymongoResponse = await axios.post(
-            `${PAYMONGO_API}/refunds`,
-            {
-                data: {
-                    attributes: {
-                        payment_id: paymongoPaymentId,
-                        amount: amountInCentavos, 
-                        reason: "requested_by_customer" 
-                    }
-                }
-            },
-            {
-                headers: {
-                    // PayMongo requires Basic Authorization header with the secret key
-                    Authorization: `Basic ${Buffer.from(PAYMONGO_SECRET_KEY + ":").toString("base64")}`,
-                    "Content-Type": "application/json",
-                    Accept: "application/json",
-                },
-            }
-        );
+    return { statusCode: 200, body: JSON.stringify({ received: true, orderId: orderRef.id }) };
+  }
 
-        const paymongoRefundId = paymongoResponse.data.data.id;
-        console.log(`✅ PayMongo Refund initiated for payment ${paymongoPaymentId}. Refund ID: ${paymongoRefundId}`);
-        
-        // 5. Finalize local DB update after successful initiation
-        if (orderRef) {
-            await orderRef.update({
-                paymongoRefundId: paymongoRefundId,
-                // Do NOT set final status here. Webhook handles 'Refunded' or 'Refund Failed'.
-            });
-        }
-
-        // 6. Return Success Response
-        return {
-            statusCode: 200,
-            body: JSON.stringify({
-                message: "Refund request submitted to PayMongo.",
-                paymongoRefundId: paymongoRefundId,
-            }),
-        };
-
-    } catch (error) {
-        // 7. Handle Errors
-        console.error(
-            "❌ PayMongo Refund Initiation Error:",
-            error.response?.data || error.message
-        );
-        
-        // Revert status if the PayMongo API call failed immediately
-        if (orderRef) {
-            try {
-                 await orderRef.update({
-                    status: previousStatus, // Revert to the status before 'Refund Pending' (usually 'Completed')
-                    refundRequest: admin.firestore.FieldValue.delete(), // Remove the request flag
-                    refundAmount: admin.firestore.FieldValue.delete(), // Remove temporary amount field
-                    refundRequestedAt: admin.firestore.FieldValue.delete(), // Remove timestamp field
-                 });
-                 console.log(`⚠️ Refund failed. Order ${orderRef.id} status reverted to ${previousStatus}.`);
-            } catch (updateError) {
-                console.error("Failed to revert order status:", updateError.message);
-            }
-        }
-        
-        return {
-            statusCode: 500,
-            body: JSON.stringify({
-                error: "Failed to initiate refund with PayMongo.",
-                details: error.response?.data?.errors?.[0]?.detail || error.message,
-            }),
-        };
-    }
+  // -------------------- Default Response --------------------
+  return { statusCode: 200, body: JSON.stringify({ received: true }) };
 };
