@@ -583,23 +583,27 @@ finalConfirmBtn?.addEventListener("click", async () => {
             modal.style.display = "none";
         } else if (paymentMethod === "E-Payment") {
             showToast("Preparing E-Payment...", 3000, "blue", true);
+
+            // 🔹 STRINGIFY arrays for metadata
+            const metadata = {
+                items: JSON.stringify(commonOrderData.items),
+                cartItemIds: JSON.stringify(commonOrderData.cartItemIds),
+                orderTotal: commonOrderData.total,
+                deliveryFee: commonOrderData.deliveryFee,
+                userId: commonOrderData.userId,
+                customerName: commonOrderData.customerName,
+                address: commonOrderData.address,
+                queueNumber: commonOrderData.queueNumber,
+                queueNumberNumeric: commonOrderData.queueNumberNumeric
+            };
+
             const response = await fetch("/.netlify/functions/create-checkout", {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({
                     amount: Math.round(orderTotal * 100),
                     description: `Order #${queueNumber}`,
-                    metadata: {
-                        items: commonOrderData.items,
-                        orderTotal: commonOrderData.total,
-                        deliveryFee: commonOrderData.deliveryFee,
-                        userId: commonOrderData.userId,
-                        customerName: commonOrderData.customerName,
-                        address: commonOrderData.address,
-                        queueNumber: commonOrderData.queueNumber,
-                        queueNumberNumeric: commonOrderData.queueNumberNumeric,
-                        cartItemIds: commonOrderData.cartItemIds
-                    },
+                    metadata
                 }),
             });
 
@@ -613,6 +617,7 @@ finalConfirmBtn?.addEventListener("click", async () => {
                 console.error("PayMongo Checkout Error:", data.details || data);
             }
         }
+
         modal.style.display = "none";
     } catch (err) {
         console.error(err);
