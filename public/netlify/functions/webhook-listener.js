@@ -8,7 +8,7 @@ const crypto = require('crypto');
 // ---------------------
 let db;
 try {
-  const serviceAccount = require("./cafeamore-service-key.json");
+  const serviceAccount = JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT_KEY);
   admin.initializeApp({
     credential: admin.credential.cert(serviceAccount),
   });
@@ -19,7 +19,18 @@ try {
 }
 
 // ---------------------
-// Netlify handler
+// Helper Functions
+// ---------------------
+function safeParse(value, fallback = []) {
+  try {
+    return typeof value === 'string' ? JSON.parse(value) : value || fallback;
+  } catch {
+    return fallback;
+  }
+}
+
+// ---------------------
+// Netlify Function Handler
 // ---------------------
 exports.handler = async (event, context) => {
   if (event.httpMethod !== "POST") {
@@ -28,15 +39,15 @@ exports.handler = async (event, context) => {
 
   const PAYMONGO_SECRET_KEY = process.env.PAYMONGO_SECRET_KEY;
   const WEBHOOK_SECRET = process.env.WEBHOOK_SECRET;
-  let payload;
 
+  let payload;
   try {
     payload = JSON.parse(event.body);
   } catch (err) {
     return { statusCode: 400, body: "Invalid JSON payload" };
   }
 
-  // Verify signature
+  // --------------------- Signature Verification ---------------------
   try {
     const sigHeader = event.headers["paymongo-signature"] || "";
     if (WEBHOOK_SECRET && sigHeader) {
@@ -55,16 +66,28 @@ exports.handler = async (event, context) => {
 
   // -------------------- Refund Events --------------------
   if (eventType === "payment.refunded" || eventType === "payment.refund.updated") {
-    // You can implement Firestore update logic here if needed
     console.log("💸 Refund event received:", dataObject?.id);
+
+    // Optional: update Firestore order status if needed
+    if (db && dataObject?.attributes?.payment_id) {
+      const paymentId = dataObject.attributes.payment_id;
+      const deliveryOrdersRef = db.collection("DeliveryOrders");
+      const snapshot = await deliveryOrdersRef.where("paymongoPaymentId", "==", paymentId).limit(1).get();
+      if (!snapshot.empty) {
+        const orderRef = snapshot.docs[0].ref;
+        await orderRef.update({ status: "Refunded", paymongoRefundId: dataObject.id });
+        console.log(`✅ Updated order ${orderRef.id} status to Refunded`);
+      }
+    }
+
     return { statusCode: 200, body: JSON.stringify({ received: true, processedRefund: true }) };
   }
 
-  // -------------------- Payment Paid --------------------
+  // -------------------- Payment Paid Events --------------------
   if (eventType === "payment.paid" || eventType === "checkout_session.payment.paid") {
     const metadata = dataObject?.attributes?.metadata || {};
-    const orderItems = metadata.orderItems ? JSON.parse(metadata.orderItems) : [];
-    const cartItemIds = metadata.cartItemIds ? JSON.parse(metadata.cartItemIds) : [];
+    const orderItems = safeParse(metadata.orderItems);
+    const cartItemIds = safeParse(metadata.cartItemIds);
 
     if (!metadata.userId || !metadata.queueNumber) return { statusCode: 400, body: "Missing metadata" };
 
@@ -87,9 +110,11 @@ exports.handler = async (event, context) => {
 
     console.log("💾 Order saved with ID:", orderRef.id);
 
-    // TODO: Deduct inventory, clear cart, etc.
+    // TODO: Deduct inventory and clear cart here if needed
+
     return { statusCode: 200, body: JSON.stringify({ received: true, orderId: orderRef.id }) };
   }
 
+  // -------------------- Default Response --------------------
   return { statusCode: 200, body: JSON.stringify({ received: true }) };
 };
