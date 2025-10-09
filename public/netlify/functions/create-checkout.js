@@ -1,10 +1,10 @@
+// netlify/functions/create-checkout.js
+
 require('dotenv').config(); // Keep for local development, Netlify ignores it
 const axios = require('axios');
 
 // PayMongo API endpoint
 const PAYMONGO_API = 'https://api.paymongo.com/v1';
-
-// --- (Keep the existing buildLineItems helper function unchanged) ---
 
 /**
  * Helper function to create the detailed line_items array for PayMongo.
@@ -118,12 +118,9 @@ exports.handler = async (event, context) => {
         const paymongoMetadata = {
             userId: metadata.userId,
             queueNumber: metadata.queueNumber,
-            // 💡 CRITICAL CHANGE: Pass the entire order data object as a string
-            fullOrderData: JSON.stringify({
-                ...metadata,
-                // Ensure status is correctly set to 'Pending' by the webhook
-                status: "Pending" 
-            }),
+            // ✅ UPDATED: Pass the entire metadata object stringified.
+            // The webhook is the single source of truth for setting the final "Pending" status.
+            fullOrderData: JSON.stringify(metadata), 
             // Keep original cart IDs and items for secondary check
             cartItemIds: JSON.stringify(metadata.cartItemIds),
             itemsSummary: JSON.stringify(metadata.items.map(i => ({ p: i.product, q: i.qty })))
