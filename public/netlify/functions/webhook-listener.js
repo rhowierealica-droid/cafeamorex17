@@ -28,11 +28,25 @@ function safeParse(value) {
   }
 }
 
-// Deduct inventory function (kept unchanged, but simplified for clarity)
+// Helper: Remove null/undefined/empty string fields before saving
+function cleanObject(obj) {
+    const cleaned = {};
+    for (const key in obj) {
+        const value = obj[key];
+        // Only include values that are not null, undefined, and not an empty string
+        if (value !== null && value !== undefined && value !== "") {
+            cleaned[key] = value;
+        }
+    }
+    return cleaned;
+}
+
+// Deduct inventory function
 async function deductInventory(orderItems) {
   const deductItem = async (id, amount) => {
     if (!id || !amount) return;
     const invRef = db.collection("Inventory").doc(id);
+    // Use FieldValue.increment to atomically decrease inventory
     await invRef.update({ 
         quantity: admin.firestore.FieldValue.increment(-Math.abs(amount))
     }).catch(err => console.error(`⚠️ Failed to deduct ${amount} from item ${id}:`, err.message));
@@ -59,6 +73,7 @@ exports.handler = async (event, context) => {
       return { statusCode: 500, body: "Server misconfigured" };
     }
 
+    // --- 1. Signature Verification ---
     const sigHeader = event.headers["paymongo-signature"];
     if (!sigHeader) return { statusCode: 400, body: "Missing signature header" };
 
@@ -92,38 +107,66 @@ exports.handler = async (event, context) => {
 
     console.log("🔔 PayMongo Webhook Event:", eventType);
 
-    // --- Handle Successful Payment / Checkout Completion ---
+    // --- 2. Handle Successful Payment / Checkout Completion ---
     if (eventType === "payment.paid" || eventType === "checkout_session.payment.paid") {
         const metadata = payment?.attributes?.metadata || {};
         
-        // 💡 CRITICAL CHANGE: Retrieve the full order data payload
-        const finalOrderData = safeParse(metadata.fullOrderData);
+        // Retrieve the full order data payload from the metadata
+        const initialOrderData = safeParse(metadata.fullOrderData);
 
-        if (!finalOrderData || !finalOrderData.userId || !finalOrderData.items) {
-            console.error("❌ Missing or invalid fullOrderData in metadata.", metadata);
+        if (!initialOrderData || !initialOrderData.userId || !initialOrderData.items) {
+            console.error("❌ Missing required order data in metadata.", metadata);
             return { statusCode: 400, body: "Missing required order data for saving" };
         }
+
+        // Calculate net amount (total paid in centavos - fee in centavos)
+        const totalAmount = payment?.attributes?.amount ?? 0;
+        const fee = payment?.attributes?.fee ?? 0;
+        const netAmountInCentavos = totalAmount - fee;
+        const paymongoNetAmount = netAmountInCentavos / 100; // Convert to PHP
         
-        // 1. Prepare data for Firebase save
-        // We override the status to "Pending" as requested, regardless of what the client sent.
+        // 1. Construct the final data for Firebase with explicit mapping
         const orderToSave = {
-            ...finalOrderData,
-            status: "Pending", // 🎯 SET FINAL STATUS TO "Pending"
-            paymentId: payment.id,
+            // Data pulled explicitly from the metadata (the client's order data)
+            userId: initialOrderData.userId,
+            customerName: initialOrderData.customerName || "",
+            address: initialOrderData.address || "",
+            queueNumber: initialOrderData.queueNumber,
+            queueNumberNumeric: Number(initialOrderData.queueNumberNumeric) || 0,
+            orderType: initialOrderData.orderType || "Delivery",
+            items: initialOrderData.items || [], 
+            deliveryFee: Number(initialOrderData.deliveryFee) || 0,
+            total: Number(initialOrderData.total) || 0, 
+            cartItemIds: initialOrderData.cartItemIds || [],
+            estimatedTime: initialOrderData.estimatedTime || "",
+            
+            // Overridden/Added fields
+            paymentMethod: "E-Payment",
+            // 🎯 FORCED STATUS: Set final status to "Pending" upon successful payment
+            status: "Pending", 
+            
+            // PayMongo details
+            paymongoPaymentId: payment.id,
+            paymongoNetAmount: paymongoNetAmount,
+            
+            // Timestamps
             createdAt: admin.firestore.FieldValue.serverTimestamp(),
             updatedAt: admin.firestore.FieldValue.serverTimestamp()
         };
 
-        // 2. Save Order to Firebase (CREATE the document)
-        const newOrderRef = await db.collection("DeliveryOrders").add(orderToSave);
+        // 2. Clean the object (removes empty strings like address: "")
+        const cleanedOrderToSave = cleanObject(orderToSave);
+
+        // 3. Save Order to Firebase (CREATE the document)
+        const newOrderRef = await db.collection("DeliveryOrders").add(cleanedOrderToSave);
         const orderId = newOrderRef.id;
 
         console.log(`✅ Order ${orderId} saved to Firebase with status: Pending.`);
 
-        // 3. Perform Fulfillment Tasks
-        const orderItems = finalOrderData.items || [];
-        const userId = finalOrderData.userId;
-        const cartItemIds = finalOrderData.cartItemIds || [];
+        // 4. Perform Fulfillment Tasks
+        const orderItems = initialOrderData.items || [];
+        const userId = initialOrderData.userId;
+        const cartItemIds = initialOrderData.cartItemIds || [];
         
         if (orderItems.length > 0) {
             console.log(`Deducting inventory for Order ${orderId}...`);
@@ -145,9 +188,7 @@ exports.handler = async (event, context) => {
         return { statusCode: 200, body: "Success: Order paid, saved, and fulfilled" };
     }
 
-    // --- Handle Failed/Expired Payments (Cleanup) ---
-    // 💡 This section is NO LONGER NEEDED in the new flow! 
-    // Since the order is never saved before payment, there's nothing to clean up.
+    // --- 3. Handle Failed/Expired Payments (No Action Needed) ---
     if (eventType === "payment.failed" || eventType === "checkout_session.expired") {
         console.log(`Payment failed/expired. No action needed as order was not saved.`);
         return { statusCode: 200, body: "Event received. No pending order to clean." };
