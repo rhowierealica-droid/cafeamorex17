@@ -546,7 +546,8 @@ finalConfirmBtn?.addEventListener("click", async () => {
         }));
 
         const orderTotal = orderItems.reduce((sum, i) => sum + i.total, 0) + userDeliveryFee;
-        const orderTotalInCentavos = Math.round(orderTotal * 100);
+
+       
 
         const commonOrderData = {
             userId: currentUser.uid,
@@ -582,18 +583,24 @@ finalConfirmBtn?.addEventListener("click", async () => {
             // 1. Add order to DeliveryOrders with "Pending" status
             orderRef = await addDoc(collection(db, "DeliveryOrders"), commonOrderData);
 
-            // 2. Call the Netlify Function for checkout
-            const response = await fetch("/.netlify/functions/create-checkout", { // ⭐ CHANGE APPLIED HERE
-                method: "POST",
-
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({
-                    amount: orderTotalInCentavos,
-                    currency: "PHP",
-                    description: `Order #${queueNumber} (ID: ${orderRef.id})`,
-                    metadata: {
-                        orderId: orderRef.id, // CRITICAL: Pass the new DeliveryOrder ID
-                        userId: currentUser.uid,
+            const response = await fetch("/.netlify/functions/create-checkout", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+                amount: orderTotal, // ⭐ MUST BE PHP (decimal) now (Netlify function converts to centavos)
+                currency: "PHP",
+                description: `Order #${queueNumber} (ID: ${orderRef.id})`,
+                metadata: {
+                    orderId: orderRef.id, // CRITICAL: Pass the new DeliveryOrder ID
+                    userId: currentUser.uid,
+                    // ⭐ NEW REQUIRED FIELDS FOR NETLIFY FUNCTION:
+                    queueNumber: queueNumber,
+                    orderItems: orderItems, // Full order details for line_items
+                    cartItemIds: selectedItemIds, // For cart cleanup
+                    deliveryFee: userDeliveryFee,
+                    orderTotal: orderTotal, // The total in PHP (for Netlify logging/metadata)
+                    customerName: commonOrderData.customerName,
+                    address: commonOrderData.address
                     }
                 }),
             });
@@ -616,4 +623,5 @@ finalConfirmBtn?.addEventListener("click", async () => {
         showToast("Order failed. Try again.", 4000, "red", true);
     }
 });
+
 
