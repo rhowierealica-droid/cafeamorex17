@@ -1,5 +1,3 @@
-// netlify/functions/create-checkout.js
-
 require('dotenv').config(); // Keep for local development, Netlify ignores it
 const axios = require('axios');
 
@@ -15,6 +13,8 @@ const PAYMONGO_API = 'https://api.paymongo.com/v1';
 function buildLineItems(metadata) {
     const lineItems = (metadata.orderItems || []).flatMap(item => {
         const qty = Number(item.qty || 1);
+        
+        // Calculate the base price (base + size price) for the item, in centavos
         const baseAmount = Math.round(
             (Number(item.basePrice || 0) + Number(item.sizePrice || 0)) * 100
         );
@@ -28,6 +28,7 @@ function buildLineItems(metadata) {
             },
         ];
 
+        // Add separate line items for all addons
         (item.addons || []).forEach(addon => {
             itemsArray.push({
                 name: `${item.product || "Product"} Add-on: ${addon.name || "Addon"}`,
@@ -55,7 +56,8 @@ function buildLineItems(metadata) {
         lineItems.push({
             name: "Order Payment",
             currency: "PHP",
-            amount: Number(metadata.orderTotal || 0) * 100, // Assuming orderTotal exists and is in PHP
+            // Use the total from metadata in centavos as a fallback
+            amount: Math.round(Number(metadata.orderTotal || 0) * 100), 
             quantity: 1,
         });
     }
@@ -65,9 +67,9 @@ function buildLineItems(metadata) {
 
 
 exports.handler = async (event, context) => {
-    // 💡 CRITICAL FIX: Read the secret key inside the handler
+    // CRITICAL FIX: Read the secret key inside the handler
     const PAYMONGO_SECRET_KEY = process.env.PAYMONGO_SECRET_KEY;
-    // ⚠️ IMPORTANT: BASE_URL should be set as an Environment Variable in Netlify (Key: URL)
+    // IMPORTANT: BASE_URL should be set as an Environment Variable in Netlify (Key: URL)
     const BASE_URL = process.env.URL || "https://thriving-profiterole-03bc7e.netlify.app";
 
     if (event.httpMethod !== "POST") {
@@ -75,22 +77,6 @@ exports.handler = async (event, context) => {
     }
 
     try {
-        // Expected payload from the client (now MUST include orderItems and cartItemIds):
-        /* { 
-            amount: 500.00, // Total amount in PHP (not centavos)
-            description: "Order #G0001...", 
-            metadata: { 
-                userId: "...", 
-                queueNumber: "G0001",
-                orderTotal: 500.00, // Total in PHP
-                deliveryFee: 50.00, // Delivery fee in PHP
-                orderItems: [{ product: "Coffee", basePrice: 100, qty: 1, ... }], // Full items array
-                cartItemIds: ["id1", "id2"], // IDs to clear
-                customerName: "...",
-                address: "...",
-            } 
-        } 
-        */
         let { amount, metadata, description } = JSON.parse(event.body);
 
         // --- CHECK SECRET KEY & ESSENTIAL INPUTS ---
@@ -103,7 +89,7 @@ exports.handler = async (event, context) => {
             };
         }
         
-        // Convert amount to centavos for validation
+        // Convert amount (in PHP) to centavos for PayMongo
         const amountInCentavos = Math.round(Number(amount) * 100);
 
         // 🛑 CRITICAL VALIDATION: Check for the required inputs and the order items
@@ -116,7 +102,8 @@ exports.handler = async (event, context) => {
             return {
                 statusCode: 400,
                 body: JSON.stringify({
-                    error: 'Invalid amount or metadata missing required fields: userId, queueNumber, or orderItems.'
+                    // Improved error message 
+                    error: 'Invalid amount or metadata missing required fields: amount (PHP), metadata.userId, metadata.queueNumber, or metadata.orderItems (must be non-empty array).'
                 })
             };
         }
@@ -124,12 +111,13 @@ exports.handler = async (event, context) => {
         // --- CONSTRUCT PAYMONGO PAYLOAD ---
         const lineItems = buildLineItems(metadata);
         
-        // Prepare metadata for PayMongo (must be strings for complex objects)
+        // Prepare metadata for PayMongo (complex objects must be stringified)
         const paymongoMetadata = {
             ...metadata,
             // These must be stringified for PayMongo to accept them
             orderItems: JSON.stringify(metadata.orderItems),
             cartItemIds: JSON.stringify(metadata.cartItemIds),
+            orderId: metadata.orderId // Ensure this is explicitly passed as a string
         };
         
         // Fallback description
@@ -140,17 +128,13 @@ exports.handler = async (event, context) => {
             {
                 data: {
                     attributes: {
-                        // Pass the Order ID back in the URLs for post-payment actions (Optional but helpful)
-                        // Redirects customer to a status page or cart page
-                        // NOTE: If you are using PayMongo's webhooks, the URL here is for user redirect,
-                        // the webhook is the critical part for order fulfillment.
                         success_url: `${BASE_URL}/index.html`, // Redirect to main page after success
                         cancel_url: `${BASE_URL}/cart.html`,  // Redirect to cart page after cancel
                         send_email_receipt: false,
                         description: finalDescription,
                         line_items: lineItems,
                         payment_method_types: ['gcash'],
-                        metadata: paymongoMetadata // Use the detailed metadata for the webhook
+                        metadata: paymongoMetadata
                     }
                 }
             },
