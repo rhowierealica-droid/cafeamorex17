@@ -47,7 +47,7 @@ function buildLineItems(metadata) {
     });
   }
 
-  // Fallback (if lineItems accidentally empty)
+  // Fallback if lineItems empty
   if (lineItems.length === 0) {
     lineItems.push({
       name: "Order Payment",
@@ -75,25 +75,15 @@ exports.handler = async (event) => {
     const BASE_URL = process.env.URL || "https://thriving-profiterole-03bc7e.netlify.app";
     const PAYMONGO_API = "https://api.paymongo.com/v1";
 
-    // 🟢 Handle flexible payload structures
-    const metadata =
-      body.orderData || body.metadata || body.commonOrderData || body;
-
-    const amount =
-      body.amount ||
-      metadata?.total ||
-      metadata?.orderTotal ||
-      null;
+    // Handle flexible payload structures
+    const metadata = body.orderData || body.metadata || body.commonOrderData || body;
 
     if (!PAYMONGO_SECRET_KEY) {
-      return {
-        statusCode: 500,
-        body: JSON.stringify({ error: "PAYMONGO_SECRET_KEY not set" }),
-      };
+      return { statusCode: 500, body: JSON.stringify({ error: "PAYMONGO_SECRET_KEY not set" }) };
     }
 
     if (!metadata || !metadata.userId || !metadata.queueNumber || !Array.isArray(metadata.items || metadata.orderItems)) {
-      console.error("⚠️ Invalid metadata shape:", metadata);
+      console.error("⚠️ Invalid metadata:", metadata);
       return {
         statusCode: 400,
         body: JSON.stringify({
@@ -102,28 +92,22 @@ exports.handler = async (event) => {
       };
     }
 
-    const parsedAmount = Number(amount);
-    if (!parsedAmount || parsedAmount <= 0) {
-      console.error("⚠️ Missing or invalid amount in request body:", { amount, body });
-      return {
-        statusCode: 400,
-        body: JSON.stringify({ error: "Missing or invalid amount." }),
-      };
-    }
-
-    // Convert to centavos (if not already)
-    const amountInCentavos = parsedAmount >= 1000 ? Math.round(parsedAmount) : Math.round(parsedAmount * 100);
-
     const lineItems = buildLineItems(metadata);
+
+    // Optional: Verify line items total matches metadata.total
+    const sumLineItems = lineItems.reduce((sum, i) => sum + i.amount * i.quantity, 0);
+    const expectedTotal = Math.round(Number(metadata.total || 0) * 100);
+    if (sumLineItems !== expectedTotal) {
+      console.warn("⚠️ Line items total does not match metadata.total", { sumLineItems, expectedTotal });
+    }
 
     const paymongoMetadata = {
       userId: metadata.userId,
       queueNumber: metadata.queueNumber,
-      fullOrderData: JSON.stringify({
-        ...metadata,
-        status: "Pending",
-      }),
+      fullOrderData: JSON.stringify({ ...metadata, status: "Pending" }),
       cartItemIds: JSON.stringify(metadata.cartItemIds || []),
+      customerName: metadata.customerName || "",
+      customerEmail: metadata.customerEmail || ""
     };
 
     const payload = {
@@ -136,21 +120,22 @@ exports.handler = async (event) => {
           line_items: lineItems,
           payment_method_types: ["gcash"],
           metadata: paymongoMetadata,
+          // ✅ Include customer info in checkout
+          customer: {
+            name: metadata.customerName || "Customer",
+            email: metadata.customerEmail || ""
+          },
         },
       },
     };
 
-    const response = await axios.post(
-      `${PAYMONGO_API}/checkout_sessions`,
-      payload,
-      {
-        headers: {
-          Authorization: `Basic ${Buffer.from(PAYMONGO_SECRET_KEY + ":").toString("base64")}`,
-          "Content-Type": "application/json",
-          Accept: "application/json",
-        },
-      }
-    );
+    const response = await axios.post(`${PAYMONGO_API}/checkout_sessions`, payload, {
+      headers: {
+        Authorization: `Basic ${Buffer.from(PAYMONGO_SECRET_KEY + ":").toString("base64")}`,
+        "Content-Type": "application/json",
+        Accept: "application/json",
+      },
+    });
 
     return {
       statusCode: 200,
