@@ -53,7 +53,7 @@ exports.handler = async (event, context) => {
       const expectedHash = crypto.createHmac("sha256", WEBHOOK_SECRET).update(event.body).digest("hex");
       if (v1 !== expectedHash) console.warn("⚠️ Signature mismatch");
     } else {
-      console.warn("⚠️ Skipping signature verification (local test)");
+      console.warn("⚠️ Skipping signature verification (local/test)");
     }
   } catch (err) {
     console.warn("⚠️ Signature verification failed:", err.message);
@@ -68,8 +68,11 @@ exports.handler = async (event, context) => {
 
     if (db && dataObject?.attributes?.payment_id) {
       const paymentId = dataObject.attributes.payment_id;
-      const deliveryOrdersRef = db.collection("DeliveryOrders");
-      const snapshot = await deliveryOrdersRef.where("paymongoPaymentId", "==", paymentId).limit(1).get();
+      const snapshot = await db.collection("DeliveryOrders")
+        .where("paymongoPaymentId", "==", paymentId)
+        .limit(1)
+        .get();
+
       if (!snapshot.empty) {
         const orderRef = snapshot.docs[0].ref;
         await orderRef.update({ status: "Refunded", paymongoRefundId: dataObject.id });
@@ -90,21 +93,21 @@ exports.handler = async (event, context) => {
       return { statusCode: 400, body: "Missing metadata" };
     }
 
-    // Calculate total if not provided
-    const totalAmount = Number(metadata.orderTotal) || 
-      orderItems.reduce((sum, i) => sum + (i.total || 0), 0) + Number(metadata.deliveryFee || 0);
+    const deliveryFee = Number(metadata.deliveryFee || 0);
+    const totalAmount = Number(metadata.total || metadata.orderTotal) ||
+      orderItems.reduce((sum, i) => sum + (Number(i.total || 0) || 0), 0) + deliveryFee;
 
-    // Save order to Firestore
+    // -------------------- Save Order --------------------
     const orderRef = await db.collection("DeliveryOrders").add({
       userId: metadata.userId,
       customerName: metadata.customerName || "",
-      customerEmail: metadata.customerEmail || "", // optional for receipts
+      customerEmail: metadata.customerEmail || "",
       address: metadata.address || "",
       queueNumber: metadata.queueNumber,
       queueNumberNumeric: Number(metadata.queueNumberNumeric) || 0,
-      orderType: "Delivery",
+      orderType: metadata.orderType || "Delivery",
       items: orderItems,
-      deliveryFee: Number(metadata.deliveryFee) || 0,
+      deliveryFee: deliveryFee,
       total: totalAmount,
       paymentMethod: "E-Payment",
       status: "Pending",
