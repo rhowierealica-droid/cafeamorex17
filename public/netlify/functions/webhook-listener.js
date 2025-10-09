@@ -29,6 +29,45 @@ function safeParse(value, fallback = []) {
 }
 
 // ---------------------
+// 🔹 Deduct inventory function
+// ---------------------
+async function deductInventory(orderItems) {
+  if (!orderItems || !orderItems.length) return;
+  const batch = db.batch();
+
+  for (const item of orderItems) {
+    // Ingredients
+    for (const ing of item.ingredients || []) {
+      if (ing.id) {
+        const invRef = db.collection("Inventory").doc(ing.id);
+        batch.update(invRef, { quantity: Math.max((ing.currentQty || 0) - (ing.qty || 1) * (item.qty || 1), 0) });
+      }
+    }
+    // Other components
+    for (const other of item.others || []) {
+      if (other.id) {
+        const invRef = db.collection("Inventory").doc(other.id);
+        batch.update(invRef, { quantity: Math.max((other.currentQty || 0) - (other.qty || 1) * (item.qty || 1), 0) });
+      }
+    }
+    // Size
+    if (item.sizeId) {
+      const sizeRef = db.collection("Inventory").doc(item.sizeId);
+      batch.update(sizeRef, { quantity: Math.max((item.sizeQty || 0) - (item.qty || 1), 0) });
+    }
+    // Addons
+    for (const addon of item.addons || []) {
+      if (addon.id) {
+        const addonRef = db.collection("Inventory").doc(addon.id);
+        batch.update(addonRef, { quantity: Math.max((addon.currentQty || 0) - (item.qty || 1), 0) });
+      }
+    }
+  }
+
+  await batch.commit();
+}
+
+// ---------------------
 // Netlify Function Handler
 // ---------------------
 exports.handler = async (event, context) => {
@@ -87,14 +126,12 @@ exports.handler = async (event, context) => {
   if (eventType === "payment.paid" || eventType === "checkout_session.payment.paid") {
     const metadata = dataObject?.attributes?.metadata || {};
 
-    // -------------------- 🔹 CHANGES HERE 🔹 --------------------
-    // 1. Ensure arrays/objects are parsed from stringified JSON
-    const orderItems = safeParse(metadata.items);        // was empty because frontend didn't stringify
-    const cartItemIds = safeParse(metadata.cartItemIds); // same
+    // -------------------- 🔹 Parse arrays/objects --------------------
+    const orderItems = safeParse(metadata.items);        // Added: parse frontend stringified items
+    const cartItemIds = safeParse(metadata.cartItemIds); // Added: parse frontend stringified cart IDs
 
-    // 2. Use metadata.total instead of metadata.orderTotal
     const deliveryFee = Number(metadata.deliveryFee || 0);
-    const totalAmount = Number(metadata.total || 0) ||  // fallback calculation
+    const totalAmount = Number(metadata.total || 0) || 
       orderItems.reduce((sum, i) => sum + (Number(i.total || 0) || 0), 0) + deliveryFee;
 
     if (!metadata.userId || !metadata.queueNumber) {
@@ -110,19 +147,25 @@ exports.handler = async (event, context) => {
       queueNumber: metadata.queueNumber,
       queueNumberNumeric: Number(metadata.queueNumberNumeric) || 0,
       orderType: metadata.orderType || "Delivery",
-      items: orderItems,       // now saved correctly
-      deliveryFee: deliveryFee, // now saved correctly
-      total: totalAmount,       // now saved correctly
+      items: orderItems,
+      deliveryFee,
+      total: totalAmount,
       paymentMethod: "E-Payment",
       status: "Pending",
       createdAt: admin.firestore.FieldValue.serverTimestamp(),
       paymongoPaymentId: dataObject.id,
-      cartItemIds: cartItemIds
+      cartItemIds
     });
 
     console.log("💾 Order saved with ID:", orderRef.id);
 
-    // TODO: Deduct inventory if needed
+    // -------------------- 🔹 Deduct inventory --------------------
+    await deductInventory(orderItems);
+
+    // -------------------- 🔹 Clear user's cart --------------------
+    for (const itemId of cartItemIds) {
+      await db.collection("users").doc(metadata.userId).collection("cart").doc(itemId).delete();
+    }
 
     return { statusCode: 200, body: JSON.stringify({ received: true, orderId: orderRef.id }) };
   }
