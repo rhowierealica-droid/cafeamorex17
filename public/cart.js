@@ -360,7 +360,7 @@ function populateModalCart() {
             <div class="modal-cart-item" style="display:flex; align-items:center; gap:12px; justify-content:space-between; border-bottom:1px solid #ddd; padding:8px 0;">
                 <div style="display:flex; align-items:center; gap:10px; flex:1;">
                     <img src="${item.image || 'placeholder.png'}" alt="${item.name}"
-                        style="height:60px; width:60px; object-fit:cover; border-radius:6px; flex-shrink:0;">
+                             style="height:60px; width:60px; object-fit:cover; border-radius:6px; flex-shrink:0;">
                     <div>
                         <strong>${item.name}${outOfStockLabel} (Stock: ${item.stock ?? 'N/A'})</strong><br>
                         ${item.size ? `Size: ${item.size} - ₱${Number(item.sizePrice).toFixed(2)}` : 'Size: N/A'}
@@ -530,6 +530,7 @@ finalConfirmBtn?.addEventListener("click", async () => {
         const selectedItems = cartItems.filter(item => selectedCartItems.has(item.id));
         const selectedItemIds = Array.from(selectedCartItems);
 
+        // Recalculate the item total based on components to ensure accuracy with PayMongo's line_items.
         const orderItems = selectedItems.map(item => {
             const basePrice = Number(item.basePrice || 0);
             const sizePrice = Number(item.sizePrice || 0);
@@ -589,29 +590,43 @@ finalConfirmBtn?.addEventListener("click", async () => {
         } else if (paymentMethod === "E-Payment") {
             showToast("Preparing E-Payment...", 3000, "blue", true);
             
-            // 🌟 Sending order data to Netlify function 🌟
+            // 🎯 CRITICAL FIX: The entire 'commonOrderData' object must be nested 
+            // under a 'metadata' property, which is then sent to /create-checkout.
+            // The server will handle nesting this further under 'orderData'.
+            
             const response = await fetch("/.netlify/functions/create-checkout", {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({
-                    commonOrderData: commonOrderData, 
+                    amount: Math.round(orderTotal * 100), // Amount in centavos
+                    description: `Order #${queueNumber}`,
+                    // 🚨 MODIFIED: Passing the required data structure to the local server
+                    metadata: {
+                        // The server will use this property to build line_items
+                        orderItems: commonOrderData.items, 
+                        // The server will use this property for the webhook metadata
+                        orderTotal: commonOrderData.total,
+                        deliveryFee: commonOrderData.deliveryFee,
+                        userId: commonOrderData.userId,
+                        customerName: commonOrderData.customerName,
+                        address: commonOrderData.address,
+                        queueNumber: commonOrderData.queueNumber,
+                        queueNumberNumeric: commonOrderData.queueNumberNumeric,
+                        cartItemIds: commonOrderData.cartItemIds
+                    }, 
                 }),
             });
 
             const data = await response.json();
 
-            if (response.ok && data?.checkoutUrl) { 
+            if (response.ok && data?.checkout_url) {
                 showToast("Redirecting to E-Payment page...", 3000, "green", true);
                 // Redirect user to PayMongo page
-                window.location.href = data.checkoutUrl;
+                window.location.href = data.checkout_url;
             } else {
-                // If the Netlify function returned an error, check for details
-                const detailMessage = Array.isArray(data.details) 
-                    ? data.details.map(d => `${d.code || d.detail || 'Error'}: ${d.detail || 'Check console.'}`).join(' / ') 
-                    : data.details || data.error || 'Unknown error (Check Netlify Logs)';
-
-                showToast(`Payment setup failed: ${detailMessage}. Order not saved.`, 4000, "red", true);
-                console.error("PayMongo Checkout Error:", data.error || data);
+                // If payment setup fails, NOTHING IS SAVED TO FIREBASE. Success!
+                showToast(`Payment setup failed: ${data.details || 'Unknown error'}. Order not saved.`, 4000, "red", true);
+                console.error("PayMongo Checkout Error:", data.details || data);
             }
         }
         modal.style.display = "none";
@@ -622,3 +637,4 @@ finalConfirmBtn?.addEventListener("click", async () => {
         showToast("Order failed. Try again.", 4000, "red", true);
     }
 });
+
