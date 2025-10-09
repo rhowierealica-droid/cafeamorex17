@@ -1,157 +1,325 @@
 // netlify/functions/webhook-listener.js
 
-require('dotenv').config();
-// CRITICAL FIX: Import 'cert' function for credential setup
-const { initializeApp, cert } = require('firebase-admin/app'); 
-const { getFirestore, FieldValue } = require('firebase-admin/firestore');
-const { getAuth } = require('firebase-admin/auth');
 
-// Initialize Firebase Admin SDK (Use Netlify Environment Variables)
-// NOTE: Ensure FIREBASE_SERVICE_ACCOUNT is a valid, unescaped JSON string.
-const serviceAccount = JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT);
-const firebaseApp = initializeApp({
-    // FIX: Use 'cert' function directly, as 'admin' object is not imported
-    credential: cert(serviceAccount), 
-    databaseURL: process.env.FIREBASE_DATABASE_URL
-});
-const db = getFirestore(firebaseApp);
-const auth = getAuth(firebaseApp);
 
-// --- HELPER FUNCTIONS ---
+require("dotenv").config();
 
-/**
- * Removes properties with null, undefined, or empty string values.
- * This is useful for cleaning up the data before saving to Firebase.
- * @param {object} obj - The object to clean.
- * @returns {object} The cleaned object.
- */
-function cleanObject(obj) {
-    const newObj = {};
-    for (const key in obj) {
-        if (obj[key] !== null && obj[key] !== undefined && obj[key] !== "") {
-            newObj[key] = obj[key];
-        }
-    }
-    return newObj;
+const crypto = require("crypto");
+
+const admin = require("firebase-admin");
+
+
+
+// Initialize Firebase Admin once
+
+if (!admin.apps.length) {
+
+  admin.initializeApp({
+
+    credential: admin.credential.cert(
+
+      JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT_KEY)
+
+    ),
+
+  });
+
 }
 
-/**
- * Deducts inventory based on the items in the order.
- * @param {Array} orderItems - The array of items from the order.
- */
+const db = admin.firestore();
+
+
+
+// Helper: safely parse JSON fields (Handles case where PayMongo stringifies metadata)
+
+function safeParse(value) {
+
+  try {
+
+    if (!value) return null;
+
+    // PayMongo often double-stringifies complex metadata objects
+
+    let parsedValue = typeof value === "string" ? JSON.parse(value) : value;
+
+    // Attempt a second parse for complex objects like fullOrderData
+
+    if (typeof parsedValue === "string") parsedValue = JSON.parse(parsedValue);
+
+    return parsedValue;
+
+  } catch {
+
+    return null;
+
+  }
+
+}
+
+
+
+// Deduct inventory function (kept unchanged, but simplified for clarity)
+
 async function deductInventory(orderItems) {
-    const deductItem = async (id, amount) => {
-        if (!id) return;
-        const invRef = db.collection("Inventory").doc(id);
-        const invSnap = await invRef.get();
-        const invQty = invSnap.exists ? Number(invSnap.data().quantity || 0) : 0;
-        await invRef.update({ quantity: Math.max(invQty - amount, 0) });
-    };
 
-    for (const item of orderItems) {
-        // Deduct ingredients
-        for (const ing of item.ingredients || []) await deductItem(ing.id, (ing.qty || 1) * item.qty);
-        // Deduct other components
-        for (const other of item.others || []) await deductItem(other.id, (other.qty || 1) * item.qty);
-        // Deduct size component
-        if (item.sizeId) await deductItem(item.sizeId, item.qty);
-        // Deduct addons
-        for (const addon of item.addons || []) await deductItem(addon.id, item.qty);
-    }
+  const deductItem = async (id, amount) => {
+
+    if (!id || !amount) return;
+
+    const invRef = db.collection("Inventory").doc(id);
+
+    await invRef.update({ 
+
+        quantity: admin.firestore.FieldValue.increment(-Math.abs(amount))
+
+    }).catch(err => console.error(`⚠️ Failed to deduct ${amount} from item ${id}:`, err.message));
+
+  };
+
+
+
+  for (const item of orderItems) {
+
+    const itemQty = Number(item.qty || 1);
+
+    for (const ing of item.ingredients || []) await deductItem(ing.id, (ing.qty || 1) * itemQty);
+
+    for (const other of item.others || []) await deductItem(other.id, (other.qty || 1) * itemQty);
+
+    if (item.sizeId) await deductItem(item.sizeId, itemQty);
+
+    for (const addon of item.addons || []) await deductItem(addon.id, itemQty);
+
+  }
+
 }
 
-/**
- * Clears the selected items from the user's cart.
- * @param {string} userId - The ID of the user.
- * @param {Array} cartItemIds - The IDs of the cart documents to delete.
- */
-async function clearCartItems(userId, cartItemIds) {
-    const cartRef = db.collection("users").doc(userId).collection("cart");
-    const deletePromises = (cartItemIds || []).map(id => cartRef.doc(id).delete());
-    await Promise.all(deletePromises);
-}
 
-// --- MAIN HANDLER ---
 
 exports.handler = async (event, context) => {
-    if (event.httpMethod !== "POST") {
-        return { statusCode: 405, body: "Method Not Allowed" };
+
+  if (event.httpMethod !== "POST") {
+
+    return { statusCode: 405, body: "Method Not Allowed" };
+
+  }
+
+
+
+  try {
+
+    const webhookSecret = process.env.WEBHOOK_SECRET_KEY;
+
+    if (!webhookSecret) {
+
+      console.error("❌ Missing WEBHOOK_SECRET_KEY");
+
+      return { statusCode: 500, body: "Server misconfigured" };
+
     }
 
-    // PayMongo Webhook Secret (Set as Netlify Environment Variable)
-    const PAYMONGO_WEBHOOK_SECRET = process.env.PAYMONGO_WEBHOOK_SECRET;
+
+
+    const sigHeader = event.headers["paymongo-signature"];
+
+    if (!sigHeader) return { statusCode: 400, body: "Missing signature header" };
+
+
+
+    const sigParts = sigHeader.split(",");
+
+    const sigMap = {};
+
+    sigParts.forEach((p) => { const [k, v] = p.split("="); sigMap[k] = v; });
+
     
-    // In a production environment, you should always verify the webhook signature.
-    // However, for this simplified demonstration, we'll focus on the payload.
-    /*
-    const signature = event.headers['paymongo-signature'];
-    if (!verifySignature(event.body, signature, PAYMONGO_WEBHOOK_SECRET)) {
-        console.error("Webhook signature verification failed.");
-        return { statusCode: 401, body: "Unauthorized" };
+
+    const signature = sigMap.v1 || sigMap.te;
+
+    const timestamp = sigMap.t;
+
+    
+
+    if (!signature || !timestamp) {
+
+        console.error("❌ Invalid signature header format:", sigHeader);
+
+        return { statusCode: 400, body: "Invalid signature header format" };
+
     }
-    */
 
-    try {
-        const payload = JSON.parse(event.body);
-        const eventType = payload.data.attributes.type;
-        const data = payload.data.attributes.data;
 
-        // We only care about successful payment events
-        if (eventType === 'checkout_session.paid') {
-            const status = data.attributes.status;
-            const paymentIntentStatus = data.attributes.payment_intent.attributes.status;
-            const metadata = data.attributes.metadata;
 
-            // Only proceed if the payment was successful
-            if (status === 'paid' && paymentIntentStatus === 'succeeded') {
-                const fullOrderDataStr = metadata.fullOrderData;
-                const cartItemIdsStr = metadata.cartItemIds;
+    const signedPayload = event.body; 
 
-                if (!fullOrderDataStr) {
-                    console.error("Missing fullOrderData in metadata for paid session.");
-                    return { statusCode: 400, body: "Order data missing." };
-                }
+    
 
-                // --- 1. PARSE THE COMPLETE ORDER DATA ---
-                const parsedOrderData = JSON.parse(fullOrderDataStr);
-                const orderItems = parsedOrderData.items;
-                const userId = parsedOrderData.userId;
-                const queueNumber = parsedOrderData.queueNumber;
-                
-                // --- 2. CONSTRUCT FINAL FIREBASE DOCUMENT ---
-                const finalOrderDoc = {
-                    ...cleanObject(parsedOrderData),
-                    // CRITICAL: Set the definitive status upon successful payment
-                    status: "Pending", 
-                    // CRITICAL: Use server timestamp for accuracy
-                    createdAt: FieldValue.serverTimestamp(), 
-                    // Add PayMongo specific IDs for reference
-                    paymongoCheckoutId: data.id,
-                    paymongoPaymentIntentId: data.attributes.payment_intent.id,
-                };
+    const hmac = crypto.createHmac("sha256", webhookSecret);
 
-                // --- 3. SAVE TO FIREBASE ---
-                await db.collection("DeliveryOrders").add(finalOrderDoc);
-                console.log(`Order #${queueNumber} successfully saved to Firebase (E-Payment).`);
+    hmac.update(signedPayload, "utf8");
 
-                // --- 4. DEDUCT INVENTORY ---
-                await deductInventory(orderItems);
-                console.log(`Inventory deducted for Order #${queueNumber}.`);
+    const digest = hmac.digest("hex");
 
-                // --- 5. CLEAR CART ---
-                const cartItemIds = JSON.parse(cartItemIdsStr || "[]");
-                await clearCartItems(userId, cartItemIds);
-                console.log(`Cart items cleared for User ${userId}.`);
 
-                return { statusCode: 200, body: "Order processed successfully." };
-            }
+
+    if (digest !== signature) {
+
+      console.error("❌ Invalid webhook signature. Expected:", digest, "Received:", signature);
+
+      return { statusCode: 401, body: "Invalid signature" };
+
+    }
+
+
+
+    // Signature valid, continue processing
+
+    const body = JSON.parse(event.body);
+
+    const eventType = body.data?.attributes?.type;
+
+    const payment = body.data?.attributes?.data;
+
+
+
+    console.log("🔔 PayMongo Webhook Event:", eventType);
+
+
+
+    // --- Handle Successful Payment / Checkout Completion ---
+
+    if (eventType === "payment.paid" || eventType === "checkout_session.payment.paid") {
+
+        const metadata = payment?.attributes?.metadata || {};
+
+        
+
+        // 💡 CRITICAL CHANGE: Retrieve the full order data payload
+
+        const finalOrderData = safeParse(metadata.fullOrderData);
+
+
+
+        if (!finalOrderData || !finalOrderData.userId || !finalOrderData.items) {
+
+            console.error("❌ Missing or invalid fullOrderData in metadata.", metadata);
+
+            return { statusCode: 400, body: "Missing required order data for saving" };
+
         }
 
-        // Acknowledge receipt of other webhook events (e.g., checkout_session.failed, payment_intent.created)
-        return { statusCode: 200, body: `Acknowledged event type: ${eventType}` };
+        
 
-    } catch (error) {
-        console.error("Fatal Webhook Error:", error.message, error.stack);
-        return { statusCode: 500, body: "Internal Server Error" };
+        // 1. Prepare data for Firebase save
+
+        // We override the status to "Pending" as requested, regardless of what the client sent.
+
+        const orderToSave = {
+
+            ...finalOrderData,
+
+            status: "Pending", // 🎯 SET FINAL STATUS TO "Pending"
+
+            paymentId: payment.id,
+
+            createdAt: admin.firestore.FieldValue.serverTimestamp(),
+
+            updatedAt: admin.firestore.FieldValue.serverTimestamp()
+
+        };
+
+
+
+        // 2. Save Order to Firebase (CREATE the document)
+
+        const newOrderRef = await db.collection("DeliveryOrders").add(orderToSave);
+
+        const orderId = newOrderRef.id;
+
+
+
+        console.log(`✅ Order ${orderId} saved to Firebase with status: Pending.`);
+
+
+
+        // 3. Perform Fulfillment Tasks
+
+        const orderItems = finalOrderData.items || [];
+
+        const userId = finalOrderData.userId;
+
+        const cartItemIds = finalOrderData.cartItemIds || [];
+
+        
+
+        if (orderItems.length > 0) {
+
+            console.log(`Deducting inventory for Order ${orderId}...`);
+
+            await deductInventory(orderItems); 
+
+        }
+
+
+
+        if (userId && cartItemIds.length > 0) {
+
+            console.log(`Clearing ${cartItemIds.length} cart items for user ${userId}...`);
+
+            const batch = db.batch();
+
+            const userCartRef = db.collection("users").doc(userId).collection("cart");
+
+            cartItemIds.forEach(itemId => {
+
+                batch.delete(userCartRef.doc(itemId));
+
+            });
+
+            await batch.commit();
+
+        }
+
+
+
+        console.log(`✅ Fulfillment for Order ${orderId} complete.`);
+
+
+
+        return { statusCode: 200, body: "Success: Order paid, saved, and fulfilled" };
+
     }
+
+
+
+    // --- Handle Failed/Expired Payments (Cleanup) ---
+
+    // 💡 This section is NO LONGER NEEDED in the new flow! 
+
+    // Since the order is never saved before payment, there's nothing to clean up.
+
+    if (eventType === "payment.failed" || eventType === "checkout_session.expired") {
+
+        console.log(`Payment failed/expired. No action needed as order was not saved.`);
+
+        return { statusCode: 200, body: "Event received. No pending order to clean." };
+
+    }
+
+
+
+    // Fallback for unhandled events
+
+    return { statusCode: 200, body: "Event received, but no action taken" };
+
+
+
+  } catch (error) {
+
+    console.error("🔴 Fatal error in webhook handler:", error);
+
+    return { statusCode: 500, body: "Internal Server Error" };
+
+  }
+
 };
