@@ -1,11 +1,10 @@
 // ==========================
-// --- netlify/functions/cart.js ---
+// --- imports ---
 // ==========================
 import { db } from './firebase-config.js';
-import { 
+import {
     collection, addDoc, getDocs, updateDoc, deleteDoc, doc,
-    serverTimestamp, onSnapshot, query, orderBy, limit, getDoc,
-    FieldValue // Added FieldValue for increment deduction
+    serverTimestamp, onSnapshot, query, orderBy, limit, getDoc
 } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 import { getAuth, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
 
@@ -44,7 +43,7 @@ let unsubscribeCart = null;
 let selectedAddress = null;
 let userDeliveryFee = 0;
 let defaultUserDocData = null;
-let cartAddresses = []; 
+let cartAddresses = [];
 
 // ==========================
 // --- TOAST FUNCTION ---
@@ -106,12 +105,7 @@ export async function addToCart(product, selectedSize = null, selectedAddons = [
             const data = docSnap.data();
             const sameProduct = data.productId === product.id;
             const sameSize = data.sizeId === selectedSize?.id;
-            
-            // Check for deep equality of addons
-            const existingAddons = JSON.stringify(data.addons || []);
-            const newAddons = JSON.stringify(addons || []);
-            const sameAddons = existingAddons === newAddons;
-            
+            const sameAddons = JSON.stringify(data.addons || []) === JSON.stringify(addons || []);
             if (sameProduct && sameSize && sameAddons) existingDoc = { id: docSnap.id, data };
         });
 
@@ -133,7 +127,7 @@ export async function addToCart(product, selectedSize = null, selectedAddons = [
                 size: selectedSize?.name || null,
                 sizeId: selectedSize?.id || null,
                 addons,
-                ingredients: selectedSizeData?.ingredients || [], 
+                ingredients: selectedSizeData?.ingredients || [],
                 others: selectedSizeData?.others || [],
                 addedAt: new Date(),
                 userId: currentUser.uid,
@@ -153,7 +147,7 @@ export async function addToCart(product, selectedSize = null, selectedAddons = [
 async function fetchCartItemStock(item) {
     const inventoryMap = {};
     const snapshot = await getDocs(collection(db, "Inventory"));
-    snapshot.forEach(docSnap => { 
+    snapshot.forEach(docSnap => {
         const data = docSnap.data();
         inventoryMap[docSnap.id] = { ...data, quantity: Number(data.quantity || 0) };
     });
@@ -165,33 +159,28 @@ async function fetchCartItemStock(item) {
     const getComponentLimit = (component, requiredQtyPerProduct) => {
         const invItem = inventoryMap[component.id];
         if (!invItem || !invItem.active || invItem.quantity <= 0) return 0;
-        // Ensure requiredQty is at least 1 to prevent division by zero or errors
-        const requiredQty = Math.max(Number(requiredQtyPerProduct) || 1, 1); 
+        const requiredQty = Math.max(Number(requiredQtyPerProduct) || 1, 1);
         return Math.floor(invItem.quantity / requiredQty);
     };
-    
-    // Check stock for the size variant
+
     if (item.sizeId) {
-        const sizeLimit = getComponentLimit({ id: item.sizeId }, 1); 
+        const sizeLimit = getComponentLimit({ id: item.sizeId }, 1);
         possible = Math.min(possible, sizeLimit);
         if (possible === 0) return 0;
     }
 
-    // Check stock for ingredients
     for (const ing of item.ingredients || []) {
         const ingLimit = getComponentLimit(ing, ing.qty);
         possible = Math.min(possible, ingLimit);
         if (possible === 0) return 0;
     }
 
-    // Check stock for addons (usually qty of 1 per product)
     for (const addon of item.addons || []) {
-        const addonLimit = getComponentLimit(addon, 1); 
+        const addonLimit = getComponentLimit(addon, 1);
         possible = Math.min(possible, addonLimit);
         if (possible === 0) return 0;
     }
 
-    // Check stock for others
     for (const other of item.others || []) {
         const otherLimit = getComponentLimit(other, other.qty);
         possible = Math.min(possible, otherLimit);
@@ -211,33 +200,21 @@ function loadCartRealtime() {
 
     unsubscribeCart = onSnapshot(cartRef, async snapshot => {
         cartItems = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-        
-        // Retain selected items only if they still exist in the cart
-        const currentItemIds = new Set(cartItems.map(item => item.id));
-        selectedCartItems = new Set([...selectedCartItems].filter(id => currentItemIds.has(id)));
-        
+        selectedCartItems.clear();
         cartItemsDiv.innerHTML = "";
 
         if (!cartItems.length) {
             cartItemsDiv.innerHTML = "<p>Your cart is empty.</p>";
             cartTotalSpan.textContent = "0.00";
             updateModalTotals();
-            confirmOrderBtn.disabled = true;
             return;
         }
 
-        confirmOrderBtn.disabled = false;
-
-        // Re-render select-all checkbox and delivery fee element
         const selectAllDiv = document.createElement("div");
-        selectAllDiv.innerHTML = `<label style="font-weight: bold; display: block; margin-bottom: 10px;"><input type="checkbox" id="select-all-checkbox"> Select All</label>`;
+        selectAllDiv.innerHTML = `<label><input type="checkbox" id="select-all-checkbox"> Select All</label>`;
         cartItemsDiv.appendChild(selectAllDiv);
         const selectAllCheckbox = document.getElementById("select-all-checkbox");
-        
-        const cartItemsContainer = document.createElement("div");
-        cartItemsContainer.id = "cart-items-list";
-        cartItemsDiv.appendChild(cartItemsContainer);
-        
+
         let deliveryDiv = document.getElementById("delivery-fee");
         if (!deliveryDiv) {
             deliveryDiv = document.createElement("div");
@@ -253,25 +230,17 @@ function loadCartRealtime() {
             } else {
                 selectedCartItems.clear();
             }
-            renderCartItems(true); // Re-render with new selection state
+            renderCartItems();
             updateCartTotal();
             updateModalTotals();
         });
-        
-        async function renderCartItems(skipStockUpdate = false) {
-            cartItemsContainer.innerHTML = ""; // Clear list, keep select-all and delivery fee
 
-            let updatedCartItems = cartItems;
-            if (!skipStockUpdate) {
-                const stockPromises = cartItems.map(item => fetchCartItemStock(item).then(stock => ({ ...item, stock })));
-                updatedCartItems = await Promise.all(stockPromises);
-                cartItems = updatedCartItems;
-            }
+        async function renderCartItems() {
+            cartItemsDiv.querySelectorAll(".cart-item").forEach(el => el.remove());
 
-            // Update 'Select All' state based on available stock
-            const selectableItems = cartItems.filter(i => i.stock > 0);
-            selectAllCheckbox.checked = selectableItems.length > 0 && selectedCartItems.size === selectableItems.length;
-
+            const stockPromises = cartItems.map(item => fetchCartItemStock(item).then(stock => ({ ...item, stock })));
+            const updatedCartItems = await Promise.all(stockPromises);
+            cartItems = updatedCartItems;
 
             for (const item of cartItems) {
                 const stock = item.stock;
@@ -293,40 +262,31 @@ function loadCartRealtime() {
                 const disabledAttr = stock <= 0 ? "disabled" : "";
                 const outOfStockLabel = stock <= 0 ? " (Unavailable)" : "";
 
-                // Display quantity: limit to stock if stock is low
-                let displayQty = Math.min(item.quantity, stock > 0 ? stock : 1); 
-                
-                // If the item is out of stock, ensure it's not selected
-                if (stock <= 0) {
-                    displayQty = 0; // Display 0 quantity for out of stock items
-                    selectedCartItems.delete(item.id);
-                }
+                let displayQty = Math.min(item.quantity, stock > 0 ? stock : 1);
+                if (stock <= 0) displayQty = 1;
 
                 itemDiv.innerHTML = `
                     <div style="display:flex; align-items:center; gap:12px; flex:1;">
                         <input type="checkbox" class="cart-checkbox" data-id="${item.id}" ${checkedAttr} ${disabledAttr}>
-                        <img src="${item.image || 'placeholder.png'}" alt="${item.name}" 
+                        <img src="${item.image || 'placeholder.png'}" alt="${item.name}"
                             style="height:70px; width:70px; object-fit:cover; border-radius:6px; flex-shrink:0;">
                         <div style="flex:1;">
                             <strong>${item.name}${outOfStockLabel}</strong> <span style="margin-left: 10px;">(Stock: ${stock})</span>
-                        <br>
+<br>
                             ${item.size ? `Size: ${item.size} - ₱${Number(item.sizePrice).toFixed(2)}` : 'Size: N/A'}<br>
                             ${addonsHTML}<br>
-                            <label>Qty: <input type="number" min="1" max="${stock}" value="${displayQty}" class="qty-input" data-id="${item.id}" style="width:60px;" ${disabledAttr}></label><br>
-                            <small>Unit Price: ₱${Number(item.unitPrice).toFixed(2)} | Total: ₱${Number(item.totalPrice).toFixed(2)}</small>
+                            <label>Qty: <input type="number" min="1" max="${stock}" value="${displayQty}" class="qty-input" style="width:60px;" ${disabledAttr}></label><br>
+                            <small>Total: ₱${Number(item.totalPrice).toFixed(2)}</small>
                         </div>
                     </div>
-                    <button class="remove-btn" data-id="${item.id}" style="background:none; border:none; font-size:18px; cursor:pointer;">❌</button>
+                    <button class="remove-btn" style="background:none; border:none; font-size:18px; cursor:pointer;" ${disabledAttr}>❌</button>
                 `;
 
                 const checkbox = itemDiv.querySelector(".cart-checkbox");
                 checkbox.addEventListener("change", e => {
                     if (e.target.checked) selectedCartItems.add(item.id);
                     else selectedCartItems.delete(item.id);
-                    // Recalculate select all state
-                    const selectable = cartItems.filter(i => i.stock > 0);
-                    selectAllCheckbox.checked = selectedCartItems.size === selectable.length;
-                    
+                    selectAllCheckbox.checked = selectedCartItems.size === cartItems.filter(i => i.stock > 0).length;
                     updateCartTotal();
                     updateModalTotals();
                 });
@@ -335,42 +295,28 @@ function loadCartRealtime() {
                 if (qtyInput) {
                     qtyInput.addEventListener("change", async e => {
                         let newQty = parseInt(e.target.value) || 1;
-                        if (newQty > stock) {
-                            newQty = stock;
-                            showToast(`Quantity limited to stock (${stock}).`, 2000, "orange", true);
-                        }
-                        if (newQty < 1) newQty = 1;
-
+                        if (newQty > stock) newQty = stock;
                         e.target.value = newQty;
                         const newUnit = Number(item.basePrice) + Number(item.sizePrice) + Number(item.addonsPrice);
                         await updateDoc(doc(cartRef, item.id), {
                             quantity: newQty,
-                            // unitPrice is constant for an item, no need to update
+                            unitPrice: newUnit,
                             totalPrice: newUnit * newQty
                         });
-                        // Firestore listener handles the final update, but setting value immediately feels snappier
-                        
-                        // If the item is selected, immediately update the total view
-                        if(selectedCartItems.has(item.id)) {
-                             updateCartTotal();
-                             updateModalTotals();
-                        }
                     });
                 }
 
                 const removeBtn = itemDiv.querySelector(".remove-btn");
                 removeBtn.addEventListener("click", async () => {
                     await deleteDoc(doc(cartRef, item.id));
-                    selectedCartItems.delete(item.id); // Ensure it's removed from the set
                     showToast("Item removed from cart.", 2000, "red", true);
                 });
 
-                cartItemsContainer.appendChild(itemDiv);
+                cartItemsDiv.insertBefore(itemDiv, deliveryDiv);
             }
 
             deliveryDiv.innerHTML = `<strong>Delivery Fee: ₱${selectedCartItems.size > 0 ? userDeliveryFee.toFixed(2) : "0.00"}</strong>`;
             updateCartTotal();
-            updateModalTotals();
         }
 
         renderCartItems();
@@ -379,7 +325,6 @@ function loadCartRealtime() {
         cartItemsDiv.innerHTML = "<p>Failed to load cart.</p>";
         cartTotalSpan.textContent = "0.00";
         updateModalTotals();
-        confirmOrderBtn.disabled = true;
     });
 }
 
@@ -414,8 +359,8 @@ function populateModalCart() {
         modalCartItemsDiv.innerHTML += `
             <div class="modal-cart-item" style="display:flex; align-items:center; gap:12px; justify-content:space-between; border-bottom:1px solid #ddd; padding:8px 0;">
                 <div style="display:flex; align-items:center; gap:10px; flex:1;">
-                    <img src="${item.image || 'placeholder.png'}" alt="${item.name}" 
-                            style="height:60px; width:60px; object-fit:cover; border-radius:6px; flex-shrink:0;">
+                    <img src="${item.image || 'placeholder.png'}" alt="${item.name}"
+                               style="height:60px; width:60px; object-fit:cover; border-radius:6px; flex-shrink:0;">
                     <div>
                         <strong>${item.name}${outOfStockLabel} (Stock: ${item.stock ?? 'N/A'})</strong><br>
                         ${item.size ? `Size: ${item.size} - ₱${Number(item.sizePrice).toFixed(2)}` : 'Size: N/A'}
@@ -434,15 +379,6 @@ function populateModalCart() {
 confirmOrderBtn?.addEventListener("click", () => {
     if (!currentUser) return showToast("Please log in.", 3000, "red");
     if (selectedCartItems.size === 0) return showToast("Select items to checkout.", 3000, "red");
-    
-    // Check if any selected item has quantity > stock
-    const overstocked = cartItems.filter(i => selectedCartItems.has(i.id) && i.quantity > i.stock);
-    if (overstocked.length > 0) {
-        showToast("Adjust quantity for items that exceed stock, or unselect them.", 4000, "orange");
-        // Optionally prevent modal open, but letting the user see the problem is better
-        // return; 
-    }
-    
     modal.style.display = "block";
     loadSavedAddresses();
 });
@@ -461,13 +397,11 @@ async function loadSavedAddresses() {
         if (userDoc) {
             const defaultAddr = [userDoc.houseNumber, userDoc.barangay, userDoc.city, userDoc.province, userDoc.region].filter(Boolean).join(", ");
             if (defaultAddr) {
-                // Prioritize fee from userDoc, fallback to deliveryFees map
                 const fee = Number((userDoc.deliveryFee ?? deliveryFees[userDoc.barangay]) || 0);
                 cartAddresses.push({ fullAddress: defaultAddr, deliveryFee: fee });
 
                 const div = document.createElement("div");
                 div.classList.add("delivery-address");
-                // Check the default address by default
                 div.innerHTML = `<label><input type="radio" name="selectedAddress" value="${defaultAddr}" checked> Address 1 (Default): ${defaultAddr}</label>`;
                 savedAddressDiv.appendChild(div);
 
@@ -533,68 +467,44 @@ addressForm?.addEventListener("submit", async e => {
 });
 
 // ==========================
-// --- INVENTORY DEDUCTION (ONLY FOR CASH ORDERS) ---
+// --- INVENTORY DEDUCTION ---
 // ==========================
 async function deductInventory(order) {
     const deductItem = async (id, amount) => {
         if (!id) return;
         const invRef = doc(db, "Inventory", id);
-        // Using Firebase FieldValue.increment is the correct way for concurrent updates
-        try {
-            await updateDoc(invRef, { 
-                 quantity: FieldValue.increment(-Math.abs(amount)) 
-            });
-        } catch (error) {
-            console.error(`Error using FieldValue.increment for ${id}: ${error.message}`);
-            // Fallback: This is less safe for high concurrency, but serves as a backup.
-             const invSnap = await getDoc(invRef);
-             const invQty = invSnap.exists() ? Number(invSnap.data().quantity || 0) : 0;
-             await updateDoc(invRef, { quantity: Math.max(invQty - amount, 0) });
-        }
+        const invSnap = await getDoc(invRef);
+        const invQty = invSnap.exists() ? Number(invSnap.data().quantity || 0) : 0;
+        await updateDoc(invRef, { quantity: Math.max(invQty - amount, 0) });
     };
-    
-    // Convert to proper number of items to deduct
-    const deductionPromises = [];
-    for (const item of order) {
-        const itemQty = Number(item.qty || 1);
-        // Deduct size variant
-        if (item.sizeId) deductionPromises.push(deductItem(item.sizeId, itemQty));
-        // Deduct ingredients
-        for (const ing of item.ingredients || []) deductionPromises.push(deductItem(ing.id, (ing.qty || 1) * itemQty));
-        // Deduct others
-        for (const other of item.others || []) deductionPromises.push(deductItem(other.id, (other.qty || 1) * itemQty));
-        // Deduct addons
-        for (const addon of item.addons || []) deductionPromises.push(deductItem(addon.id, itemQty));
-    }
-    await Promise.all(deductionPromises);
-}
 
+    for (const item of order) {
+        for (const ing of item.ingredients || []) await deductItem(ing.id, (ing.qty || 1) * item.qty);
+        for (const other of item.others || []) await deductItem(other.id, (other.qty || 1) * item.qty);
+        if (item.sizeId) await deductItem(item.sizeId, item.qty);
+        for (const addon of item.addons || []) await deductItem(addon.id, item.qty);
+    }
+}
 
 // ==========================
 // --- QUEUE NUMBER ---
 // ==========================
 async function getNextQueueNumber(paymentMethod) {
-    // Check both DeliveryOrders and InStoreOrders to prevent duplicate queue numbers
-    const deliveryRef = collection(db, "DeliveryOrders");
-    const instoreRef = collection(db, "InStoreOrders");
-    
-    const [deliverySnap, instoreSnap] = await Promise.all([
-        getDocs(query(deliveryRef, orderBy("queueNumberNumeric", "desc"), limit(1))),
-        getDocs(query(instoreRef, orderBy("queueNumberNumeric", "desc"), limit(1)))
-    ]);
+    const collectionRef = collection(db, "DeliveryOrders");
+    const q = query(
+        collectionRef,
+        orderBy("queueNumberNumeric", "desc"),
+        limit(1)
+    );
+    const snapshot = await getDocs(q);
 
-    let lastNumeric = 0;
-
-    if (!deliverySnap.empty) {
-        lastNumeric = Math.max(lastNumeric, Number(deliverySnap.docs[0].data().queueNumberNumeric || 0));
+    let nextNumeric = 1;
+    if (!snapshot.empty) {
+        const lastNumeric = Number(snapshot.docs[0].data().queueNumberNumeric || 0);
+        nextNumeric = lastNumeric + 1;
     }
-    if (!instoreSnap.empty) {
-        lastNumeric = Math.max(lastNumeric, Number(instoreSnap.docs[0].data().queueNumberNumeric || 0));
-    }
-
-    let nextNumeric = lastNumeric + 1;
     
-    const prefix = paymentMethod === 'Cash' ? 'C' : 'G'; 
+    const prefix = paymentMethod === 'Cash' ? 'C' : 'G';
     const formattedQueueNumber = `${prefix}${nextNumeric.toString().padStart(4, '0')}`;
 
     return {
@@ -604,7 +514,7 @@ async function getNextQueueNumber(paymentMethod) {
 }
 
 // ==========================
-// --- FINAL CONFIRM ORDER (UPDATED FOR DRAFT ORDERS) ---
+// --- FINAL CONFIRM ORDER ---
 // ==========================
 finalConfirmBtn?.addEventListener("click", async () => {
     if (!currentUser) return showToast("Log in first.", 3000, "red");
@@ -613,125 +523,95 @@ finalConfirmBtn?.addEventListener("click", async () => {
 
     const paymentMethod = document.querySelector("input[name='payment']:checked")?.value || "Cash";
 
-    // 1. Prepare Order Data
-    const { formatted: queueNumber, numeric: queueNumberNumeric } = await getNextQueueNumber(paymentMethod);
-
-    const selectedItems = cartItems.filter(item => selectedCartItems.has(item.id));
-    const selectedItemIds = Array.from(selectedCartItems);
-
-    // Final check for stock before placing order
-    const outOfStockItems = selectedItems.filter(item => item.quantity > item.stock || item.stock === 0);
-    if (outOfStockItems.length > 0) {
-        showToast("One or more selected items exceed available stock. Please adjust quantities or unselect them.", 5000, "red");
-        // Re-render the cart to highlight the issue
-        loadCartRealtime(); 
-        modal.style.display = "none";
-        return;
-    }
-
-    const orderItems = selectedItems.map(item => ({
-        product: item.name,
-        productId: item.productId || null,
-        size: item.size || null,
-        sizeId: item.sizeId || null,
-        qty: item.quantity || 1,
-        basePrice: Number(item.basePrice || 0),
-        sizePrice: Number(item.sizePrice || 0),
-        addonsPrice: Number(item.addonsPrice || 0),
-        addons: item.addons || [],
-        ingredients: item.ingredients || [],
-        others: item.others || [],
-        total: Number(item.totalPrice || 0)
-    }));
-
-    const orderTotal = orderItems.reduce((sum, i) => sum + i.total, 0) + userDeliveryFee;
-    const orderTotalInCentavos = Math.round(orderTotal * 100);
-
-    const baseOrderData = {
-        userId: currentUser.uid,
-        customerName: currentUser.displayName || defaultUserDocData?.customerName || "Customer",
-        address: selectedAddress,
-        queueNumber, 
-        queueNumberNumeric, 
-        orderType: "Delivery",
-        orderItems: orderItems, // Renamed to orderItems for consistency
-        deliveryFee: userDeliveryFee,
-        orderTotal: orderTotal, // Renamed to orderTotal for consistency
-        cartItemIds: selectedItemIds,
-        createdAt: serverTimestamp()
-    };
-
     try {
-        if (paymentMethod === "Cash") {
-            // 2A. CASH: Place order directly, deduct inventory, and clear cart
-            await addDoc(collection(db, "DeliveryOrders"), {
-                ...baseOrderData,
-                total: orderTotal, // Keep 'total' for legacy if needed
-                items: orderItems, // Keep 'items' for legacy if needed
-                paymentMethod,
-                status: "Pending",
-            });
+        const { formatted: queueNumber, numeric: queueNumberNumeric } = await getNextQueueNumber(paymentMethod);
 
-            // Perform Inventory Deduction immediately for COD
-            await deductInventory(orderItems); 
-            // Clear cart immediately for COD
-            const cartRef = collection(db, "users", currentUser.uid, "cart");
+        const cartRef = collection(db, "users", currentUser.uid, "cart");
+        const selectedItems = cartItems.filter(item => selectedCartItems.has(item.id));
+        const selectedItemIds = Array.from(selectedCartItems);
+
+        const orderItems = selectedItems.map(item => ({
+            product: item.name,
+            productId: item.productId || null,
+            size: item.size || null,
+            sizeId: item.sizeId || null,
+            qty: item.quantity || 1,
+            basePrice: Number(item.basePrice || 0),
+            sizePrice: Number(item.sizePrice || 0),
+            addonsPrice: Number(item.addonsPrice || 0),
+            addons: item.addons || [],
+            ingredients: item.ingredients || [],
+            others: item.others || [],
+            total: Number(item.totalPrice || 0)
+        }));
+
+        const orderTotal = orderItems.reduce((sum, i) => sum + i.total, 0) + userDeliveryFee;
+        const orderTotalInCentavos = Math.round(orderTotal * 100);
+
+        const commonOrderData = {
+            userId: currentUser.uid,
+            customerName: currentUser.displayName || defaultUserDocData?.customerName || "Customer",
+            address: selectedAddress,
+            queueNumber,
+            queueNumberNumeric,
+            orderType: "Delivery",
+            items: orderItems,
+            deliveryFee: userDeliveryFee,
+            total: orderTotal,
+            paymentMethod,
+            status: "Pending", // ⭐ ALWAYS Pending initially
+            cartItemIds: selectedItemIds, // Added for E-Payment cleanup
+            createdAt: serverTimestamp()
+        };
+
+        let orderRef = null;
+
+        if (paymentMethod === "Cash") {
+            // 1. Add order to DeliveryOrders with "Pending" status
+            await addDoc(collection(db, "DeliveryOrders"), commonOrderData);
+
+            // 2. Deduct inventory and clear cart immediately
+            await deductInventory(orderItems);
             for (const itemId of selectedItemIds) await deleteDoc(doc(cartRef, itemId));
 
             showToast(`Order placed! Queue #${queueNumber}. (Payment: Cash)`, 3000, "green", true);
             modal.style.display = "none";
-            // Navigate to confirmation page
-            window.location.href = `order-confirmation.html?order=${queueNumber}`; 
-
         } else if (paymentMethod === "E-Payment") {
-            // 2B. E-PAYMENT: Create Draft Order
-            showToast("Preparing payment...", 3000, "blue", true);
+            showToast("Preparing E-Payment...", 3000, "blue", true);
             
-            const draftRef = await addDoc(collection(db, "DraftOrders"), {
-                ...baseOrderData,
-                status: "Draft",
-                paymentMethod: "E-Payment",
-            });
+            // 1. Add order to DeliveryOrders with "Pending" status
+            orderRef = await addDoc(collection(db, "DeliveryOrders"), commonOrderData);
 
-            // 3. Initiate PayMongo Checkout using the Draft ID in metadata
-            const response = await fetch("/.netlify/functions/create-checkout", {
+            // 2. Call the Netlify Function for checkout
+            const response = await fetch("/.netlify/functions/create-checkout", { // ⭐ CHANGE APPLIED HERE
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({
                     amount: orderTotalInCentavos,
                     currency: "PHP",
-                    description: `Order #${queueNumber} (Draft: ${draftRef.id})`,
-                    // ⭐ CRITICAL FIX: PASS THE COMPLETE, STRINGIFIED METADATA
-                    metadata: { 
-                        draftOrderId: draftRef.id, 
-                        userId: baseOrderData.userId, 
-                        queueNumber: baseOrderData.queueNumber, 
-                        orderTotal: baseOrderData.orderTotal,
-                        customerName: baseOrderData.customerName,
-                        address: baseOrderData.address,
-                        deliveryFee: baseOrderData.deliveryFee,
-                        
-                        // ⭐ Stringify complex arrays for reliable PayMongo transfer
-                        orderItems: JSON.stringify(baseOrderData.orderItems), 
-                        cartItemIds: JSON.stringify(baseOrderData.cartItemIds),
-                    } // END OF METADATA
-                }), // END OF BODY
+                    description: `Order #${queueNumber} (ID: ${orderRef.id})`,
+                    metadata: {
+                        orderId: orderRef.id, // CRITICAL: Pass the new DeliveryOrder ID
+                        userId: currentUser.uid,
+                    }
+                }),
             });
 
             const data = await response.json();
 
-            if (response.ok && data.checkout_url) {
-                showToast("Redirecting to payment gateway...", 2000, "green", true);
+            if (response.ok && data?.checkout_url) {
+                showToast("Redirecting to GCash payment page...", 3000, "green", true);
                 window.location.href = data.checkout_url;
             } else {
-                console.error("Checkout failed:", data.error || "Unknown error");
-                showToast(`Payment initiation failed: ${data.error?.message || "Check console."}`, 5000, "red");
-                // Optional: Delete the draft order if checkout creation failed
-                await deleteDoc(doc(db, "DraftOrders", draftRef.id));
+                // If payment creation fails, delete the 'Pending' order to prevent confusion
+                await deleteDoc(orderRef);
+                showToast(`Payment setup failed: ${data.error || 'Unknown error'}.`, 4000, "red", true);
+                console.error("PayMongo Checkout Error:", data.error || data);
             }
         }
-    } catch (error) {
-        console.error("Order processing error:", error);
-        showToast("An unexpected error occurred during order processing.", 5000, "red");
+        modal.style.display = "none";
+    } catch (err) {
+        console.error(err);
+        showToast("Order failed. Try again.", 4000, "red", true);
     }
 });
