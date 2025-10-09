@@ -4,6 +4,8 @@ const axios = require('axios');
 // PayMongo API endpoint
 const PAYMONGO_API = 'https://api.paymongo.com/v1';
 
+// --- (Keep the existing buildLineItems helper function unchanged) ---
+
 /**
  * Helper function to create the detailed line_items array for PayMongo.
  * This logic is ported directly from your Server.cjs file.
@@ -11,7 +13,7 @@ const PAYMONGO_API = 'https://api.paymongo.com/v1';
  * @returns {Array} Array of line item objects for PayMongo.
  */
 function buildLineItems(metadata) {
-    const lineItems = (metadata.orderItems || []).flatMap(item => {
+    const lineItems = (metadata.items || []).flatMap(item => { // Changed metadata.orderItems to metadata.items
         const qty = Number(item.qty || 1);
         
         // Calculate the base price (base + size price) for the item, in centavos
@@ -57,7 +59,7 @@ function buildLineItems(metadata) {
             name: "Order Payment",
             currency: "PHP",
             // Use the total from metadata in centavos as a fallback
-            amount: Math.round(Number(metadata.orderTotal || 0) * 100), 
+            amount: Math.round(Number(metadata.total || 0) * 100), // Changed metadata.orderTotal to metadata.total
             quantity: 1,
         });
     }
@@ -77,7 +79,8 @@ exports.handler = async (event, context) => {
     }
 
     try {
-        let { amount, metadata, description } = JSON.parse(event.body);
+        // Renamed 'metadata' to 'orderData' for clarity, which holds the commonOrderData from client
+        let { amount, orderData: metadata } = JSON.parse(event.body); 
 
         // --- CHECK SECRET KEY & ESSENTIAL INPUTS ---
         if (!PAYMONGO_SECRET_KEY) {
@@ -96,45 +99,51 @@ exports.handler = async (event, context) => {
         if (
             !amount || amountInCentavos < 100 || 
             !metadata || !metadata.userId || !metadata.queueNumber || 
-            !Array.isArray(metadata.orderItems) || metadata.orderItems.length === 0
+            !Array.isArray(metadata.items) || metadata.items.length === 0 // Changed metadata.orderItems to metadata.items
         ) {
             console.error("Missing required fields or invalid order details for checkout:", { amount, metadata });
             return {
                 statusCode: 400,
                 body: JSON.stringify({
-                    // Improved error message 
-                    error: 'Invalid amount or metadata missing required fields: amount (PHP), metadata.userId, metadata.queueNumber, or metadata.orderItems (must be non-empty array).'
+                    error: 'Invalid amount or metadata missing required fields: amount (PHP), metadata.userId, metadata.queueNumber, or metadata.items (must be non-empty array).'
                 })
             };
         }
 
         // --- CONSTRUCT PAYMONGO PAYLOAD ---
-        const lineItems = buildLineItems(metadata);
+        // Pass the metadata object to the line items builder
+        const lineItems = buildLineItems(metadata); 
         
         // Prepare metadata for PayMongo (complex objects must be stringified)
         const paymongoMetadata = {
-            ...metadata,
-            // These must be stringified for PayMongo to accept them
-            orderItems: JSON.stringify(metadata.orderItems),
+            userId: metadata.userId,
+            queueNumber: metadata.queueNumber,
+            // 💡 CRITICAL CHANGE: Pass the entire order data object as a string
+            fullOrderData: JSON.stringify({
+                ...metadata,
+                // Ensure status is correctly set to 'Pending' by the webhook
+                status: "Pending" 
+            }),
+            // Keep original cart IDs and items for secondary check
             cartItemIds: JSON.stringify(metadata.cartItemIds),
-            orderId: metadata.orderId // Ensure this is explicitly passed as a string
+            itemsSummary: JSON.stringify(metadata.items.map(i => ({ p: i.product, q: i.qty })))
         };
         
-        // Fallback description
-        const finalDescription = description || `Payment for Order #${metadata.queueNumber}`;
+        // Use queue number as a fallback description
+        const finalDescription = `Payment for Order #${metadata.queueNumber}`;
 
         const response = await axios.post(
             `${PAYMONGO_API}/checkout_sessions`,
             {
                 data: {
                     attributes: {
-                        success_url: `${BASE_URL}/index.html`, // Redirect to main page after success
-                        cancel_url: `${BASE_URL}/cart.html`,  // Redirect to cart page after cancel
+                        success_url: `${BASE_URL}/index.html?status=success`, // Added status param
+                        cancel_url: `${BASE_URL}/cart.html?status=cancelled`, // Added status param
                         send_email_receipt: false,
                         description: finalDescription,
                         line_items: lineItems,
                         payment_method_types: ['gcash'],
-                        metadata: paymongoMetadata
+                        metadata: paymongoMetadata // Use the new metadata object
                     }
                 }
             },
