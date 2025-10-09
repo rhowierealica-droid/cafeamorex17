@@ -1,9 +1,9 @@
 // create-checkout.js
-require('dotenv').config(); // Keep for local development, Netlify ignores it 
-const axios = require('axios'); 
+require('dotenv').config(); // Keep for local development, Netlify ignores it
+const axios = require('axios');
 
-// PayMongo API endpoint 
-const PAYMONGO_API = 'https://api.paymongo.com/v1'; 
+// PayMongo API endpoint
+const PAYMONGO_API = 'https://api.paymongo.com/v1';
 
 /**
  * Helper function to create the detailed line_items array for PayMongo.
@@ -80,21 +80,16 @@ exports.handler = async (event, context) => {
         // Parse body safely
         const body = JSON.parse(event.body || "{}");
 
-        // 🟢 FIX: Support both frontend shapes:
-        // - { amount, orderData: { ... } }
-        // - { amount, metadata: { ... } }
-        // and also allow metadata to be nested differently.
+        // 🟢 FIX: Support various frontend body shapes for metadata extraction
         let amount = body.amount;
         let metadata = body.orderData || body.metadata || body.orderData?.metadata || body.metadata?.orderData || null;
 
         // 🟢 FIX: If metadata still missing, attempt to coerce a couple common shapes
-        // (e.g., some clients might send { metadata: { orderItems: [...] , orderTotal: ... } })
         if (!metadata && body.metadata) {
             metadata = body.metadata;
         }
 
         // 🟢 FIX: If frontend accidentally sent the whole commonOrderData at top-level, handle it
-        // (some variants might send all order fields at root)
         const likelyOrderKeys = ['userId', 'items', 'queueNumber', 'total'];
         if (!metadata && likelyOrderKeys.some(k => k in body)) {
             metadata = {
@@ -113,31 +108,20 @@ exports.handler = async (event, context) => {
         }
 
         // 🟢 FIX: Accept amount either as PHP (e.g. 420) or as centavos (e.g. 42000).
-        // Detection heuristic:
-        // - If amount >= 1000 treat as centavos (because 1000 centavos = PHP 10)
-        // - Otherwise treat as PHP and multiply by 100.
-        if (amount === undefined || amount === null || amount === "") {
-            console.error("Missing amount in request body:", { body });
-            return {
-                statusCode: 400,
-                body: JSON.stringify({ error: 'Missing amount in request body.' })
-            };
-        }
-
         // Normalize amount -> amountInCentavos
         let amountInCentavos;
         const parsedAmount = Number(amount);
-        if (Number.isNaN(parsedAmount)) {
-            console.error("Invalid amount provided:", amount);
-            return {
-                statusCode: 400,
-                body: JSON.stringify({ error: 'Invalid amount provided.' })
-            };
+        
+        if (amount === undefined || amount === null || Number.isNaN(parsedAmount) || parsedAmount <= 0) {
+             console.error("Missing or invalid amount in request body:", { amount, body });
+             return {
+                 statusCode: 400,
+                 body: JSON.stringify({ error: 'Missing or invalid amount provided.' })
+             };
         }
 
         // If amount looks big enough to already be in centavos, don't multiply
         if (parsedAmount >= 1000) {
-            // Treat as centavos already
             amountInCentavos = Math.round(parsedAmount);
         } else {
             // Treat as PHP and convert to centavos
@@ -156,9 +140,22 @@ exports.handler = async (event, context) => {
             };
         }
 
+        // 🟢 CRITICAL FIX: Extract customer email for the billing object
+        const customerEmail = metadata.customerEmail || metadata.email;
+
+        if (!customerEmail) {
+            console.error("Missing customer email in metadata:", { metadata });
+            return {
+                statusCode: 400,
+                body: JSON.stringify({
+                    error: 'Missing customer email. The email must be included in the order data (metadata.customerEmail or metadata.email).'
+                })
+            };
+        }
+
         // --- CONSTRUCT PAYMONGO PAYLOAD ---
-        // Pass the metadata object to the line items builder
         const lineItems = buildLineItems(metadata);
+        const finalDescription = `Payment for Order #${metadata.queueNumber}`;
 
         // Prepare metadata for PayMongo (complex objects must be stringified)
         const paymongoMetadata = {
@@ -167,16 +164,12 @@ exports.handler = async (event, context) => {
             // 💡 CRITICAL CHANGE: Pass the entire order data object as a string
             fullOrderData: JSON.stringify({
                 ...metadata,
-                // Ensure status is correctly set to 'Pending' by the webhook
-                status: "Pending"
+                status: "Pending" // Ensure status is correctly set to 'Pending' by the webhook
             }),
             // Keep original cart IDs and items for secondary check
             cartItemIds: JSON.stringify(metadata.cartItemIds || []),
             itemsSummary: JSON.stringify((metadata.items || []).map(i => ({ p: i.product, q: i.qty })))
         };
-
-        // Use queue number as a fallback description
-        const finalDescription = `Payment for Order #${metadata.queueNumber}`;
 
         // Build PayMongo payload attributes
         const payload = {
@@ -188,15 +181,19 @@ exports.handler = async (event, context) => {
                     description: finalDescription,
                     line_items: lineItems,
                     payment_method_types: ['gcash'],
-                    metadata: paymongoMetadata
+                    metadata: paymongoMetadata,
+                    // 🟢 CRITICAL FIX: Add the billing object with the required email address
+                    billing: {
+                        email: customerEmail,
+                        name: metadata.name || "Customer", // Assuming name is optional but good to pass if available
+                        phone: metadata.phone || undefined, // Optional
+                        address: metadata.address || undefined // Optional
+                    }
                 }
             }
         };
 
-        // If you want to pass the amount to PayMongo's checkout session attributes (some integrations do),
-        // you can add 'amount' attribute. PayMongo Checkout Sessions usually use line_items instead,
-        // but keeping 'amount' is ok if you want a fallback.
-        // Add fallback top-level amount only if there are no line_items (we already handle fallback in buildLineItems).
+        // Add fallback top-level amount only if line items are somehow empty (highly unlikely now)
         if (!payload.data.attributes.line_items || payload.data.attributes.line_items.length === 0) {
             payload.data.attributes.amount = amountInCentavos;
             payload.data.attributes.currency = "PHP";
