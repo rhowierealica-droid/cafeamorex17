@@ -67,9 +67,9 @@ exports.handler = async (event, context) => {
             {
                 data: {
                     attributes: {
-                        success_url: "https://grand-madeleine-e2fe55.netlify.app/customer-status.html",
+                        success_url: "https://thriving-profiterole-03bc7e.netlify.app/cart.html",
                         // Corrected typo: cart.htmll -> cart.html
-                        cancel_url: "https://grand-madeleine-e2fe55.netlify.app/cart.html", 
+                        cancel_url: "https://thriving-profiterole-03bc7e.netlify.app/cart.html", 
                         send_email_receipt: false,
                         description,
                         line_items: lineItems,
@@ -106,3 +106,4 @@ exports.handler = async (event, context) => {
         };
     }
 };
+
