@@ -530,8 +530,6 @@ finalConfirmBtn?.addEventListener("click", async () => {
         const selectedItems = cartItems.filter(item => selectedCartItems.has(item.id));
         const selectedItemIds = Array.from(selectedCartItems);
 
-        // 🛑 CRITICAL FIX APPLIED HERE 🛑
-        // Recalculate the item total based on components to ensure accuracy with PayMongo's line_items.
         const orderItems = selectedItems.map(item => {
             const basePrice = Number(item.basePrice || 0);
             const sizePrice = Number(item.sizePrice || 0);
@@ -591,26 +589,23 @@ finalConfirmBtn?.addEventListener("click", async () => {
         } else if (paymentMethod === "E-Payment") {
             showToast("Preparing E-Payment...", 3000, "blue", true);
             
-            // The Netlify function will receive 'commonOrderData', attempt to create PayMongo checkout,
-            // and upon successful payment via webhook, it should **SAVE the order to Firebase**
-            
+            // 🌟 CRITICAL FIX: Send the commonOrderData wrapped correctly 🌟
             const response = await fetch("/.netlify/functions/create-checkout", {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({
-                    amount: orderTotal, 
-                    currency: "PHP",
-                    description: `Order #${queueNumber}`,
-                    orderData: commonOrderData, 
+                    // This structure MUST match what create-checkout.js is destructuring
+                    commonOrderData: commonOrderData, 
                 }),
             });
 
             const data = await response.json();
 
-            if (response.ok && data?.checkout_url) {
+            // 🌟 CRITICAL FIX: Check for 'checkoutUrl' (camelCase) as returned by the function 🌟
+            if (response.ok && data?.checkoutUrl) { 
                 showToast("Redirecting to E-Payment page...", 3000, "green", true);
                 // Redirect user to PayMongo page
-                window.location.href = data.checkout_url;
+                window.location.href = data.checkoutUrl;
             } else {
                 // If payment setup fails, NOTHING IS SAVED TO FIREBASE. Success!
                 showToast(`Payment setup failed: ${data.error || 'Unknown error'}. Order not saved.`, 4000, "red", true);
