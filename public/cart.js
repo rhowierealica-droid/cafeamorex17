@@ -14,7 +14,7 @@ import { getAuth, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/
 const deliveryFees = {
     "Alima": 50,
     "Aniban I": 60,
-    // Add all your barangays and their fees here
+    // Add other barangays
 };
 
 // ==========================
@@ -153,7 +153,6 @@ async function fetchCartItemStock(item) {
     });
 
     if (item.disabled) return 0;
-
     let possible = Infinity;
 
     const getComponentLimit = (component, requiredQtyPerProduct) => {
@@ -584,17 +583,16 @@ finalConfirmBtn?.addEventListener("click", async () => {
         } else if (paymentMethod === "E-Payment") {
             showToast("Preparing E-Payment...", 3000, "blue", true);
 
-            // 🔹 STRINGIFY arrays for metadata
             const metadata = {
-                 items: commonOrderData.items, // send array directly
-    cartItemIds: commonOrderData.cartItemIds,
-    orderTotal: commonOrderData.total,
-    deliveryFee: commonOrderData.deliveryFee,
-    userId: commonOrderData.userId,
-    customerName: commonOrderData.customerName,
-    address: commonOrderData.address,
-    queueNumber: commonOrderData.queueNumber,
-    queueNumberNumeric: commonOrderData.queueNumberNumeric
+                 items: commonOrderData.items,
+                 cartItemIds: commonOrderData.cartItemIds,
+                 orderTotal: commonOrderData.total,
+                 deliveryFee: commonOrderData.deliveryFee,
+                 userId: commonOrderData.userId,
+                 customerName: commonOrderData.customerName,
+                 address: commonOrderData.address,
+                 queueNumber: commonOrderData.queueNumber,
+                 queueNumberNumeric: commonOrderData.queueNumberNumeric
             };
 
             const response = await fetch("/.netlify/functions/create-checkout", {
@@ -625,4 +623,3 @@ finalConfirmBtn?.addEventListener("click", async () => {
         showToast("Order failed. Try again.", 4000, "red", true);
     }
 });
-
