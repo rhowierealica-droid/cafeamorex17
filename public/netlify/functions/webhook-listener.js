@@ -83,20 +83,22 @@ exports.handler = async (event, context) => {
   // -------------------- Payment Paid Events --------------------
   if (eventType === "payment.paid" || eventType === "checkout_session.payment.paid") {
     const metadata = dataObject?.attributes?.metadata || {};
-    const orderItems = safeParse(metadata.items); // ✅ read correct key
+    const orderItems = safeParse(metadata.items || metadata.orderItems);
     const cartItemIds = safeParse(metadata.cartItemIds);
 
     if (!metadata.userId || !metadata.queueNumber) {
       return { statusCode: 400, body: "Missing metadata" };
     }
 
-    // Ensure total is correct
-    const totalAmount = Number(metadata.orderTotal) || orderItems.reduce((sum, i) => sum + (i.total || 0), 0) + Number(metadata.deliveryFee || 0);
+    // Calculate total if not provided
+    const totalAmount = Number(metadata.orderTotal) || 
+      orderItems.reduce((sum, i) => sum + (i.total || 0), 0) + Number(metadata.deliveryFee || 0);
 
     // Save order to Firestore
     const orderRef = await db.collection("DeliveryOrders").add({
       userId: metadata.userId,
       customerName: metadata.customerName || "",
+      customerEmail: metadata.customerEmail || "", // optional for receipts
       address: metadata.address || "",
       queueNumber: metadata.queueNumber,
       queueNumberNumeric: Number(metadata.queueNumberNumeric) || 0,
@@ -113,7 +115,7 @@ exports.handler = async (event, context) => {
 
     console.log("💾 Order saved with ID:", orderRef.id);
 
-    // TODO: Deduct inventory, etc., if needed
+    // TODO: Deduct inventory if needed
 
     return { statusCode: 200, body: JSON.stringify({ received: true, orderId: orderRef.id }) };
   }
