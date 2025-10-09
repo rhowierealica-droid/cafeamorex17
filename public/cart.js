@@ -360,7 +360,7 @@ function populateModalCart() {
             <div class="modal-cart-item" style="display:flex; align-items:center; gap:12px; justify-content:space-between; border-bottom:1px solid #ddd; padding:8px 0;">
                 <div style="display:flex; align-items:center; gap:10px; flex:1;">
                     <img src="${item.image || 'placeholder.png'}" alt="${item.name}"
-                             style="height:60px; width:60px; object-fit:cover; border-radius:6px; flex-shrink:0;">
+                        style="height:60px; width:60px; object-fit:cover; border-radius:6px; flex-shrink:0;">
                     <div>
                         <strong>${item.name}${outOfStockLabel} (Stock: ${item.stock ?? 'N/A'})</strong><br>
                         ${item.size ? `Size: ${item.size} - ₱${Number(item.sizePrice).toFixed(2)}` : 'Size: N/A'}
@@ -589,26 +589,28 @@ finalConfirmBtn?.addEventListener("click", async () => {
         } else if (paymentMethod === "E-Payment") {
             showToast("Preparing E-Payment...", 3000, "blue", true);
             
-            // 🌟 CRITICAL FIX: Send the commonOrderData wrapped correctly 🌟
+            // 🌟 Sending order data to Netlify function 🌟
             const response = await fetch("/.netlify/functions/create-checkout", {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({
-                    // This structure MUST match what create-checkout.js is destructuring
                     commonOrderData: commonOrderData, 
                 }),
             });
 
             const data = await response.json();
 
-            // 🌟 CRITICAL FIX: Check for 'checkoutUrl' (camelCase) as returned by the function 🌟
             if (response.ok && data?.checkoutUrl) { 
                 showToast("Redirecting to E-Payment page...", 3000, "green", true);
                 // Redirect user to PayMongo page
                 window.location.href = data.checkoutUrl;
             } else {
-                // If payment setup fails, NOTHING IS SAVED TO FIREBASE. Success!
-                showToast(`Payment setup failed: ${data.error || 'Unknown error'}. Order not saved.`, 4000, "red", true);
+                // If the Netlify function returned an error, check for details
+                const detailMessage = Array.isArray(data.details) 
+                    ? data.details.map(d => `${d.code || d.detail || 'Error'}: ${d.detail || 'Check console.'}`).join(' / ') 
+                    : data.details || data.error || 'Unknown error (Check Netlify Logs)';
+
+                showToast(`Payment setup failed: ${detailMessage}. Order not saved.`, 4000, "red", true);
                 console.error("PayMongo Checkout Error:", data.error || data);
             }
         }
