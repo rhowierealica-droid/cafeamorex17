@@ -360,7 +360,7 @@ function populateModalCart() {
             <div class="modal-cart-item" style="display:flex; align-items:center; gap:12px; justify-content:space-between; border-bottom:1px solid #ddd; padding:8px 0;">
                 <div style="display:flex; align-items:center; gap:10px; flex:1;">
                     <img src="${item.image || 'placeholder.png'}" alt="${item.name}"
-                                 style="height:60px; width:60px; object-fit:cover; border-radius:6px; flex-shrink:0;">
+                             style="height:60px; width:60px; object-fit:cover; border-radius:6px; flex-shrink:0;">
                     <div>
                         <strong>${item.name}${outOfStockLabel} (Stock: ${item.stock ?? 'N/A'})</strong><br>
                         ${item.size ? `Size: ${item.size} - ₱${Number(item.sizePrice).toFixed(2)}` : 'Size: N/A'}
@@ -530,20 +530,33 @@ finalConfirmBtn?.addEventListener("click", async () => {
         const selectedItems = cartItems.filter(item => selectedCartItems.has(item.id));
         const selectedItemIds = Array.from(selectedCartItems);
 
-        const orderItems = selectedItems.map(item => ({
-            product: item.name,
-            productId: item.productId || null,
-            size: item.size || null,
-            sizeId: item.sizeId || null,
-            qty: item.quantity || 1,
-            basePrice: Number(item.basePrice || 0),
-            sizePrice: Number(item.sizePrice || 0),
-            addonsPrice: Number(item.addonsPrice || 0),
-            addons: item.addons || [],
-            ingredients: item.ingredients || [],
-            others: item.others || [],
-            total: Number(item.totalPrice || 0)
-        }));
+        // 🛑 CRITICAL FIX APPLIED HERE 🛑
+        // Recalculate the item total based on components to ensure accuracy with PayMongo's line_items.
+        const orderItems = selectedItems.map(item => {
+            const basePrice = Number(item.basePrice || 0);
+            const sizePrice = Number(item.sizePrice || 0);
+            const addonsPrice = Number(item.addonsPrice || 0);
+            const qty = item.quantity || 1;
+            
+            // Calculate the precise unit price from components
+            const unitPrice = basePrice + sizePrice + addonsPrice;
+            
+            return {
+                product: item.name,
+                productId: item.productId || null,
+                size: item.size || null,
+                sizeId: item.sizeId || null,
+                qty: qty,
+                basePrice: basePrice,
+                sizePrice: sizePrice,
+                addonsPrice: addonsPrice,
+                addons: item.addons || [],
+                ingredients: item.ingredients || [],
+                others: item.others || [],
+                // Use the precise, calculated total (unitPrice * qty)
+                total: unitPrice * qty
+            }
+        });
 
         const orderTotal = orderItems.reduce((sum, i) => sum + i.total, 0) + userDeliveryFee;
 
@@ -580,7 +593,6 @@ finalConfirmBtn?.addEventListener("click", async () => {
             
             // The Netlify function will receive 'commonOrderData', attempt to create PayMongo checkout,
             // and upon successful payment via webhook, it should **SAVE the order to Firebase**
-            // and set the final status to **"Pending"** as requested.
             
             const response = await fetch("/.netlify/functions/create-checkout", {
                 method: "POST",
