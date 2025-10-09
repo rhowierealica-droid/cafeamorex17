@@ -551,7 +551,7 @@ finalConfirmBtn?.addEventListener("click", async () => {
 
         const commonOrderData = {
             userId: currentUser.uid,
-            customerName: currentUser.displayName || defaultUserDocData?.customerName || "Customer",
+            customerName: currentUser.displayName || currentUser.email || "Customer",
             address: selectedAddress,
             queueNumber,
             queueNumberNumeric,
@@ -623,5 +623,6 @@ finalConfirmBtn?.addEventListener("click", async () => {
         showToast("Order failed. Try again.", 4000, "red", true);
     }
 });
+
 
 
