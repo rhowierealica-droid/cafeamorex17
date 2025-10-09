@@ -14,6 +14,7 @@ try {
         throw new Error("FIREBASE_SERVICE_ACCOUNT_KEY is missing in environment.");
     }
 
+    // Ensure the key is correctly parsed
     const serviceAccount = JSON.parse(serviceAccountKey);
 
     if (!admin.apps.length) {
@@ -24,15 +25,13 @@ try {
     db = admin.firestore();
     console.log("✅ Firebase Admin SDK Initialized Successfully.");
 } catch (e) {
-    // 🔴 If this logs, the JSON formatting is still wrong, or the key is missing.
-    console.error("❌ FIREBASE ADMIN INIT FAILED:", e.message); 
+    console.error("❌ FIREBASE ADMIN INIT FAILED:", e.message);
     
     // Set a handler that immediately returns a server error and stops execution
     exports.handler = async () => ({
         statusCode: 500,
         body: `Firebase Initialization Failed: ${e.message}`,
     });
-    // Throw error to prevent the rest of the file from trying to run
     throw new Error("Firebase Admin failed to initialize."); 
 }
 
@@ -41,6 +40,7 @@ function safeParse(value) {
     try {
         if (!value) return null;
         let parsedValue = typeof value === "string" ? JSON.parse(value) : value;
+        // PayMongo sometimes double-strings the JSON payload
         if (typeof parsedValue === "string") parsedValue = JSON.parse(parsedValue);
         return parsedValue;
     } catch (e) {
@@ -54,7 +54,6 @@ function cleanObject(obj) {
     const cleaned = {};
     for (const key in obj) {
         const value = obj[key];
-        // Only include values that are not null, undefined, and not an empty string
         if (value !== null && value !== undefined && value !== "") {
             cleaned[key] = value;
         }
@@ -62,19 +61,22 @@ function cleanObject(obj) {
     return cleaned;
 }
 
-// Deduct inventory function
+// Deduct inventory function (using Admin SDK's atomic increment)
 async function deductInventory(orderItems) {
     const deductItem = async (id, amount) => {
         if (!id || !amount) return;
         const invRef = db.collection("Inventory").doc(id);
-        // Use FieldValue.increment to atomically decrease inventory
+        
         await invRef.update({ 
+            // Use negative increment to decrease quantity
             quantity: admin.firestore.FieldValue.increment(-Math.abs(amount))
-        }).catch(err => console.error(`⚠️ Failed to deduct ${amount} from item ${id}:`, err.message));
+        }).catch(err => {
+            // Log error but don't stop the whole handler
+            console.error(`⚠️ Failed to deduct ${amount} from item ${id}:`, err.message);
+        });
     };
 
     for (const item of orderItems) {
-        // Ensure we are using the correct quantity field name 'qty'
         const itemQty = Number(item.qty || 1); 
         for (const ing of item.ingredients || []) await deductItem(ing.id, (ing.qty || 1) * itemQty);
         for (const other of item.others || []) await deductItem(other.id, (other.qty || 1) * itemQty);
@@ -84,7 +86,6 @@ async function deductInventory(orderItems) {
 }
 
 exports.handler = async (event, context) => {
-    // 🚨 NEW LOG 1: Confirm function STARTED (If you see this, Firebase Init passed)
     console.log("--- Webhook Handler Started ---"); 
     
     if (event.httpMethod !== "POST") {
@@ -114,10 +115,11 @@ exports.handler = async (event, context) => {
             return { statusCode: 400, body: "Invalid signature header format" };
         }
 
-        const signedPayload = event.body; 
+        // 🎯 CRITICAL FIX: Use timestamp + "." + raw body for PayMongo signature
+        const signedPayload = `${timestamp}.${event.body}`; 
         
         const hmac = crypto.createHmac("sha256", webhookSecret);
-        hmac.update(signedPayload, "utf8");
+        hmac.update(signedPayload); // No explicit encoding needed for this operation
         const digest = hmac.digest("hex");
 
         if (digest !== signature) {
@@ -125,7 +127,7 @@ exports.handler = async (event, context) => {
             return { statusCode: 401, body: "Invalid signature" };
         }
         
-        // --- Timestamp Verification against replay attacks ---
+        // --- Timestamp Verification against replay attacks (optional but good practice) ---
         const currentTimeInSeconds = Math.floor(Date.now() / 1000);
         const signatureTimeInSeconds = Number(timestamp);
         const tolerance = 300; // 5 minutes (300 seconds)
@@ -136,21 +138,23 @@ exports.handler = async (event, context) => {
         }
         
         // Signature valid, continue processing
+        console.log("✅ Signature Verified. Processing payload.");
+        
         const body = JSON.parse(event.body);
         const eventType = body.data?.attributes?.type;
         const payment = body.data?.attributes?.data;
 
         console.log("🔔 PayMongo Webhook Event:", eventType);
-        console.log("DEBUG: PayMongo Data ID:", payment?.id || "N/A"); // 🚨 New Log
         
         // --- 2. Handle Successful Payment / Checkout Completion ---
         if (eventType === "payment.paid" || eventType === "checkout_session.payment.paid") {
             const metadata = payment?.attributes?.metadata || {};
             
-            // Retrieve the full order data payload from the metadata
-            const initialOrderData = safeParse(metadata.fullOrderData);
+            // 🎯 CRITICAL FIX: Using 'orderData' here to match the common naming convention 
+            // used in the client-side code's original JSON.stringify payload.
+            const initialOrderData = safeParse(metadata.orderData); 
             
-            console.log("DEBUG: Parsed initialOrderData (first 500 chars):", JSON.stringify(initialOrderData, null, 2).substring(0, 500) + "...");
+            console.log("DEBUG: Parsed initialOrderData:", JSON.stringify(initialOrderData, null, 2).substring(0, 500) + "...");
 
             // 🛑 STRONGER VALIDATION: Check for the presence of crucial fields
             if (
@@ -172,7 +176,6 @@ exports.handler = async (event, context) => {
                 return { statusCode: 400, body: "Missing required order data for saving" };
             }
 
-            // 🚨 NEW LOG 3: Confirm data is validated
             console.log("DEBUG: Data validation passed, preparing order object.");
             
             // Calculate net amount (total paid in centavos - fee in centavos)
@@ -194,11 +197,10 @@ exports.handler = async (event, context) => {
                 deliveryFee: Number(initialOrderData.deliveryFee) || 0,
                 total: Number(initialOrderData.total) || 0, 
                 cartItemIds: initialOrderData.cartItemIds || [],
-                estimatedTime: initialOrderData.estimatedTime || "",
                 
                 // Overridden/Added fields
                 paymentMethod: "E-Payment",
-                status: "Pending", 
+                status: "Pending", // Set status to 'Pending' upon successful payment
                 
                 // PayMongo details
                 paymongoPaymentId: payment.id,
@@ -212,7 +214,6 @@ exports.handler = async (event, context) => {
             // 2. Clean the object (removes empty strings like address: "")
             const cleanedOrderToSave = cleanObject(orderToSave);
 
-            // 🚨 NEW LOG 4: Confirm we are about to save
             console.log("DEBUG: Attempting to save to DeliveryOrders.");
 
             // 3. Save Order to Firebase (CREATE the document)
@@ -221,10 +222,11 @@ exports.handler = async (event, context) => {
 
             console.log(`✅ Order ${orderId} saved to Firebase with status: Pending.`);
 
-            // 4. Perform Fulfillment Tasks
+            // 4. Perform Fulfillment Tasks (Deduct Inventory and Clear Cart)
             const orderItems = initialOrderData.items || [];
             const userId = initialOrderData.userId;
-            const cartItemIds = safeParse(metadata.cartItemIds) || []; 
+            // Cart Item IDs were passed in the initial order data payload
+            const cartItemIds = initialOrderData.cartItemIds || []; 
             
             if (orderItems.length > 0) {
                 console.log(`Deducting inventory for Order ${orderId}...`);
@@ -241,14 +243,14 @@ exports.handler = async (event, context) => {
                 await batch.commit();
             }
 
-            console.log(`✅ Fulfillment for Order ${orderId} complete.`);
+            console.log(`✅ Fulfillment for Order ${orderId} complete. Returning success.`);
 
             return { statusCode: 200, body: "Success: Order paid, saved, and fulfilled" };
         }
 
-        // --- 3. Handle Failed/Expired Payments (No Action Needed) ---
+        // --- 3. Handle Other Events (Payment Failed, Expired, etc.) ---
         if (eventType === "payment.failed" || eventType === "checkout_session.expired") {
-            console.log(`Payment failed/expired. No action needed as order was not saved.`);
+            console.log(`Payment failed/expired. No action needed as order was never saved.`);
             return { statusCode: 200, body: "Event received. No pending order to clean." };
         }
 
@@ -256,7 +258,7 @@ exports.handler = async (event, context) => {
         return { statusCode: 200, body: "Event received, but no action taken" };
 
     } catch (error) {
-        // 🔴 If this logs, the crash happened inside the handler (after Firebase Init)
+        // 🔴 This catches unexpected runtime errors inside the handler
         console.error("🔴 Fatal error in webhook handler:", error.message, error.stack); 
         return { statusCode: 500, body: "Internal Server Error" };
     }
