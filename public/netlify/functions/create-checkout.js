@@ -66,8 +66,8 @@ exports.handler = async (event, context) => {
                 data: {
                     attributes: {
                         // Pass the draft ID back in the URLs for post-payment actions
-                        success_url: `${BASE_URL}/order-success.html?draftId=${metadata.draftOrderId}`,
-                        cancel_url: `${BASE_URL}/cart.html?draftId=${metadata.draftOrderId}`, 
+                        success_url: `https://thriving-profiterole-03bc7e.netlify.app/customer-status.html`,
+                        cancel_url: `https://thriving-profiterole-03bc7e.netlify.app/cart.html`, 
                         send_email_receipt: false,
                         description,
                         line_items: lineItems,
@@ -103,3 +103,4 @@ exports.handler = async (event, context) => {
         };
     }
 };
+
