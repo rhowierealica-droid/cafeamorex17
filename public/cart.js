@@ -592,7 +592,6 @@ finalConfirmBtn?.addEventListener("click", async () => {
             
             // 🎯 CRITICAL FIX: The entire 'commonOrderData' object must be nested 
             // under a 'metadata' property, which is then sent to /create-checkout.
-            // The server will handle nesting this further under 'orderData'.
             
             const response = await fetch("/.netlify/functions/create-checkout", {
                 method: "POST",
@@ -625,7 +624,8 @@ finalConfirmBtn?.addEventListener("click", async () => {
                 window.location.href = data.checkout_url;
             } else {
                 // If payment setup fails, NOTHING IS SAVED TO FIREBASE. Success!
-                showToast(`Payment setup failed: ${data.details || 'Unknown error'}. Order not saved.`, 4000, "red", true);
+                // 🟢 FIX: The serverless function now ensures 'data.details' is available.
+                showToast(`Payment setup failed: ${data.details || 'Unknown API Error'}. Order not saved.`, 4000, "red", true);
                 console.error("PayMongo Checkout Error:", data.details || data);
             }
         }
@@ -637,4 +637,3 @@ finalConfirmBtn?.addEventListener("click", async () => {
         showToast("Order failed. Try again.", 4000, "red", true);
     }
 });
-
