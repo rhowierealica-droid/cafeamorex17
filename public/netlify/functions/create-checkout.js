@@ -100,7 +100,7 @@ exports.handler = async (event) => {
       console.warn("⚠️ Line items total does not match metadata.total", { sumLineItems, expectedTotal });
     }
 
-    // ✅ Fix: Stringify arrays and include address
+    // ✅ Fix: Stringify arrays and include deliveryFee
     const paymongoMetadata = {
       userId: metadata.userId,
       queueNumber: metadata.queueNumber,
@@ -109,7 +109,9 @@ exports.handler = async (event) => {
       items: JSON.stringify(metadata.items || metadata.orderItems || []),
       address: metadata.address || "",
       customerName: metadata.customerName || "",
-      customerEmail: metadata.customerEmail || ""
+      customerEmail: metadata.customerEmail || "",
+      deliveryFee: metadata.deliveryFee || 0,  // <- ensure delivery fee is included
+      total: metadata.total || 0              // <- ensure total is included
     };
 
     const payload = {
