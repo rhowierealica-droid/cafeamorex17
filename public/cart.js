@@ -586,15 +586,15 @@ finalConfirmBtn?.addEventListener("click", async () => {
 
             // 🔹 STRINGIFY arrays for metadata
             const metadata = {
-                items: JSON.stringify(commonOrderData.items),
-                cartItemIds: JSON.stringify(commonOrderData.cartItemIds),
-                orderTotal: commonOrderData.total,
-                deliveryFee: commonOrderData.deliveryFee,
-                userId: commonOrderData.userId,
-                customerName: commonOrderData.customerName,
-                address: commonOrderData.address,
-                queueNumber: commonOrderData.queueNumber,
-                queueNumberNumeric: commonOrderData.queueNumberNumeric
+                 items: commonOrderData.items, // send array directly
+    cartItemIds: commonOrderData.cartItemIds,
+    orderTotal: commonOrderData.total,
+    deliveryFee: commonOrderData.deliveryFee,
+    userId: commonOrderData.userId,
+    customerName: commonOrderData.customerName,
+    address: commonOrderData.address,
+    queueNumber: commonOrderData.queueNumber,
+    queueNumberNumeric: commonOrderData.queueNumberNumeric
             };
 
             const response = await fetch("/.netlify/functions/create-checkout", {
@@ -625,3 +625,4 @@ finalConfirmBtn?.addEventListener("click", async () => {
         showToast("Order failed. Try again.", 4000, "red", true);
     }
 });
+
