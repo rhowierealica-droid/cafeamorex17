@@ -18,18 +18,21 @@ const db = admin.firestore();
 function safeParse(value) {
   try {
     if (!value) return null;
-    return typeof value === "string" ? JSON.parse(value) : value;
+    // PayMongo often double-stringifies complex metadata objects
+    let parsedValue = typeof value === "string" ? JSON.parse(value) : value;
+    // Attempt a second parse for complex objects like fullOrderData
+    if (typeof parsedValue === "string") parsedValue = JSON.parse(parsedValue);
+    return parsedValue;
   } catch {
     return null;
   }
 }
 
-// Deduct inventory function
+// Deduct inventory function (kept unchanged, but simplified for clarity)
 async function deductInventory(orderItems) {
   const deductItem = async (id, amount) => {
     if (!id || !amount) return;
     const invRef = db.collection("Inventory").doc(id);
-    // Use FieldValue.increment to atomically decrease inventory
     await invRef.update({ 
         quantity: admin.firestore.FieldValue.increment(-Math.abs(amount))
     }).catch(err => console.error(`⚠️ Failed to deduct ${amount} from item ${id}:`, err.message));
@@ -71,7 +74,6 @@ exports.handler = async (event, context) => {
         return { statusCode: 400, body: "Invalid signature header format" };
     }
 
-    // CRITICAL: The signed payload is ONLY the raw request body
     const signedPayload = event.body; 
     
     const hmac = crypto.createHmac("sha256", webhookSecret);
@@ -94,45 +96,38 @@ exports.handler = async (event, context) => {
     if (eventType === "payment.paid" || eventType === "checkout_session.payment.paid") {
         const metadata = payment?.attributes?.metadata || {};
         
-        // Get the orderId of the *existing* DeliveryOrder document
-        const orderId = metadata.orderId || safeParse(metadata.orderId);
+        // 💡 CRITICAL CHANGE: Retrieve the full order data payload
+        const finalOrderData = safeParse(metadata.fullOrderData);
 
-        if (!orderId) {
-            console.error("❌ Missing orderId in metadata.");
-            return { statusCode: 400, body: "Missing order ID for fulfillment" };
+        if (!finalOrderData || !finalOrderData.userId || !finalOrderData.items) {
+            console.error("❌ Missing or invalid fullOrderData in metadata.", metadata);
+            return { statusCode: 400, body: "Missing required order data for saving" };
         }
+        
+        // 1. Prepare data for Firebase save
+        // We override the status to "Pending" as requested, regardless of what the client sent.
+        const orderToSave = {
+            ...finalOrderData,
+            status: "Pending", // 🎯 SET FINAL STATUS TO "Pending"
+            paymentId: payment.id,
+            createdAt: admin.firestore.FieldValue.serverTimestamp(),
+            updatedAt: admin.firestore.FieldValue.serverTimestamp()
+        };
 
-        const orderRef = db.collection("DeliveryOrders").doc(orderId);
-        const orderSnap = await orderRef.get();
+        // 2. Save Order to Firebase (CREATE the document)
+        const newOrderRef = await db.collection("DeliveryOrders").add(orderToSave);
+        const orderId = newOrderRef.id;
 
-        if (!orderSnap.exists) {
-            console.error(`❌ Order document ${orderId} not found.`);
-            return { statusCode: 404, body: "Order not found" };
-        }
+        console.log(`✅ Order ${orderId} saved to Firebase with status: Pending.`);
 
-        const orderData = orderSnap.data();
-        
-        // Prevent double-processing
-        if (orderData.status !== "Pending") {
-            console.log(`ℹ️ Order ${orderId} already processed (Status: ${orderData.status}). Skipping.`);
-            return { statusCode: 200, body: "Order already processed" };
-        }
-
-        // 1. Update Order Status
-        await orderRef.update({
-            status: "Paid/Confirmed", // New status for successfully paid orders
-            paymentId: payment.id, // Save the PayMongo payment ID
-            updatedAt: admin.firestore.FieldValue.serverTimestamp()
-        });
-
-        // 2. Perform Fulfillment Tasks
-        const orderItems = orderData.items || [];
-        const userId = orderData.userId;
-        const cartItemIds = orderData.cartItemIds || []; // IDs of the cart items to delete
+        // 3. Perform Fulfillment Tasks
+        const orderItems = finalOrderData.items || [];
+        const userId = finalOrderData.userId;
+        const cartItemIds = finalOrderData.cartItemIds || [];
         
         if (orderItems.length > 0) {
             console.log(`Deducting inventory for Order ${orderId}...`);
-            await deductInventory(orderItems); 
+            await deductInventory(orderItems); 
         }
 
         if (userId && cartItemIds.length > 0) {
@@ -145,22 +140,17 @@ exports.handler = async (event, context) => {
             await batch.commit();
         }
 
-        console.log(`✅ Order ${orderId} successfully confirmed and fulfilled.`);
+        console.log(`✅ Fulfillment for Order ${orderId} complete.`);
 
-        return { statusCode: 200, body: "Success: Order paid and fulfilled" };
+        return { statusCode: 200, body: "Success: Order paid, saved, and fulfilled" };
     }
 
     // --- Handle Failed/Expired Payments (Cleanup) ---
+    // 💡 This section is NO LONGER NEEDED in the new flow! 
+    // Since the order is never saved before payment, there's nothing to clean up.
     if (eventType === "payment.failed" || eventType === "checkout_session.expired") {
-        // Get the order ID from the payment object's metadata
-        const orderId = payment?.attributes?.metadata?.orderId || safeParse(payment?.attributes?.metadata?.orderId);
-
-        if (orderId) {
-            console.log(`Payment failed/expired for order ${orderId}. Deleting pending order...`);
-            // Delete the pending order since payment was unsuccessful
-            await db.collection("DeliveryOrders").doc(orderId).delete();
-        }
-        return { statusCode: 200, body: "Payment failed/expired. Pending order cleaned up." };
+        console.log(`Payment failed/expired. No action needed as order was not saved.`);
+        return { statusCode: 200, body: "Event received. No pending order to clean." };
     }
 
     // Fallback for unhandled events
@@ -168,8 +158,6 @@ exports.handler = async (event, context) => {
 
   } catch (error) {
     console.error("🔴 Fatal error in webhook handler:", error);
-    // Return a 200 to PayMongo to prevent retries if the error is due to bad data,
-    // but log the error clearly. A 500 would signal PayMongo to retry.
     return { statusCode: 500, body: "Internal Server Error" };
   }
 };
