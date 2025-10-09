@@ -17,6 +17,7 @@ exports.handler = async (event) => {
     }
 
     try {
+        // CRITICAL: Expects the client to send the data wrapped as 'commonOrderData'
         const { commonOrderData } = JSON.parse(event.body);
         
         // 1. Validate incoming data
