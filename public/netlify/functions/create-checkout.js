@@ -80,9 +80,16 @@ exports.handler = async (event, context) => {
         // Parse body safely
         const body = JSON.parse(event.body || "{}");
 
-        // 🟢 FIX: Support various frontend body shapes for metadata extraction
-        let amount = body.amount;
-        let metadata = body.orderData || body.metadata || body.orderData?.metadata || body.metadata?.orderData || null;
+        // 🟢 Support `commonOrderData` from frontend
+let metadata = body.orderData || body.metadata || body.commonOrderData || null;
+
+// 🟢 Extract total amount from whichever shape it’s in
+let amount =
+  body.amount ||
+  metadata?.total ||
+  body.commonOrderData?.total ||
+  null;
+
 
         // 🟢 FIX: If metadata still missing, attempt to coerce a couple common shapes
         if (!metadata && body.metadata) {
@@ -230,3 +237,4 @@ exports.handler = async (event, context) => {
         };
     }
 };
+
