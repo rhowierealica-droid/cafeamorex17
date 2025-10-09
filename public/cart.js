@@ -602,7 +602,7 @@ finalConfirmBtn?.addEventListener("click", async () => {
                     // 🚨 MODIFIED: Passing the required data structure to the local server
                     metadata: {
                         // The server will use this property to build line_items
-                        orderItems: commonOrderData.items, 
+                        items: commonOrderData.items, // ✅ rename this key
                         // The server will use this property for the webhook metadata
                         orderTotal: commonOrderData.total,
                         deliveryFee: commonOrderData.deliveryFee,
@@ -637,3 +637,4 @@ finalConfirmBtn?.addEventListener("click", async () => {
         showToast("Order failed. Try again.", 4000, "red", true);
     }
 });
+
