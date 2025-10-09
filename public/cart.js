@@ -1,4 +1,8 @@
 // ==========================
+// --- cart.js ---
+// ==========================
+
+// ==========================
 // --- imports ---
 // ==========================
 import { db } from './firebase-config.js';
@@ -560,9 +564,11 @@ finalConfirmBtn?.addEventListener("click", async () => {
             total: orderTotal,
             paymentMethod,
             // Status is "Pending" for cash. For E-Payment, we send a temporary status.
-            status: paymentMethod === "Cash" ? "Pending" : "Payment Initiated", 
-            cartItemIds: selectedItemIds, 
-            createdAt: serverTimestamp()
+            status: paymentMethod === "Cash" ? "Pending" : "Payment Initiated",
+            cartItemIds: selectedItemIds,
+            createdAt: serverTimestamp(),
+            // ✅ CRITICAL ADDITION: Include estimatedTime
+            estimatedTime: "" 
         };
 
         if (paymentMethod === "Cash") {
@@ -578,18 +584,14 @@ finalConfirmBtn?.addEventListener("click", async () => {
         } else if (paymentMethod === "E-Payment") {
             showToast("Preparing E-Payment...", 3000, "blue", true);
             
-            // The Netlify function will receive 'commonOrderData', attempt to create PayMongo checkout,
-            // and upon successful payment via webhook, it should **SAVE the order to Firebase**
-            // and set the final status to **"Pending"** as requested.
-            
             const response = await fetch("/.netlify/functions/create-checkout", {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({
-                    amount: orderTotal, 
+                    amount: orderTotal,
                     currency: "PHP",
                     description: `Order #${queueNumber}`,
-                    orderData: commonOrderData, 
+                    orderData: commonOrderData, // Contains ALL order details
                 }),
             });
 
@@ -609,7 +611,7 @@ finalConfirmBtn?.addEventListener("click", async () => {
     } catch (err) {
         console.error(err);
         // Ensure modal is hidden even on unexpected errors
-        modal.style.display = "none"; 
+        modal.style.display = "none";
         showToast("Order failed. Try again.", 4000, "red", true);
     }
 });
