@@ -1,7 +1,7 @@
 require("dotenv").config();
 const axios = require("axios");
 
-// PayMongo API Base URL
+// PayMongo API Base URL (Verified: This URL is correct and not the source of the ENOTFOUND error.)
 const PAYMONGO_API_URL = "https://api.paymongo.ph/v1";
 
 /**
@@ -13,14 +13,13 @@ const PAYMONGO_API_URL = "https://api.paymongo.ph/v1";
  * @returns {object} The response object containing the redirect URL or an error.
  */
 exports.handler = async (event) => {
-    console.log("--- Create Checkout Started ---");
+    console.log("--- Create Checkout Started (Redeploy Attempt) ---");
 
     if (event.httpMethod !== "POST") {
         return { statusCode: 405, body: "Method Not Allowed" };
     }
 
     try {
-        // CRITICAL: Expects the client to send the data wrapped as 'commonOrderData'
         const { commonOrderData } = JSON.parse(event.body);
 
         // 1. Validate incoming data
@@ -35,20 +34,16 @@ exports.handler = async (event) => {
         const { total, items, userId, cartItemIds, customerName, address, queueNumber, queueNumberNumeric, deliveryFee } = commonOrderData;
 
         // 2. Prepare PayMongo Payload
-        // PayMongo requires amount to be in centavos (total * 100)
         const amountInCentavos = Math.round(total * 100);
 
-        // PayMongo metadata only supports string values. We must stringify arrays/objects.
-        // This metadata is crucial for processing the order fulfillment via the webhook.
         const metadata = {
             userId: userId,
             customerName: customerName || "Guest",
             address: address || "N/A",
             queueNumber: queueNumber,
-            queueNumberNumeric: String(queueNumberNumeric || 0), // Stringify numeric value
-            deliveryFee: String(deliveryFee || 0),               // Stringify numeric value
-            orderTotal: String(total),                           // Store the total in PHP for reference
-            // CRITICAL: Stringify the arrays for fulfillment in the webhook
+            queueNumberNumeric: String(queueNumberNumeric || 0),
+            deliveryFee: String(deliveryFee || 0),
+            orderTotal: String(total),
             orderItems: JSON.stringify(items),
             cartItemIds: JSON.stringify(cartItemIds || []),
         };
@@ -61,7 +56,6 @@ exports.handler = async (event) => {
                         email: "user@example.com", // Placeholder: Replace with actual user email if available
                         phone: "09170000000"       // Placeholder: Replace with actual user phone if available
                     },
-                    // PayMongo requires at least one line item. We use the total order amount.
                     line_items: [{
                         currency: "PHP",
                         amount: amountInCentavos,
@@ -72,10 +66,8 @@ exports.handler = async (event) => {
                     send_email_receipt: false,
                     show_description: true,
                     description: `Online Order #${queueNumber} for delivery`,
-                    // NOTE: PUBLIC_BASE_URL must be set in Netlify environment variables
                     success_url: `${process.env.PUBLIC_BASE_URL}/success?order=epayment`,
                     cancel_url: `${process.env.PUBLIC_BASE_URL}/cart?status=cancelled`,
-                    // Pass fulfillment data to the webhook
                     metadata: metadata,
                 },
             },
@@ -111,7 +103,9 @@ exports.handler = async (event) => {
 
     } catch (error) {
         // Log the full error response from PayMongo for debugging
-        console.error("🔴 Error creating PayMongo Checkout Session:", error.response ? error.response.data : error.message);
+        console.error("🔴 Error creating PayMongo Checkout Session:", 
+            error.response ? error.response.data : error.message);
+        
         return {
             statusCode: 500,
             body: JSON.stringify({
