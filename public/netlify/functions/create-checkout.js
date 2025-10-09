@@ -75,14 +75,13 @@ exports.handler = async (event) => {
     const BASE_URL = process.env.URL || "https://thriving-profiterole-03bc7e.netlify.app";
     const PAYMONGO_API = "https://api.paymongo.com/v1";
 
-    // Handle flexible payload structures
     const metadata = body.orderData || body.metadata || body.commonOrderData || body;
 
     if (!PAYMONGO_SECRET_KEY) {
       return { statusCode: 500, body: JSON.stringify({ error: "PAYMONGO_SECRET_KEY not set" }) };
     }
 
-    if (!metadata || !metadata.userId || !metadata.queueNumber || !Array.isArray(metadata.items || metadata.orderItems)) {
+    if (!metadata || !metadata.userId || !metadata.queueNumber || !(metadata.items || metadata.orderItems)?.length) {
       console.error("⚠️ Invalid metadata:", metadata);
       return {
         statusCode: 400,
@@ -101,11 +100,14 @@ exports.handler = async (event) => {
       console.warn("⚠️ Line items total does not match metadata.total", { sumLineItems, expectedTotal });
     }
 
+    // ✅ Fix: Stringify arrays and include address
     const paymongoMetadata = {
       userId: metadata.userId,
       queueNumber: metadata.queueNumber,
       fullOrderData: JSON.stringify({ ...metadata, status: "Pending" }),
       cartItemIds: JSON.stringify(metadata.cartItemIds || []),
+      items: JSON.stringify(metadata.items || metadata.orderItems || []),
+      address: metadata.address || "",
       customerName: metadata.customerName || "",
       customerEmail: metadata.customerEmail || ""
     };
@@ -120,7 +122,6 @@ exports.handler = async (event) => {
           line_items: lineItems,
           payment_method_types: ["gcash"],
           metadata: paymongoMetadata,
-          // ✅ Include customer info in checkout
           customer: {
             name: metadata.customerName || "Customer",
             email: metadata.customerEmail || ""
