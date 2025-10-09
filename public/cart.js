@@ -583,7 +583,9 @@ finalConfirmBtn?.addEventListener("click", async () => {
             orderRef = await addDoc(collection(db, "DeliveryOrders"), commonOrderData);
 
             // 2. Call the Netlify Function for checkout
-const response = await fetch("http://localhost:3000/create-checkout", {  method: "POST",
+            const response = await fetch("/.netlify/functions/create-checkout", { // ⭐ CHANGE APPLIED HERE
+                method: "POST",
+
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({
                     amount: orderTotalInCentavos,
@@ -614,3 +616,4 @@ const response = await fetch("http://localhost:3000/create-checkout", {  method:
         showToast("Order failed. Try again.", 4000, "red", true);
     }
 });
+
