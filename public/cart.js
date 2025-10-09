@@ -360,7 +360,7 @@ function populateModalCart() {
             <div class="modal-cart-item" style="display:flex; align-items:center; gap:12px; justify-content:space-between; border-bottom:1px solid #ddd; padding:8px 0;">
                 <div style="display:flex; align-items:center; gap:10px; flex:1;">
                     <img src="${item.image || 'placeholder.png'}" alt="${item.name}"
-                               style="height:60px; width:60px; object-fit:cover; border-radius:6px; flex-shrink:0;">
+                                 style="height:60px; width:60px; object-fit:cover; border-radius:6px; flex-shrink:0;">
                     <div>
                         <strong>${item.name}${outOfStockLabel} (Stock: ${item.stock ?? 'N/A'})</strong><br>
                         ${item.size ? `Size: ${item.size} - ₱${Number(item.sizePrice).toFixed(2)}` : 'Size: N/A'}
@@ -467,7 +467,7 @@ addressForm?.addEventListener("submit", async e => {
 });
 
 // ==========================
-// --- INVENTORY DEDUCTION ---
+// --- INVENTORY DEDUCTION (Cash Payment Flow) ---
 // ==========================
 async function deductInventory(order) {
     const deductItem = async (id, amount) => {
@@ -514,7 +514,7 @@ async function getNextQueueNumber(paymentMethod) {
 }
 
 // ==========================
-// --- FINAL CONFIRM ORDER ---
+// --- FINAL CONFIRM ORDER (Delayed Save for E-Payment) ---
 // ==========================
 finalConfirmBtn?.addEventListener("click", async () => {
     if (!currentUser) return showToast("Log in first.", 3000, "red");
@@ -547,11 +547,10 @@ finalConfirmBtn?.addEventListener("click", async () => {
 
         const orderTotal = orderItems.reduce((sum, i) => sum + i.total, 0) + userDeliveryFee;
 
-       
-
+        
         const commonOrderData = {
             userId: currentUser.uid,
-            customerName: currentUser.displayName || currentUser.email || "Customer",
+            customerName: currentUser.displayName || currentUser.email || "Customer",
             address: selectedAddress,
             queueNumber,
             queueNumberNumeric,
@@ -560,18 +559,17 @@ finalConfirmBtn?.addEventListener("click", async () => {
             deliveryFee: userDeliveryFee,
             total: orderTotal,
             paymentMethod,
-            status: "Pending", // ⭐ ALWAYS Pending initially
-            cartItemIds: selectedItemIds, // Added for E-Payment cleanup
+            // Status is "Pending" for cash. For E-Payment, we send a temporary status.
+            status: paymentMethod === "Cash" ? "Pending" : "Payment Initiated", 
+            cartItemIds: selectedItemIds, 
             createdAt: serverTimestamp()
         };
 
-        let orderRef = null;
-
         if (paymentMethod === "Cash") {
-            // 1. Add order to DeliveryOrders with "Pending" status
+            // Cash orders are saved and processed immediately
             await addDoc(collection(db, "DeliveryOrders"), commonOrderData);
 
-            // 2. Deduct inventory and clear cart immediately
+            // Deduct inventory and clear cart immediately
             await deductInventory(orderItems);
             for (const itemId of selectedItemIds) await deleteDoc(doc(cartRef, itemId));
 
@@ -580,49 +578,38 @@ finalConfirmBtn?.addEventListener("click", async () => {
         } else if (paymentMethod === "E-Payment") {
             showToast("Preparing E-Payment...", 3000, "blue", true);
             
-            // 1. Add order to DeliveryOrders with "Pending" status
-            orderRef = await addDoc(collection(db, "DeliveryOrders"), commonOrderData);
-
+            // The Netlify function will receive 'commonOrderData', attempt to create PayMongo checkout,
+            // and upon successful payment via webhook, it should **SAVE the order to Firebase**
+            // and set the final status to **"Pending"** as requested.
+            
             const response = await fetch("/.netlify/functions/create-checkout", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-                amount: orderTotal, // ⭐ MUST BE PHP (decimal) now (Netlify function converts to centavos)
-                currency: "PHP",
-                description: `Order #${queueNumber} (ID: ${orderRef.id})`,
-                metadata: {
-                    orderId: orderRef.id, // CRITICAL: Pass the new DeliveryOrder ID
-                    userId: currentUser.uid,
-                    // ⭐ NEW REQUIRED FIELDS FOR NETLIFY FUNCTION:
-                    queueNumber: queueNumber,
-                    orderItems: orderItems, // Full order details for line_items
-                    cartItemIds: selectedItemIds, // For cart cleanup
-                    deliveryFee: userDeliveryFee,
-                    orderTotal: orderTotal, // The total in PHP (for Netlify logging/metadata)
-                    customerName: commonOrderData.customerName,
-                    address: commonOrderData.address
-                    }
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                    amount: orderTotal, 
+                    currency: "PHP",
+                    description: `Order #${queueNumber}`,
+                    orderData: commonOrderData, 
                 }),
             });
 
             const data = await response.json();
 
             if (response.ok && data?.checkout_url) {
-                showToast("Redirecting to GCash payment page...", 3000, "green", true);
+                showToast("Redirecting to E-Payment page...", 3000, "green", true);
+                // Redirect user to PayMongo page
                 window.location.href = data.checkout_url;
             } else {
-                // If payment creation fails, delete the 'Pending' order to prevent confusion
-                await deleteDoc(orderRef);
-                showToast(`Payment setup failed: ${data.error || 'Unknown error'}.`, 4000, "red", true);
+                // If payment setup fails, NOTHING IS SAVED TO FIREBASE. Success!
+                showToast(`Payment setup failed: ${data.error || 'Unknown error'}. Order not saved.`, 4000, "red", true);
                 console.error("PayMongo Checkout Error:", data.error || data);
             }
         }
         modal.style.display = "none";
     } catch (err) {
         console.error(err);
+        // Ensure modal is hidden even on unexpected errors
+        modal.style.display = "none"; 
         showToast("Order failed. Try again.", 4000, "red", true);
     }
 });
-
-
-
