@@ -4,7 +4,7 @@
 import { db } from './firebase-config.js';
 import {
     collection, addDoc, getDocs, updateDoc, deleteDoc, doc,
-    serverTimestamp, onSnapshot, query, orderBy, limit, getDoc
+    serverTimestamp, onSnapshot, query, orderBy, limit, getDoc, writeBatch
 } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 import { getAuth, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
 
@@ -14,7 +14,7 @@ import { getAuth, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/
 const deliveryFees = {
     "Alima": 50,
     "Aniban I": 60,
-    // Add all your barangays and their fees
+    // Add all your barangays and their fees here
 };
 
 // ==========================
@@ -467,23 +467,37 @@ addressForm?.addEventListener("submit", async e => {
 });
 
 // ==========================
-// --- INVENTORY DEDUCTION (Cash Payment Flow) ---
+// --- INVENTORY DEDUCTION ---
 // ==========================
 async function deductInventory(order) {
-    const deductItem = async (id, amount) => {
-        if (!id) return;
-        const invRef = doc(db, "Inventory", id);
-        const invSnap = await getDoc(invRef);
-        const invQty = invSnap.exists() ? Number(invSnap.data().quantity || 0) : 0;
-        await updateDoc(invRef, { quantity: Math.max(invQty - amount, 0) });
-    };
+    const batch = writeBatch(db);
 
     for (const item of order) {
-        for (const ing of item.ingredients || []) await deductItem(ing.id, (ing.qty || 1) * item.qty);
-        for (const other of item.others || []) await deductItem(other.id, (other.qty || 1) * item.qty);
-        if (item.sizeId) await deductItem(item.sizeId, item.qty);
-        for (const addon of item.addons || []) await deductItem(addon.id, item.qty);
+        for (const ing of item.ingredients || []) {
+            if (ing.id) {
+                const invRef = doc(db, "Inventory", ing.id);
+                batch.update(invRef, { quantity: Math.max((ing.currentQty || 0) - (ing.qty || 1) * item.qty, 0) });
+            }
+        }
+        for (const other of item.others || []) {
+            if (other.id) {
+                const invRef = doc(db, "Inventory", other.id);
+                batch.update(invRef, { quantity: Math.max((other.currentQty || 0) - (other.qty || 1) * item.qty, 0) });
+            }
+        }
+        if (item.sizeId) {
+            const sizeRef = doc(db, "Inventory", item.sizeId);
+            batch.update(sizeRef, { quantity: Math.max((item.sizeQty || 0) - item.qty, 0) });
+        }
+        for (const addon of item.addons || []) {
+            if (addon.id) {
+                const addonRef = doc(db, "Inventory", addon.id);
+                batch.update(addonRef, { quantity: Math.max((addon.currentQty || 0) - item.qty, 0) });
+            }
+        }
     }
+
+    await batch.commit();
 }
 
 // ==========================
@@ -491,11 +505,7 @@ async function deductInventory(order) {
 // ==========================
 async function getNextQueueNumber(paymentMethod) {
     const collectionRef = collection(db, "DeliveryOrders");
-    const q = query(
-        collectionRef,
-        orderBy("queueNumberNumeric", "desc"),
-        limit(1)
-    );
+    const q = query(collectionRef, orderBy("queueNumberNumeric", "desc"), limit(1));
     const snapshot = await getDocs(q);
 
     let nextNumeric = 1;
@@ -503,18 +513,13 @@ async function getNextQueueNumber(paymentMethod) {
         const lastNumeric = Number(snapshot.docs[0].data().queueNumberNumeric || 0);
         nextNumeric = lastNumeric + 1;
     }
-    
-    const prefix = paymentMethod === 'Cash' ? 'C' : 'G';
-    const formattedQueueNumber = `${prefix}${nextNumeric.toString().padStart(4, '0')}`;
 
-    return {
-        formatted: formattedQueueNumber,
-        numeric: nextNumeric
-    };
+    const prefix = paymentMethod === 'Cash' ? 'C' : 'G';
+    return { formatted: `${prefix}${nextNumeric.toString().padStart(4, '0')}`, numeric: nextNumeric };
 }
 
 // ==========================
-// --- FINAL CONFIRM ORDER (Delayed Save for E-Payment) ---
+// --- FINAL CONFIRM ORDER ---
 // ==========================
 finalConfirmBtn?.addEventListener("click", async () => {
     if (!currentUser) return showToast("Log in first.", 3000, "red");
@@ -530,36 +535,30 @@ finalConfirmBtn?.addEventListener("click", async () => {
         const selectedItems = cartItems.filter(item => selectedCartItems.has(item.id));
         const selectedItemIds = Array.from(selectedCartItems);
 
-        // Recalculate the item total based on components to ensure accuracy with PayMongo's line_items.
         const orderItems = selectedItems.map(item => {
             const basePrice = Number(item.basePrice || 0);
             const sizePrice = Number(item.sizePrice || 0);
             const addonsPrice = Number(item.addonsPrice || 0);
             const qty = item.quantity || 1;
-            
-            // Calculate the precise unit price from components
             const unitPrice = basePrice + sizePrice + addonsPrice;
-            
             return {
                 product: item.name,
                 productId: item.productId || null,
                 size: item.size || null,
                 sizeId: item.sizeId || null,
-                qty: qty,
-                basePrice: basePrice,
-                sizePrice: sizePrice,
-                addonsPrice: addonsPrice,
+                qty,
+                basePrice,
+                sizePrice,
+                addonsPrice,
                 addons: item.addons || [],
                 ingredients: item.ingredients || [],
                 others: item.others || [],
-                // Use the precise, calculated total (unitPrice * qty)
                 total: unitPrice * qty
-            }
+            };
         });
 
         const orderTotal = orderItems.reduce((sum, i) => sum + i.total, 0) + userDeliveryFee;
 
-        
         const commonOrderData = {
             userId: currentUser.uid,
             customerName: currentUser.displayName || currentUser.email || "Customer",
@@ -571,39 +570,27 @@ finalConfirmBtn?.addEventListener("click", async () => {
             deliveryFee: userDeliveryFee,
             total: orderTotal,
             paymentMethod,
-            // Status is "Pending" for cash. For E-Payment, we send a temporary status.
-            status: paymentMethod === "Cash" ? "Pending" : "Payment Initiated", 
-            cartItemIds: selectedItemIds, 
+            status: paymentMethod === "Cash" ? "Pending" : "Payment Initiated",
+            cartItemIds: selectedItemIds,
             createdAt: serverTimestamp()
         };
 
         if (paymentMethod === "Cash") {
-            // Cash orders are saved and processed immediately
             await addDoc(collection(db, "DeliveryOrders"), commonOrderData);
-
-            // Deduct inventory and clear cart immediately
             await deductInventory(orderItems);
             for (const itemId of selectedItemIds) await deleteDoc(doc(cartRef, itemId));
-
             showToast(`Order placed! Queue #${queueNumber}. (Payment: Cash)`, 3000, "green", true);
             modal.style.display = "none";
         } else if (paymentMethod === "E-Payment") {
             showToast("Preparing E-Payment...", 3000, "blue", true);
-            
-            // 🎯 CRITICAL FIX: The entire 'commonOrderData' object must be nested 
-            // under a 'metadata' property, which is then sent to /create-checkout.
-            
             const response = await fetch("/.netlify/functions/create-checkout", {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({
-                    amount: Math.round(orderTotal * 100), // Amount in centavos
+                    amount: Math.round(orderTotal * 100),
                     description: `Order #${queueNumber}`,
-                    // 🚨 MODIFIED: Passing the required data structure to the local server
                     metadata: {
-                        // The server will use this property to build line_items
-                        items: commonOrderData.items, // ✅ rename this key
-                        // The server will use this property for the webhook metadata
+                        items: commonOrderData.items,
                         orderTotal: commonOrderData.total,
                         deliveryFee: commonOrderData.deliveryFee,
                         userId: commonOrderData.userId,
@@ -612,7 +599,7 @@ finalConfirmBtn?.addEventListener("click", async () => {
                         queueNumber: commonOrderData.queueNumber,
                         queueNumberNumeric: commonOrderData.queueNumberNumeric,
                         cartItemIds: commonOrderData.cartItemIds
-                    }, 
+                    },
                 }),
             });
 
@@ -620,11 +607,8 @@ finalConfirmBtn?.addEventListener("click", async () => {
 
             if (response.ok && data?.checkout_url) {
                 showToast("Redirecting to E-Payment page...", 3000, "green", true);
-                // Redirect user to PayMongo page
                 window.location.href = data.checkout_url;
             } else {
-                // If payment setup fails, NOTHING IS SAVED TO FIREBASE. Success!
-                // 🟢 FIX: The serverless function now ensures 'data.details' is available.
                 showToast(`Payment setup failed: ${data.details || 'Unknown API Error'}. Order not saved.`, 4000, "red", true);
                 console.error("PayMongo Checkout Error:", data.details || data);
             }
@@ -632,9 +616,7 @@ finalConfirmBtn?.addEventListener("click", async () => {
         modal.style.display = "none";
     } catch (err) {
         console.error(err);
-        // Ensure modal is hidden even on unexpected errors
         modal.style.display = "none"; 
         showToast("Order failed. Try again.", 4000, "red", true);
     }
 });
-
