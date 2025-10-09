@@ -100,18 +100,20 @@ exports.handler = async (event) => {
       console.warn("⚠️ Line items total does not match metadata.total", { sumLineItems, expectedTotal });
     }
 
-    // ✅ Fix: Stringify arrays and include deliveryFee
+    // -------------------- 🔹 CHANGES HERE 🔹 --------------------
+    // 1. Stringify arrays for proper webhook parsing
+    // 2. Include deliveryFee and total in metadata
     const paymongoMetadata = {
       userId: metadata.userId,
       queueNumber: metadata.queueNumber,
       fullOrderData: JSON.stringify({ ...metadata, status: "Pending" }),
       cartItemIds: JSON.stringify(metadata.cartItemIds || []),
-      items: JSON.stringify(metadata.items || metadata.orderItems || []),
+      items: JSON.stringify(metadata.items || metadata.orderItems || []), // ✅ ensure items saved
       address: metadata.address || "",
       customerName: metadata.customerName || "",
       customerEmail: metadata.customerEmail || "",
-      deliveryFee: metadata.deliveryFee || 0,  // <- ensure delivery fee is included
-      total: metadata.total || 0              // <- ensure total is included
+      deliveryFee: metadata.deliveryFee || 0, // ✅ ensure deliveryFee saved
+      total: metadata.total || 0            // ✅ ensure total saved
     };
 
     const payload = {
