@@ -1,10 +1,11 @@
 // ==========================
-// --- imports ---
+// --- netlify/functions/cart.js ---
 // ==========================
 import { db } from './firebase-config.js';
 import { 
     collection, addDoc, getDocs, updateDoc, deleteDoc, doc,
-    serverTimestamp, onSnapshot, query, orderBy, limit, getDoc
+    serverTimestamp, onSnapshot, query, orderBy, limit, getDoc,
+    FieldValue // Added FieldValue for increment deduction
 } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 import { getAuth, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
 
@@ -293,7 +294,7 @@ function loadCartRealtime() {
                 const outOfStockLabel = stock <= 0 ? " (Unavailable)" : "";
 
                 // Display quantity: limit to stock if stock is low
-                let displayQty = Math.min(item.quantity, stock > 0 ? stock : 1);
+                let displayQty = Math.min(item.quantity, stock > 0 ? stock : 1); 
                 
                 // If the item is out of stock, ensure it's not selected
                 if (stock <= 0) {
@@ -414,7 +415,7 @@ function populateModalCart() {
             <div class="modal-cart-item" style="display:flex; align-items:center; gap:12px; justify-content:space-between; border-bottom:1px solid #ddd; padding:8px 0;">
                 <div style="display:flex; align-items:center; gap:10px; flex:1;">
                     <img src="${item.image || 'placeholder.png'}" alt="${item.name}" 
-                           style="height:60px; width:60px; object-fit:cover; border-radius:6px; flex-shrink:0;">
+                            style="height:60px; width:60px; object-fit:cover; border-radius:6px; flex-shrink:0;">
                     <div>
                         <strong>${item.name}${outOfStockLabel} (Stock: ${item.stock ?? 'N/A'})</strong><br>
                         ${item.size ? `Size: ${item.size} - ₱${Number(item.sizePrice).toFixed(2)}` : 'Size: N/A'}
@@ -538,14 +539,14 @@ async function deductInventory(order) {
     const deductItem = async (id, amount) => {
         if (!id) return;
         const invRef = doc(db, "Inventory", id);
-        // NOTE: Using Firebase server increment is better for concurrency (see webhook-listener.js)
-        // This is a simplified client-side deduction for cash orders.
+        // Using Firebase FieldValue.increment is the correct way for concurrent updates
         try {
             await updateDoc(invRef, { 
-                 quantity: serverTimestamp.FieldValue.increment(-Math.abs(amount)) // Better approach for concurrency 
+                 quantity: FieldValue.increment(-Math.abs(amount)) 
             });
         } catch (error) {
-            // Fallback for client-side which might not have FieldValue.increment import
+            console.error(`Error using FieldValue.increment for ${id}: ${error.message}`);
+            // Fallback: This is less safe for high concurrency, but serves as a backup.
              const invSnap = await getDoc(invRef);
              const invQty = invSnap.exists() ? Number(invSnap.data().quantity || 0) : 0;
              await updateDoc(invRef, { quantity: Math.max(invQty - amount, 0) });
@@ -700,34 +701,37 @@ finalConfirmBtn?.addEventListener("click", async () => {
                     amount: orderTotalInCentavos,
                     currency: "PHP",
                     description: `Order #${queueNumber} (Draft: ${draftRef.id})`,
-                    // CRITICAL: Only pass the Draft ID and other simple data
+                    // ⭐ CRITICAL FIX: PASS THE COMPLETE, STRINGIFIED METADATA
                     metadata: { 
-                        draftOrderId: draftRef.id, // <-- This is the key
-                        userId: currentUser.uid, 
-                        queueNumber, 
-                        orderTotal: orderTotal, // Send total for quick reference
-                    }
-                }),
+                        draftOrderId: draftRef.id, 
+                        userId: baseOrderData.userId, 
+                        queueNumber: baseOrderData.queueNumber, 
+                        orderTotal: baseOrderData.orderTotal,
+                        customerName: baseOrderData.customerName,
+                        address: baseOrderData.address,
+                        deliveryFee: baseOrderData.deliveryFee,
+                        
+                        // ⭐ Stringify complex arrays for reliable PayMongo transfer
+                        orderItems: JSON.stringify(baseOrderData.orderItems), 
+                        cartItemIds: JSON.stringify(baseOrderData.cartItemIds),
+                    } // END OF METADATA
+                }), // END OF BODY
             });
 
             const data = await response.json();
 
-            if (response.ok && data?.checkout_url) {
-                // 4. Redirect to PayMongo
-                showToast("Redirecting to GCash payment page...", 3000, "green", true);
-                modal.style.display = "none";
+            if (response.ok && data.checkout_url) {
+                showToast("Redirecting to payment gateway...", 2000, "green", true);
                 window.location.href = data.checkout_url;
-                
-                // Inventory deduction and cart clearing happen on the server-side webhook
             } else {
-                // 5. Handle PayMongo failure: Delete Draft Order
-                await deleteDoc(draftRef);
-                showToast(`Failed to create GCash payment: ${data.error || 'Unknown error'}.`, 4000, "red", true);
-                console.error("PayMongo Checkout Error:", data.error || data);
+                console.error("Checkout failed:", data.error || "Unknown error");
+                showToast(`Payment initiation failed: ${data.error?.message || "Check console."}`, 5000, "red");
+                // Optional: Delete the draft order if checkout creation failed
+                await deleteDoc(doc(db, "DraftOrders", draftRef.id));
             }
         }
-    } catch (err) {
-        console.error(err);
-        showToast("Order failed. Try again.", 4000, "red", true);
+    } catch (error) {
+        console.error("Order processing error:", error);
+        showToast("An unexpected error occurred during order processing.", 5000, "red");
     }
 });
