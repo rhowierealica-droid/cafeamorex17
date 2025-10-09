@@ -6,6 +6,9 @@ const PAYMONGO_API_URL = "https://api.paymongo.ph/v1";
 
 /**
  * Netlify function to create a PayMongo Checkout Session.
+ * This function receives order details from the client-side cart.js,
+ * formats the data, and calls the PayMongo API to generate a checkout URL.
+ *
  * @param {object} event - The Netlify event object.
  * @returns {object} The response object containing the redirect URL or an error.
  */
@@ -19,13 +22,13 @@ exports.handler = async (event) => {
     try {
         // CRITICAL: Expects the client to send the data wrapped as 'commonOrderData'
         const { commonOrderData } = JSON.parse(event.body);
-        
+
         // 1. Validate incoming data
         if (!commonOrderData || !commonOrderData.total || !commonOrderData.items || !commonOrderData.userId) {
             console.error("❌ Missing required order data in request body.");
-            return { 
-                statusCode: 400, 
-                body: JSON.stringify({ error: "Missing required order data: total, items, or userId." }) 
+            return {
+                statusCode: 400,
+                body: JSON.stringify({ error: "Missing required order data: total, items, or userId." })
             };
         }
 
@@ -36,10 +39,11 @@ exports.handler = async (event) => {
         const amountInCentavos = Math.round(total * 100);
 
         // PayMongo metadata only supports string values. We must stringify arrays/objects.
+        // This metadata is crucial for processing the order fulfillment via the webhook.
         const metadata = {
             userId: userId,
-            customerName: customerName || "",
-            address: address || "",
+            customerName: customerName || "Guest",
+            address: address || "N/A",
             queueNumber: queueNumber,
             queueNumberNumeric: String(queueNumberNumeric || 0), // Stringify numeric value
             deliveryFee: String(deliveryFee || 0),               // Stringify numeric value
@@ -54,24 +58,23 @@ exports.handler = async (event) => {
                 attributes: {
                     billing: {
                         name: customerName,
-                        email: "user@example.com", // Replace with actual user email if available
-                        phone: "09170000000"       // Replace with actual user phone if available
+                        email: "user@example.com", // Placeholder: Replace with actual user email if available
+                        phone: "09170000000"       // Placeholder: Replace with actual user phone if available
                     },
+                    // PayMongo requires at least one line item. We use the total order amount.
                     line_items: [{
                         currency: "PHP",
                         amount: amountInCentavos,
-                        name: `Order #${queueNumber}`,
+                        name: `Online Order #${queueNumber}`,
                         quantity: 1,
-                        // Note: PayMongo Line Items are simplified for E-Commerce Checkout; 
-                        // detailed item list is passed via metadata for Firebase fulfillment.
                     }],
-                    payment_method_types: ["card", "gcash", "paymaya"], // Available payment options
+                    payment_method_types: ["card", "gcash", "paymaya"],
                     send_email_receipt: false,
                     show_description: true,
-                    show_line_items: false, // We're using a single line item for simplicity
-                    description: `Online Order #${queueNumber}`,
-                    success_url: `${process.env.PUBLIC_BASE_URL}/success?order=epayment`, // Replace with your actual success URL
-                    cancel_url: `${process.env.PUBLIC_BASE_URL}/cart?status=cancelled`,    // Replace with your actual cancel URL
+                    description: `Online Order #${queueNumber} for delivery`,
+                    // NOTE: PUBLIC_BASE_URL must be set in Netlify environment variables
+                    success_url: `${process.env.PUBLIC_BASE_URL}/success?order=epayment`,
+                    cancel_url: `${process.env.PUBLIC_BASE_URL}/cart?status=cancelled`,
                     // Pass fulfillment data to the webhook
                     metadata: metadata,
                 },
@@ -79,7 +82,7 @@ exports.handler = async (event) => {
         };
 
         // 3. Call PayMongo API to create Checkout Session
-        const PAYMONGO_SECRET_KEY = process.env.PAYMONGO_SECRET_KEY; // CRITICAL: Secret Key
+        const PAYMONGO_SECRET_KEY = process.env.PAYMONGO_SECRET_KEY;
         if (!PAYMONGO_SECRET_KEY) {
              throw new Error("PAYMONGO_SECRET_KEY is missing in environment variables.");
         }
@@ -89,7 +92,8 @@ exports.handler = async (event) => {
             checkoutPayload,
             {
                 headers: {
-                    "Authorization": `Basic ${Buffer.from(PAYMONGO_SECRET_KEY).toString("base64")}`,
+                    // PayMongo uses Basic Auth with the Secret Key
+                    "Authorization": `Basic ${Buffer.from(PAYMONGO_SECRET_KEY + ":").toString("base64")}`,
                     "Content-Type": "application/json",
                 },
             }
@@ -106,10 +110,11 @@ exports.handler = async (event) => {
         };
 
     } catch (error) {
+        // Log the full error response from PayMongo for debugging
         console.error("🔴 Error creating PayMongo Checkout Session:", error.response ? error.response.data : error.message);
         return {
             statusCode: 500,
-            body: JSON.stringify({ 
+            body: JSON.stringify({
                 error: "Failed to create checkout session.",
                 details: error.response ? error.response.data.errors : error.message
             }),
