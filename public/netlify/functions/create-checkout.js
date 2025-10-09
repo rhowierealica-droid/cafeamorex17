@@ -91,6 +91,7 @@ exports.handler = async (event) => {
       };
     }
 
+    // Build line items for PayMongo checkout
     const lineItems = buildLineItems(metadata);
 
     // Optional: Verify line items total matches metadata.total
@@ -100,22 +101,21 @@ exports.handler = async (event) => {
       console.warn("⚠️ Line items total does not match metadata.total", { sumLineItems, expectedTotal });
     }
 
-    // -------------------- 🔹 CHANGES HERE 🔹 --------------------
-    // 1. Stringify arrays for proper webhook parsing
-    // 2. Include deliveryFee and total in metadata
+    // -------------------- 🔹 Metadata sent to PayMongo --------------------
     const paymongoMetadata = {
       userId: metadata.userId,
       queueNumber: metadata.queueNumber,
       fullOrderData: JSON.stringify({ ...metadata, status: "Pending" }),
       cartItemIds: JSON.stringify(metadata.cartItemIds || []),
-      items: JSON.stringify(metadata.items || metadata.orderItems || []), // ✅ ensure items saved
+      items: JSON.stringify(metadata.items || metadata.orderItems || []), // ✅ items saved
       address: metadata.address || "",
       customerName: metadata.customerName || "",
       customerEmail: metadata.customerEmail || "",
-      deliveryFee: metadata.deliveryFee || 0, // ✅ ensure deliveryFee saved
-      total: metadata.total || 0            // ✅ ensure total saved
+      deliveryFee: metadata.deliveryFee || 0, // ✅ delivery fee
+      total: metadata.total || 0             // ✅ total amount
     };
 
+    // -------------------- 🔹 Prepare checkout payload --------------------
     const payload = {
       data: {
         attributes: {
@@ -134,6 +134,7 @@ exports.handler = async (event) => {
       },
     };
 
+    // -------------------- 🔹 Send request to PayMongo --------------------
     const response = await axios.post(`${PAYMONGO_API}/checkout_sessions`, payload, {
       headers: {
         Authorization: `Basic ${Buffer.from(PAYMONGO_SECRET_KEY + ":").toString("base64")}`,
