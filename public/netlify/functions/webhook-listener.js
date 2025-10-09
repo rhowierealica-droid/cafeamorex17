@@ -86,16 +86,20 @@ exports.handler = async (event, context) => {
   // -------------------- Payment Paid Events --------------------
   if (eventType === "payment.paid" || eventType === "checkout_session.payment.paid") {
     const metadata = dataObject?.attributes?.metadata || {};
-    const orderItems = safeParse(metadata.items);
-    const cartItemIds = safeParse(metadata.cartItemIds);
+
+    // -------------------- 🔹 CHANGES HERE 🔹 --------------------
+    // 1. Ensure arrays/objects are parsed from stringified JSON
+    const orderItems = safeParse(metadata.items);        // was empty because frontend didn't stringify
+    const cartItemIds = safeParse(metadata.cartItemIds); // same
+
+    // 2. Use metadata.total instead of metadata.orderTotal
+    const deliveryFee = Number(metadata.deliveryFee || 0);
+    const totalAmount = Number(metadata.total || 0) ||  // fallback calculation
+      orderItems.reduce((sum, i) => sum + (Number(i.total || 0) || 0), 0) + deliveryFee;
 
     if (!metadata.userId || !metadata.queueNumber) {
       return { statusCode: 400, body: "Missing metadata" };
     }
-
-    const deliveryFee = Number(metadata.deliveryFee || 0);
-    const totalAmount = Number(metadata.total || 0) ||
-      orderItems.reduce((sum, i) => sum + (Number(i.total || 0) || 0), 0) + deliveryFee;
 
     // -------------------- Save Order --------------------
     const orderRef = await db.collection("DeliveryOrders").add({
@@ -106,9 +110,9 @@ exports.handler = async (event, context) => {
       queueNumber: metadata.queueNumber,
       queueNumberNumeric: Number(metadata.queueNumberNumeric) || 0,
       orderType: metadata.orderType || "Delivery",
-      items: orderItems,
-      deliveryFee: deliveryFee,
-      total: totalAmount,
+      items: orderItems,       // now saved correctly
+      deliveryFee: deliveryFee, // now saved correctly
+      total: totalAmount,       // now saved correctly
       paymentMethod: "E-Payment",
       status: "Pending",
       createdAt: admin.firestore.FieldValue.serverTimestamp(),
