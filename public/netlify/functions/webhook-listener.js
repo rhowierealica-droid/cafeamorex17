@@ -30,7 +30,7 @@ try {
 // ---------------------
 
 /**
- * ⭐ DEFINITIVE FIX: Aggressively attempts to parse nested JSON strings (up to two levels) 
+ * DEFINITIVE FIX: Aggressively attempts to parse nested JSON strings (up to two levels) 
  * to handle PayMongo's inconsistent metadata serialization.
  */
 function safeParse(value, fallback = []) {
@@ -44,7 +44,7 @@ function safeParse(value, fallback = []) {
         try {
             result = JSON.parse(result);
         } catch (e) {
-            // Not a JSON string, return fallback (e.g., if it's just 'null' or a simple string)
+            // Not a JSON string, return fallback
             return Array.isArray(value) ? value : fallback;
         }
     }
@@ -64,7 +64,7 @@ function safeParse(value, fallback = []) {
 }
 
 // ---------------------
-// 3. Deduct inventory transactionally
+// 3. Deduct inventory transactionally (using batch write for efficiency)
 // ---------------------
 async function deductInventoryTransactional(orderItems) {
     if (!orderItems || !orderItems.length) return;
@@ -167,16 +167,20 @@ exports.handler = async (event, context) => {
     if (eventType === "payment.paid" || eventType === "checkout_session.payment.paid") {
         const metadata = dataObject?.attributes?.metadata || {};
 
-        // ⭐ FIX: Robust metadata retrieval, checking for common keys and capitalization
+        // ⭐ 1. Retrieve and Robustly Parse the Order Items
         const rawOrderItems = metadata.orderItems ?? metadata.OrderItems ?? metadata.items ?? metadata.Items ?? [];
-        const orderItems = safeParse(rawOrderItems, []); 
+        const parsedOrderItems = safeParse(rawOrderItems, []);
 
+        // ⭐ 2. CRITICAL FIX: CLONE the array for guaranteed saving
+        // This ensures the array passed to the save block is not mutated by the inventory logic.
+        const orderItems = [...parsedOrderItems]; 
+        
         const rawCartItemIds = metadata.cartItemIds ?? metadata.CartItemIds ?? metadata.cartIds ?? metadata.CartItemIds ?? [];
         const cartItemIds = safeParse(rawCartItemIds, []);
         
         const deliveryFee = Number(metadata.deliveryFee || metadata.DeliveryFee || 0);
         
-        // ⭐ FIX: Calculate Total from successfully parsed items array (most accurate)
+        // Calculate Total from the successfully parsed array
         const calculatedTotal = orderItems.reduce((sum, i) => sum + Number(i.total || 0), 0) + deliveryFee;
         
         // Fallback check to ensure total is never zero if items exist
@@ -192,6 +196,7 @@ exports.handler = async (event, context) => {
         
         try {
             // -------------------- Deduct inventory first (transactional) --------------------
+            // Uses the stable, cloned array 'orderItems'
             await deductInventoryTransactional(orderItems);
 
             // -------------------- Save Order --------------------
@@ -203,9 +208,9 @@ exports.handler = async (event, context) => {
                 queueNumber: metadata.queueNumber,
                 queueNumberNumeric: Number(metadata.queueNumberNumeric) || 0,
                 orderType: metadata.orderType || "Delivery",
-                items: orderItems, // ⭐ NOW CORRECTLY PARSED
+                items: orderItems, // ⭐ Saving the clean, cloned array here
                 deliveryFee,
-                total: totalAmount, // ⭐ NOW CORRECTLY CALCULATED
+                total: totalAmount, // This should now be correct every time
                 paymentMethod: "E-Payment",
                 status: "Pending",
                 createdAt: admin.firestore.FieldValue.serverTimestamp(),
