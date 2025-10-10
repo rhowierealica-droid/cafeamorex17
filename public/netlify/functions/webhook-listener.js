@@ -1,5 +1,5 @@
 // ===============================
-// webhook.js (Netlify Function)
+// webhook.js (Netlify Function) - Transactional Version
 // ===============================
 require("dotenv").config();
 const admin = require("firebase-admin");
@@ -27,14 +27,13 @@ function safeParse(value, fallback = []) {
   try {
     let parsed = typeof value === "string" ? JSON.parse(value) : value || fallback;
     if (typeof parsed === "string") parsed = JSON.parse(parsed);
-    return parsed;
+    return parsed || fallback;
   } catch (e) {
     console.error("Safe Parse Error:", e.message, "Value:", value);
     return fallback;
   }
 }
 
-// 🔹 Normalize metadata (handles object, stringified, or double-stringified)
 function normalizeMetadata(m) {
   if (!m) return {};
   if (typeof m === "object") return m;
@@ -49,55 +48,57 @@ function normalizeMetadata(m) {
 }
 
 // ---------------------
-// 🔹 Deduct inventory function
+// 🔹 Deduct inventory transactionally
 // ---------------------
-async function deductInventory(orderItems) {
+async function deductInventoryTransactional(orderItems) {
   if (!orderItems || !orderItems.length) return;
+
   const batch = db.batch();
 
   for (const item of orderItems) {
-    // Ingredients
+    const qtyMultiplier = item.qty || 1;
+
     for (const ing of item.ingredients || []) {
-      if (ing.id) {
-        const invRef = db.collection("Inventory").doc(ing.id);
-        batch.update(invRef, {
-          quantity: Math.max(
-            (ing.currentQty || 0) - (ing.qty || 1) * (item.qty || 1),
-            0
-          ),
-        });
+      if (!ing.id) continue;
+      const invRef = db.collection("Inventory").doc(ing.id);
+      const invSnap = await invRef.get();
+      const currentQty = invSnap.exists ? invSnap.data().quantity || 0 : 0;
+      if (currentQty < (ing.qty || 1) * qtyMultiplier) {
+        throw new Error(`Insufficient inventory for ingredient ${ing.id}`);
       }
+      batch.update(invRef, { quantity: currentQty - (ing.qty || 1) * qtyMultiplier });
     }
 
-    // Other components
     for (const other of item.others || []) {
-      if (other.id) {
-        const invRef = db.collection("Inventory").doc(other.id);
-        batch.update(invRef, {
-          quantity: Math.max(
-            (other.currentQty || 0) - (other.qty || 1) * (item.qty || 1),
-            0
-          ),
-        });
+      if (!other.id) continue;
+      const invRef = db.collection("Inventory").doc(other.id);
+      const invSnap = await invRef.get();
+      const currentQty = invSnap.exists ? invSnap.data().quantity || 0 : 0;
+      if (currentQty < (other.qty || 1) * qtyMultiplier) {
+        throw new Error(`Insufficient inventory for other component ${other.id}`);
       }
+      batch.update(invRef, { quantity: currentQty - (other.qty || 1) * qtyMultiplier });
     }
 
-    // Size
     if (item.sizeId) {
       const sizeRef = db.collection("Inventory").doc(item.sizeId);
-      batch.update(sizeRef, {
-        quantity: Math.max((item.sizeQty || 0) - (item.qty || 1), 0),
-      });
+      const sizeSnap = await sizeRef.get();
+      const currentQty = sizeSnap.exists ? sizeSnap.data().quantity || 0 : 0;
+      if (currentQty < qtyMultiplier) {
+        throw new Error(`Insufficient inventory for size ${item.sizeId}`);
+      }
+      batch.update(sizeRef, { quantity: currentQty - qtyMultiplier });
     }
 
-    // Addons
     for (const addon of item.addons || []) {
-      if (addon.id) {
-        const addonRef = db.collection("Inventory").doc(addon.id);
-        batch.update(addonRef, {
-          quantity: Math.max((addon.currentQty || 0) - (item.qty || 1), 0),
-        });
+      if (!addon.id) continue;
+      const addonRef = db.collection("Inventory").doc(addon.id);
+      const addonSnap = await addonRef.get();
+      const currentQty = addonSnap.exists ? addonSnap.data().quantity || 0 : 0;
+      if (currentQty < qtyMultiplier) {
+        throw new Error(`Insufficient inventory for addon ${addon.id}`);
       }
+      batch.update(addonRef, { quantity: currentQty - qtyMultiplier });
     }
   }
 
@@ -108,16 +109,14 @@ async function deductInventory(orderItems) {
 // Netlify Function Handler
 // ---------------------
 exports.handler = async (event, context) => {
-  if (event.httpMethod !== "POST") {
-    return { statusCode: 405, body: "Method Not Allowed" };
-  }
+  if (event.httpMethod !== "POST") return { statusCode: 405, body: "Method Not Allowed" };
 
   const WEBHOOK_SECRET = process.env.WEBHOOK_SECRET;
   let payload;
 
   try {
     payload = JSON.parse(event.body);
-  } catch (err) {
+  } catch {
     return { statusCode: 400, body: "Invalid JSON payload" };
   }
 
@@ -125,14 +124,8 @@ exports.handler = async (event, context) => {
   try {
     const sigHeader = event.headers["paymongo-signature"] || "";
     if (WEBHOOK_SECRET && sigHeader) {
-      const v1 = sigHeader
-        .split(",")
-        .find((p) => p.startsWith("v1="))
-        ?.replace("v1=", "");
-      const expectedHash = crypto
-        .createHmac("sha256", WEBHOOK_SECRET)
-        .update(event.body)
-        .digest("hex");
+      const v1 = sigHeader.split(",").find((p) => p.startsWith("v1="))?.replace("v1=", "");
+      const expectedHash = crypto.createHmac("sha256", WEBHOOK_SECRET).update(event.body).digest("hex");
       if (v1 !== expectedHash) console.warn("⚠️ Signature mismatch");
     } else {
       console.warn("⚠️ Skipping signature verification (local/test)");
@@ -146,94 +139,60 @@ exports.handler = async (event, context) => {
 
   // -------------------- Refund Events --------------------
   if (eventType === "payment.refunded" || eventType === "payment.refund.updated") {
-    console.log("💸 Refund event received:", dataObject?.id);
-
     if (db && dataObject?.attributes?.payment_id) {
       const paymentId = dataObject.attributes.payment_id;
-      const snapshot = await db
-        .collection("DeliveryOrders")
-        .where("paymongoPaymentId", "==", paymentId)
-        .limit(1)
-        .get();
-
+      const snapshot = await db.collection("DeliveryOrders").where("paymongoPaymentId", "==", paymentId).limit(1).get();
       if (!snapshot.empty) {
         const orderRef = snapshot.docs[0].ref;
         await orderRef.update({ status: "Refunded", paymongoRefundId: dataObject.id });
-        console.log(`✅ Updated order ${orderRef.id} status to Refunded`);
       }
     }
-
-    return {
-      statusCode: 200,
-      body: JSON.stringify({ received: true, processedRefund: true }),
-    };
+    return { statusCode: 200, body: JSON.stringify({ received: true, processedRefund: true }) };
   }
 
   // -------------------- Payment Paid Events --------------------
   if (eventType === "payment.paid" || eventType === "checkout_session.payment.paid") {
-    const rawMetadata = dataObject?.attributes?.metadata;
-    const metadata = normalizeMetadata(rawMetadata);
-
-    // ⭐ FIX: Accept both `items` and `orderItems`, handle stringified arrays
-    const orderItems = safeParse(
-      metadata.items ?? metadata.orderItems ?? metadata.order_items ?? metadata.order_item ?? [],
-      []
-    );
-    const cartItemIds = safeParse(
-      metadata.cartItemIds ?? metadata.cart_item_ids ?? metadata.cartIds ?? [],
-      []
-    );
-
-    console.log("🔍 Webhook metadata keys:", Object.keys(metadata || {}));
-    console.log("📦 Items:", orderItems.length, "🛒 Cart IDs:", cartItemIds.length);
-
+    const metadata = normalizeMetadata(dataObject?.attributes?.metadata);
+    const orderItems = safeParse(metadata.items ?? metadata.orderItems ?? metadata.order_items ?? [], []);
+    const cartItemIds = safeParse(metadata.cartItemIds ?? metadata.cart_item_ids ?? metadata.cartIds ?? [], []);
     const deliveryFee = Number(metadata.deliveryFee || 0);
+    const totalAmount = Number(metadata.orderTotal || metadata.total || 0) || orderItems.reduce((sum, i) => sum + (Number(i.total || 0) || 0), 0) + deliveryFee;
 
-    // ⭐ FIX HERE: Accept both orderTotal and total
-    const totalAmount =
-      Number(metadata.orderTotal || metadata.total || 0) ||
-      orderItems.reduce((sum, i) => sum + (Number(i.total || 0) || 0), 0) +
-      deliveryFee;
+    if (!metadata.userId || !metadata.queueNumber) return { statusCode: 400, body: "Missing metadata" };
 
-    if (!metadata.userId || !metadata.queueNumber) {
-      return { statusCode: 400, body: "Missing metadata" };
+    try {
+      // -------------------- 🔹 Deduct inventory first (transactional) --------------------
+      await deductInventoryTransactional(orderItems);
+
+      // -------------------- Save Order --------------------
+      const orderRef = await db.collection("DeliveryOrders").add({
+        userId: metadata.userId,
+        customerName: metadata.customerName || "",
+        customerEmail: metadata.customerEmail || "",
+        address: metadata.address || "",
+        queueNumber: metadata.queueNumber,
+        queueNumberNumeric: Number(metadata.queueNumberNumeric) || 0,
+        orderType: metadata.orderType || "Delivery",
+        items: orderItems,
+        deliveryFee,
+        total: totalAmount,
+        paymentMethod: "E-Payment",
+        status: "Pending",
+        createdAt: admin.firestore.FieldValue.serverTimestamp(),
+        paymongoPaymentId: dataObject.id,
+        cartItemIds,
+      });
+
+      // -------------------- Clear user's cart --------------------
+      for (const itemId of cartItemIds) {
+        await db.collection("users").doc(metadata.userId).collection("cart").doc(itemId).delete();
+      }
+
+      return { statusCode: 200, body: JSON.stringify({ received: true, orderId: orderRef.id }) };
+    } catch (err) {
+      console.error("❌ Transaction failed:", err.message);
+      return { statusCode: 500, body: `Inventory deduction failed: ${err.message}` };
     }
-
-    // -------------------- Save Order --------------------
-    const orderRef = await db.collection("DeliveryOrders").add({
-      userId: metadata.userId,
-      customerName: metadata.customerName || "",
-      customerEmail: metadata.customerEmail || "",
-      address: metadata.address || "",
-      queueNumber: metadata.queueNumber,
-      queueNumberNumeric: Number(metadata.queueNumberNumeric) || 0,
-      orderType: metadata.orderType || "Delivery",
-      items: orderItems,
-      deliveryFee,
-      total: totalAmount,
-      paymentMethod: "E-Payment",
-      status: "Pending",
-      createdAt: admin.firestore.FieldValue.serverTimestamp(),
-      paymongoPaymentId: dataObject.id,
-      cartItemIds,
-    });
-
-    console.log("💾 Order saved with ID:", orderRef.id);
-
-    // -------------------- 🔹 Deduct inventory --------------------
-    await deductInventory(orderItems);
-
-    // -------------------- 🔹 Clear user's cart --------------------
-    for (const itemId of cartItemIds) {
-      await db
-        .collection("users")
-        .doc(metadata.userId)
-        .collection("cart")
-        .doc(itemId)
-        .delete();
-    }
-
-    return { statusCode: 200, body: JSON.stringify({ received: true, orderId: orderRef.id }) };
   }
 
   // -------------------- Default Response --------------------
