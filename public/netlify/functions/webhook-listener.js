@@ -1,12 +1,10 @@
 // /.netlify/functions/webhook-listener.js
-// Transactional Version with Fetch-from-Source Strategy
-
 require("dotenv").config();
 const admin = require("firebase-admin");
 const crypto = require("crypto");
 
 // ---------------------
-// 1. Initialize Firebase Admin SDK (Modular and Production-Ready)
+// 1. Initialize Firebase Admin SDK
 // ---------------------
 let db;
 try {
@@ -24,80 +22,39 @@ try {
     console.error("⚠️ Firebase Admin SDK initialization failed:", e.message);
 }
 
-
 // ---------------------
 // 2. Helper Functions
 // ---------------------
-
-/**
- * Handles PayMongo's inconsistent metadata serialization for simple arrays/objects.
- * (Used only for cartItemIds now).
- */
 function safeParse(value, fallback = []) {
     if (Array.isArray(value) && value.length > 0) return value;
     if (!value) return fallback;
 
     let result = value;
-    
-    // Attempt Level 1 Parse
+    try { result = JSON.parse(result); } catch {}
     if (typeof result === "string") {
-        try {
-            result = JSON.parse(result);
-        } catch (e) {
-            return Array.isArray(value) ? value : fallback;
-        }
+        try { result = JSON.parse(result); } catch {}
     }
-    
-    // Attempt Level 2 Parse (Handles double-stringification)
-    if (typeof result === "string") {
-        try {
-            result = JSON.parse(result);
-        } catch (e) {
-            return fallback;
-        }
-    }
-    
     return Array.isArray(result) ? result : (typeof result === 'object' && result !== null ? result : fallback);
 }
 
-/**
- * ⭐ DEFINITIVE FIX: Fetches the definitive, complete order item data directly from Firestore 
- * based on the IDs passed via PayMongo metadata.
- */
 async function fetchOrderItemsFromCart(userId, cartItemIds) {
     if (!userId || !cartItemIds || cartItemIds.length === 0) return [];
-    
-    // Fetch each cart item document by its ID
     const itemPromises = cartItemIds.map(id => 
         db.collection("users").doc(userId).collection("cart").doc(id).get()
     );
-    
     const itemSnaps = await Promise.all(itemPromises);
-    
-    // Convert documents to item data
     const items = itemSnaps
         .filter(snap => snap.exists)
-        .map(snap => ({
-            id: snap.id, // Keep the cart item ID for future reference
-            ...snap.data()
-        }));
-        
+        .map(snap => ({ id: snap.id, ...snap.data() }));
     return items;
 }
 
-
-// ---------------------
-// 3. Deduct inventory transactionally (using batch write for efficiency)
-// ---------------------
 async function deductInventoryTransactional(orderItems) {
     if (!orderItems || !orderItems.length) return;
-
     const batch = db.batch();
 
     for (const item of orderItems) {
-        // We assume the fetched cart item is valid for deduction
-        if (!item || !item.product) continue; 
-        
+        if (!item || !item.product) continue;
         const qtyMultiplier = item.qty || 1;
 
         // Deduct Ingredients
@@ -152,7 +109,7 @@ async function deductInventoryTransactional(orderItems) {
 }
 
 // ---------------------
-// 4. Netlify Function Handler
+// 3. Netlify Function Handler
 // ---------------------
 exports.handler = async (event, context) => {
     if (event.httpMethod !== "POST") return { statusCode: 405, body: "Method Not Allowed" };
@@ -168,7 +125,7 @@ exports.handler = async (event, context) => {
         return { statusCode: 400, body: "Invalid JSON payload" };
     }
 
-    // --------------------- Signature Verification (for security) ---------------------
+    // Signature verification
     try {
         const sigHeader = event.headers["paymongo-signature"] || "";
         const v1 = sigHeader.split(",").find((p) => p.startsWith("v1="))?.replace("v1=", "");
@@ -183,56 +140,51 @@ exports.handler = async (event, context) => {
     const eventType = payload?.data?.attributes?.type;
     const dataObject = payload?.data?.attributes?.data;
 
-    // --- Handle Refunds (omitted refund logic for brevity, assuming it's correct) ---
+    // Handle refunds
     if (eventType === "payment.refunded" || eventType === "payment.refund.updated") {
-        // ... (refund logic implementation goes here) ...
         return { statusCode: 200, body: JSON.stringify({ received: true, processedRefund: true }) };
     }
-    
-    // -------------------- Payment Paid Events --------------------
+
+    // Payment events
     if (eventType === "payment.paid" || eventType === "checkout_session.payment.paid") {
         const metadata = dataObject?.attributes?.metadata || {};
-
         const userId = metadata.userId;
-        const rawCartItemIds = metadata.cartItemIds ?? metadata.CartItemIds ?? metadata.cartIds ?? metadata.CartItemIds ?? [];
-        // Use safeParse for cartItemIds just to ensure a clean array of strings
-        const cartItemIds = safeParse(rawCartItemIds, []);
-        
-        // ⭐ CRITICAL STEP: Fetch the definitive order items from Firestore, ignoring metadata.orderItems
-        const orderItems = await fetchOrderItemsFromCart(userId, cartItemIds);
-        
-        const deliveryFee = Number(metadata.deliveryFee || metadata.DeliveryFee || 0);
-        
-        // Calculate Total from the successfully fetched array
-        const calculatedTotal = orderItems.reduce((sum, i) => sum + Number(i.total || 0), 0) + deliveryFee;
-        
-        // Fallback check to ensure total is never zero if items exist
-        const totalAmount = calculatedTotal > 0 
-            ? calculatedTotal 
-            : Number(metadata.orderTotal || metadata.total || metadata.OrderTotal || metadata.Total || 0);
 
-        if (!userId || !metadata.queueNumber || orderItems.length === 0) {
-             console.error(`Missing critical metadata (userId/queueNumber) or items array is empty after fetching. User: ${userId}, Queue: ${metadata.queueNumber}. Total: ${totalAmount}. IDs received: ${cartItemIds.length}`);
-             // If items are empty, the cart was likely cleared by the client app before the webhook ran.
-             return { statusCode: 200, body: JSON.stringify({ received: true, error: "Missing metadata/fetched items (Cart empty on webhook execution)" }) };
+        const rawCartItemIds = metadata.cartItemIds ?? metadata.CartItemIds ?? metadata.cartIds ?? metadata.CartItemIds ?? [];
+        const cartItemIds = safeParse(rawCartItemIds, []);
+
+        // Try fetching from Firestore first
+        let orderItems = await fetchOrderItemsFromCart(userId, cartItemIds);
+
+        // FALLBACK: use metadata.orderItems if cart is empty
+        if (!orderItems.length && metadata.orderItems) {
+            orderItems = safeParse(metadata.orderItems, []);
+            console.log("⚠️ Using fallback metadata.orderItems for empty cart");
         }
-        
+
+        const deliveryFee = Number(metadata.deliveryFee || metadata.DeliveryFee || 0);
+        const calculatedTotal = orderItems.reduce((sum, i) => sum + Number(i.total || 0), 0) + deliveryFee;
+        const totalAmount = calculatedTotal > 0 ? calculatedTotal : Number(metadata.orderTotal || metadata.total || 0);
+
+        if (!userId || !metadata.queueNumber || !orderItems.length) {
+            console.error(`Missing metadata or orderItems empty. User: ${userId}, Queue: ${metadata.queueNumber}, Cart IDs: ${cartItemIds.length}`);
+            return { statusCode: 200, body: JSON.stringify({ received: true, error: "Missing metadata/fetched items" }) };
+        }
+
         try {
-            // -------------------- Deduct inventory first (transactional) --------------------
             await deductInventoryTransactional(orderItems);
 
-            // -------------------- Save Order --------------------
             const orderRef = await db.collection("DeliveryOrders").add({
-                userId: userId,
+                userId,
                 customerName: metadata.customerName || "",
                 customerEmail: metadata.customerEmail || "",
                 address: metadata.address || "",
                 queueNumber: metadata.queueNumber,
                 queueNumberNumeric: Number(metadata.queueNumberNumeric) || 0,
                 orderType: metadata.orderType || "Delivery",
-                items: orderItems, // ⭐ Saving the clean, fetched array here
+                items: orderItems, // always non-empty
                 deliveryFee,
-                total: totalAmount, 
+                total: totalAmount,
                 paymentMethod: "E-Payment",
                 status: "Pending",
                 createdAt: admin.firestore.FieldValue.serverTimestamp(),
@@ -240,20 +192,17 @@ exports.handler = async (event, context) => {
                 cartItemIds,
             });
 
-            // -------------------- Clear user's cart --------------------
+            // Clear user's cart AFTER saving order
             for (const itemId of cartItemIds) {
-                // We clear the cart AFTER the order has been successfully saved.
                 await db.collection("users").doc(userId).collection("cart").doc(itemId).delete();
             }
 
             return { statusCode: 200, body: JSON.stringify({ received: true, orderId: orderRef.id }) };
         } catch (err) {
-            console.error("❌ Transaction failed (Inventory/Save):", err.message);
-            // Return 200 to acknowledge the webhook, but log the error.
+            console.error("❌ Transaction failed:", err.message);
             return { statusCode: 200, body: JSON.stringify({ received: true, error: `Inventory/Save failed: ${err.message}` }) };
         }
     }
 
-    // -------------------- Default Response --------------------
     return { statusCode: 200, body: JSON.stringify({ received: true }) };
 };
