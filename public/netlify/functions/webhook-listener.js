@@ -1,5 +1,5 @@
 // /.netlify/functions/webhook-listener.js
-// Transactional Version with Robust Metadata Parsing Fix
+// Transactional Version with Fetch-from-Source Strategy
 
 require("dotenv").config();
 const admin = require("firebase-admin");
@@ -26,12 +26,12 @@ try {
 
 
 // ---------------------
-// 2. Helper Functions (Critical Fix for Nested JSON)
+// 2. Helper Functions
 // ---------------------
 
 /**
- * DEFINITIVE FIX: Aggressively attempts to parse nested JSON strings (up to two levels) 
- * to handle PayMongo's inconsistent metadata serialization.
+ * Handles PayMongo's inconsistent metadata serialization for simple arrays/objects.
+ * (Used only for cartItemIds now).
  */
 function safeParse(value, fallback = []) {
     if (Array.isArray(value) && value.length > 0) return value;
@@ -44,7 +44,6 @@ function safeParse(value, fallback = []) {
         try {
             result = JSON.parse(result);
         } catch (e) {
-            // Not a JSON string, return fallback
             return Array.isArray(value) ? value : fallback;
         }
     }
@@ -54,14 +53,38 @@ function safeParse(value, fallback = []) {
         try {
             result = JSON.parse(result);
         } catch (e) {
-            // Still a string, or unparsable, return fallback
             return fallback;
         }
     }
     
-    // Final check: result must be a non-null object or array
     return Array.isArray(result) ? result : (typeof result === 'object' && result !== null ? result : fallback);
 }
+
+/**
+ * ⭐ DEFINITIVE FIX: Fetches the definitive, complete order item data directly from Firestore 
+ * based on the IDs passed via PayMongo metadata.
+ */
+async function fetchOrderItemsFromCart(userId, cartItemIds) {
+    if (!userId || !cartItemIds || cartItemIds.length === 0) return [];
+    
+    // Fetch each cart item document by its ID
+    const itemPromises = cartItemIds.map(id => 
+        db.collection("users").doc(userId).collection("cart").doc(id).get()
+    );
+    
+    const itemSnaps = await Promise.all(itemPromises);
+    
+    // Convert documents to item data
+    const items = itemSnaps
+        .filter(snap => snap.exists)
+        .map(snap => ({
+            id: snap.id, // Keep the cart item ID for future reference
+            ...snap.data()
+        }));
+        
+    return items;
+}
+
 
 // ---------------------
 // 3. Deduct inventory transactionally (using batch write for efficiency)
@@ -72,6 +95,9 @@ async function deductInventoryTransactional(orderItems) {
     const batch = db.batch();
 
     for (const item of orderItems) {
+        // We assume the fetched cart item is valid for deduction
+        if (!item || !item.product) continue; 
+        
         const qtyMultiplier = item.qty || 1;
 
         // Deduct Ingredients
@@ -167,20 +193,17 @@ exports.handler = async (event, context) => {
     if (eventType === "payment.paid" || eventType === "checkout_session.payment.paid") {
         const metadata = dataObject?.attributes?.metadata || {};
 
-        // ⭐ 1. Retrieve and Robustly Parse the Order Items
-        const rawOrderItems = metadata.orderItems ?? metadata.OrderItems ?? metadata.items ?? metadata.Items ?? [];
-        const parsedOrderItems = safeParse(rawOrderItems, []);
-
-        // ⭐ 2. CRITICAL FIX: CLONE the array for guaranteed saving
-        // This ensures the array passed to the save block is not mutated by the inventory logic.
-        const orderItems = [...parsedOrderItems]; 
-        
+        const userId = metadata.userId;
         const rawCartItemIds = metadata.cartItemIds ?? metadata.CartItemIds ?? metadata.cartIds ?? metadata.CartItemIds ?? [];
+        // Use safeParse for cartItemIds just to ensure a clean array of strings
         const cartItemIds = safeParse(rawCartItemIds, []);
+        
+        // ⭐ CRITICAL STEP: Fetch the definitive order items from Firestore, ignoring metadata.orderItems
+        const orderItems = await fetchOrderItemsFromCart(userId, cartItemIds);
         
         const deliveryFee = Number(metadata.deliveryFee || metadata.DeliveryFee || 0);
         
-        // Calculate Total from the successfully parsed array
+        // Calculate Total from the successfully fetched array
         const calculatedTotal = orderItems.reduce((sum, i) => sum + Number(i.total || 0), 0) + deliveryFee;
         
         // Fallback check to ensure total is never zero if items exist
@@ -188,29 +211,28 @@ exports.handler = async (event, context) => {
             ? calculatedTotal 
             : Number(metadata.orderTotal || metadata.total || metadata.OrderTotal || metadata.Total || 0);
 
-        if (!metadata.userId || !metadata.queueNumber || orderItems.length === 0) {
-             console.error(`Missing critical metadata, empty items array, or parsing failed for order ${metadata.queueNumber}. Total: ${totalAmount}`);
-             // Return 200 to avoid PayMongo retries, but log the error.
-             return { statusCode: 200, body: JSON.stringify({ received: true, error: "Missing metadata/items" }) };
+        if (!userId || !metadata.queueNumber || orderItems.length === 0) {
+             console.error(`Missing critical metadata (userId/queueNumber) or items array is empty after fetching. User: ${userId}, Queue: ${metadata.queueNumber}. Total: ${totalAmount}. IDs received: ${cartItemIds.length}`);
+             // If items are empty, the cart was likely cleared by the client app before the webhook ran.
+             return { statusCode: 200, body: JSON.stringify({ received: true, error: "Missing metadata/fetched items (Cart empty on webhook execution)" }) };
         }
         
         try {
             // -------------------- Deduct inventory first (transactional) --------------------
-            // Uses the stable, cloned array 'orderItems'
             await deductInventoryTransactional(orderItems);
 
             // -------------------- Save Order --------------------
             const orderRef = await db.collection("DeliveryOrders").add({
-                userId: metadata.userId,
+                userId: userId,
                 customerName: metadata.customerName || "",
                 customerEmail: metadata.customerEmail || "",
                 address: metadata.address || "",
                 queueNumber: metadata.queueNumber,
                 queueNumberNumeric: Number(metadata.queueNumberNumeric) || 0,
                 orderType: metadata.orderType || "Delivery",
-                items: orderItems, // ⭐ Saving the clean, cloned array here
+                items: orderItems, // ⭐ Saving the clean, fetched array here
                 deliveryFee,
-                total: totalAmount, // This should now be correct every time
+                total: totalAmount, 
                 paymentMethod: "E-Payment",
                 status: "Pending",
                 createdAt: admin.firestore.FieldValue.serverTimestamp(),
@@ -220,7 +242,8 @@ exports.handler = async (event, context) => {
 
             // -------------------- Clear user's cart --------------------
             for (const itemId of cartItemIds) {
-                await db.collection("users").doc(metadata.userId).collection("cart").doc(itemId).delete();
+                // We clear the cart AFTER the order has been successfully saved.
+                await db.collection("users").doc(userId).collection("cart").doc(itemId).delete();
             }
 
             return { statusCode: 200, body: JSON.stringify({ received: true, orderId: orderRef.id }) };
