@@ -188,9 +188,12 @@ exports.handler = async (event, context) => {
     console.log("📦 Items:", orderItems.length, "🛒 Cart IDs:", cartItemIds.length);
 
     const deliveryFee = Number(metadata.deliveryFee || 0);
+
+    // ⭐ FIX HERE: Accept both orderTotal and total
     const totalAmount =
-      Number(metadata.total || 0) ||
-      orderItems.reduce((sum, i) => sum + (Number(i.total || 0) || 0), 0) + deliveryFee;
+      Number(metadata.orderTotal || metadata.total || 0) ||
+      orderItems.reduce((sum, i) => sum + (Number(i.total || 0) || 0), 0) +
+      deliveryFee;
 
     if (!metadata.userId || !metadata.queueNumber) {
       return { statusCode: 400, body: "Missing metadata" };
