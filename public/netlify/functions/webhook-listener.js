@@ -1,9 +1,9 @@
 // ===============================
 // webhook.js (Netlify Function)
 // ===============================
-require('dotenv').config();
-const admin = require('firebase-admin');
-const crypto = require('crypto');
+require("dotenv").config();
+const admin = require("firebase-admin");
+const crypto = require("crypto");
 
 // ---------------------
 // Initialize Firebase Admin SDK
@@ -25,8 +25,8 @@ try {
 // ---------------------
 function safeParse(value, fallback = []) {
   try {
-    let parsed = typeof value === 'string' ? JSON.parse(value) : value || fallback;
-    if (typeof parsed === 'string') parsed = JSON.parse(parsed);
+    let parsed = typeof value === "string" ? JSON.parse(value) : value || fallback;
+    if (typeof parsed === "string") parsed = JSON.parse(parsed);
     return parsed;
   } catch (e) {
     console.error("Safe Parse Error:", e.message, "Value:", value);
@@ -37,10 +37,10 @@ function safeParse(value, fallback = []) {
 // 🔹 Normalize metadata (handles object, stringified, or double-stringified)
 function normalizeMetadata(m) {
   if (!m) return {};
-  if (typeof m === 'object') return m;
+  if (typeof m === "object") return m;
   try {
     let parsed = JSON.parse(m);
-    if (typeof parsed === 'string') parsed = JSON.parse(parsed);
+    if (typeof parsed === "string") parsed = JSON.parse(parsed);
     return parsed || {};
   } catch (e) {
     console.warn("Could not parse metadata string:", e.message);
@@ -61,7 +61,10 @@ async function deductInventory(orderItems) {
       if (ing.id) {
         const invRef = db.collection("Inventory").doc(ing.id);
         batch.update(invRef, {
-          quantity: Math.max((ing.currentQty || 0) - (ing.qty || 1) * (item.qty || 1), 0),
+          quantity: Math.max(
+            (ing.currentQty || 0) - (ing.qty || 1) * (item.qty || 1),
+            0
+          ),
         });
       }
     }
@@ -71,7 +74,10 @@ async function deductInventory(orderItems) {
       if (other.id) {
         const invRef = db.collection("Inventory").doc(other.id);
         batch.update(invRef, {
-          quantity: Math.max((other.currentQty || 0) - (other.qty || 1) * (item.qty || 1), 0),
+          quantity: Math.max(
+            (other.currentQty || 0) - (other.qty || 1) * (item.qty || 1),
+            0
+          ),
         });
       }
     }
@@ -119,8 +125,14 @@ exports.handler = async (event, context) => {
   try {
     const sigHeader = event.headers["paymongo-signature"] || "";
     if (WEBHOOK_SECRET && sigHeader) {
-      const v1 = sigHeader.split(",").find(p => p.startsWith("v1="))?.replace("v1=", "");
-      const expectedHash = crypto.createHmac("sha256", WEBHOOK_SECRET).update(event.body).digest("hex");
+      const v1 = sigHeader
+        .split(",")
+        .find((p) => p.startsWith("v1="))
+        ?.replace("v1=", "");
+      const expectedHash = crypto
+        .createHmac("sha256", WEBHOOK_SECRET)
+        .update(event.body)
+        .digest("hex");
       if (v1 !== expectedHash) console.warn("⚠️ Signature mismatch");
     } else {
       console.warn("⚠️ Skipping signature verification (local/test)");
@@ -151,7 +163,10 @@ exports.handler = async (event, context) => {
       }
     }
 
-    return { statusCode: 200, body: JSON.stringify({ received: true, processedRefund: true }) };
+    return {
+      statusCode: 200,
+      body: JSON.stringify({ received: true, processedRefund: true }),
+    };
   }
 
   // -------------------- Payment Paid Events --------------------
