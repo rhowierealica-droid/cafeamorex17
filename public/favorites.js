@@ -223,50 +223,42 @@ function calculateProductStock(product, inventoryMap) {
   return stockPerSize;
 }
 
-// ==========================
-// Load Products Realtime (FAVORITES only)
-// ** Refactored to use a centralized render function and properly handle inventory **
-// ==========================
 function loadProductsRealtime() {
-  if (!drinksContainer && !sandwichContainer) return;
+  if (!drinksContainer && !sandwichContainer) return;
 
-  // If user not logged in: prompt login
-  if (!currentUser) {
-    if (drinksContainer) drinksContainer.innerHTML = `<p style="padding:12px;"></p>`;
-    if (sandwichContainer) sandwichContainer.innerHTML = "";
-    return;
-  }
-  
-  // 1. Start listening to Inventory
-  onSnapshot(collection(db, "Inventory"), inventorySnapshot => {
-    inventoryMap = {};
-    inventorySnapshot.forEach(docSnap => {
-      inventoryMap[docSnap.id] = { id: docSnap.id, ...docSnap.data() };
-    });
+  if (!currentUser) {
+    if (drinksContainer) drinksContainer.innerHTML = `<p style="padding:12px;"></p>`;
+    if (sandwichContainer) sandwichContainer.innerHTML = "";
+    return;
+  }
 
-    // 2. Listen to Favorites for the current user
-    const favQuery = query(collection(db, "favorites"), where("userId", "==", currentUser.uid));
-    onSnapshot(favQuery, async favSnapshot => {
-      const favoriteProductIds = favSnapshot.docs.map(d => d.data().productId);
+  // 1. Listen to Inventory in real-time
+  onSnapshot(collection(db, "Inventory"), inventorySnapshot => {
+    inventoryMap = {};
+    inventorySnapshot.forEach(docSnap => {
+      inventoryMap[docSnap.id] = { id: docSnap.id, ...docSnap.data() };
+    });
 
-      // 3. Fetch Products and filter (only run once when favorites change)
-      if (!favoriteProductIds.length) {
-        renderProducts([]);
-        return;
-      }
+    // 2. Listen to Favorites in real-time
+    const favQuery = query(collection(db, "favorites"), where("userId", "==", currentUser.uid));
+    onSnapshot(favQuery, async favSnapshot => {
+      const favoriteProductIds = favSnapshot.docs.map(d => d.data().productId);
+      if (!favoriteProductIds.length) return renderProducts([]);
 
-      // Fetch products corresponding to the favorite IDs
-      // NOTE: Firebase does not support `where(id in [array])` on a client-side SDK for a large array,
-      // but client-side filtering after a full fetch (as done here) works for small to moderate product lists.
-      const productSnapshot = await getDocs(collection(db, "products"));
-      const products = productSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }))
-        .filter(p => favoriteProductIds.includes(p.id));
-      
-      // 4. Render the products with the latest inventory data
-      renderProducts(products, favoriteProductIds);
-    });
-  });
+      // 3. Listen to Products in real-time
+      const productsQuery = query(collection(db, "products"));
+      onSnapshot(productsQuery, productSnapshot => {
+        const products = productSnapshot.docs
+          .map(doc => ({ id: doc.id, ...doc.data() }))
+          .filter(p => favoriteProductIds.includes(p.id));
+
+        // Render products with latest inventory and availability
+        renderProducts(products, favoriteProductIds);
+      });
+    });
+  });
 }
+
 
 // ==========================
 // Product Rendering Logic (Centralized)
