@@ -1,193 +1,294 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Café Amore | Customer Menu</title>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Café Amore | Customer Menu</title>
 
-  <!-- Font Awesome -->
-  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
-
-  <!-- CSS -->
-  <link rel="stylesheet" href="index.css">
-  <link rel="stylesheet" href="OrderStatusNotif.css">
-  <link rel="stylesheet" href="customer-side.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
+    <link rel="stylesheet" href="index.css">
+    <link rel="stylesheet" href="OrderStatusNotif.css">
+    <link rel="stylesheet" href="customer-side.css">
 </head>
 <body>
 
- <!-- Top Bar for Mobile -->
-<div class="top-bar">
-  <div class="hamburger" id="hamburger"><i class="fas fa-bars"></i></div>
-  <div class="mobile-logo">
-    <img src="logo.png" alt="Café Amore Logo">
-    <span class="brand">Café Amore</span>
-  </div>
-</div>
-
-<!-- Sidebar -->
-<aside class="sidebar" id="sidebar">
-  <div class="logo">
-    <img src="logo.png" alt="Café Amore Logo">
-    <span class="brand">Café Amore</span>
-  </div>
-  <nav>
-    <ul>
-      <li class="menu-link active"><i class="fas fa-utensils"></i> Menu</li>
-      <li class="cart-link"><i class="fas fa-shopping-cart"></i> Cart</li>
-      <li class="order-status-link"><i class="fas fa-truck"></i> Order Status</li>
-      <li class="favorites-link"><i class="fas fa-heart"></i> Favorites</li>
-      <!-- <li class="history-link"><i class="fas fa-history"></i> History</li> -->
-    </ul>
-  </nav>
-  <div class="login-link"><i class="fas fa-sign-in-alt"></i> Login</div>
-  <div class="profile-card">
-    <div class="profile-avatar"><i class="fas fa-user-circle"></i></div>
-    <div class="profile-info">
-      <p class="profile-name">Customer</p>
-      <p class="edit-text">Edit Profile</p>
+    <div class="top-bar">
+        <div class="hamburger" id="hamburger"><i class="fas fa-bars"></i></div>
+        <div class="mobile-logo">
+            <img src="logo.png" alt="Café Amore Logo">
+            <span class="brand">Café Amore</span>
+        </div>
     </div>
-  </div>
-  <div class="logout"><i class="fas fa-sign-out-alt"></i> Log Out</div>
-  <!-- Close button for Hamburger -->
-  <div class="close-btn hidden" id="closeBtn">&times;</div>
-</aside>
 
-<!-- Notification Bell -->
-<div id="notifBellContainer">
-  <i class="fas fa-bell"></i>
-  <span class="badge">0</span>
-</div>
-<div id="notifDropdown"></div>
+    <aside class="sidebar" id="sidebar">
+        <div class="logo">
+            <img src="logo.png" alt="Café Amore Logo">
+            <span class="brand">Café Amore</span>
+        </div>
+        <nav>
+            <ul>
+                <li class="menu-link active"><i class="fas fa-utensils"></i> Menu</li>
+                <li class="cart-link"><i class="fas fa-shopping-cart"></i> Cart</li>
+                <li class="order-status-link"><i class="fas fa-truck"></i> Order Status</li>
+                <li class="favorites-link"><i class="fas fa-heart"></i> Favorites</li>
+            </ul>
+        </nav>
+        <div class="login-link"><i class="fas fa-sign-in-alt"></i> Login</div>
+        <div class="profile-card">
+            <div class="profile-avatar"><i class="fas fa-user-circle"></i></div>
+            <div class="profile-info">
+                <p class="profile-name">Customer</p>
+                <p class="edit-text">Edit Profile</p>
+            </div>
+        </div>
+        <div class="logout"><i class="fas fa-sign-out-alt"></i> Log Out</div>
+        <div class="close-btn hidden" id="closeBtn">&times;</div>
+    </aside>
 
-<!-- Main -->
-<main class="menu-container">
-  <section class="main-content">
-    <header>
-      <h1>Welcome, Customer</h1>
-    </header>
+    <div id="notifBellContainer">
+        <i class="fas fa-bell"></i>
+        <span class="badge">0</span>
+    </div>
+    <div id="notifDropdown"></div>
 
-    <section class="main-section">
-      <h2>Drinks</h2>
-      <div class="category-list" data-main="Drink"></div>
-    </section>
+    <main class="menu-container">
+        <section class="main-content">
+            <header>
+                <h1 class="welcome-header">Welcome, Customer</h1>
+            </header>
 
-    <section class="main-section">
-      <h2>Sandwiches</h2>
-      <div class="category-list" data-main="Sandwich"></div>
-    </section>
+            <div class="tab-container">
+                <button class="tab-button active" data-category="Drinks">Drinks</button>
+                <button class="tab-button" data-category="Food">Food</button>
+                <button class="tab-button" data-category="Others">Others</button>
+            </div>
 
-    <!-- Info Section -->
-    <section class="info-section">
-      <div class="about">
-        <h3>About Us</h3>
-        <p><a href="about.html" target="_blank">Learn more about Café Amore</a></p>
-      </div>
-      <div class="terms">
-        <h3>Terms & Conditions</h3>
-        <p><a href="#" id="openTerms">Read our Terms & Conditions</a></p>
-      </div>
-      <div class="follow">
-        <h3>Follow Us</h3>
-        <p>
-          <a href="https://www.facebook.com/cafeamorex17s" target="_blank"><i class="fab fa-facebook-square"></i> Facebook</a><br>
-          <a href="https://www.instagram.com/_cafeamore17s_?igsh=cWJnZTE1ZTNmMnZk" target="_blank"><i class="fab fa-instagram"></i> Instagram</a>
-        </p>
-      </div>
-      <div class="contact">
-        <h3>Contact Us</h3>
-        <p>
-          <a><i class="fas fa-envelope"></i> cafeamorex17s@gmail.com</a><br>
-          <a><i class="fas fa-phone"></i> +63 965 497 1413</a>
-        </p>
-      </div>
-      <hr class="divider">
-      <div class="credits">
-        <span>&copy; 2025 Café Amore Team. All rights reserved.</span>
-      </div>
-    </section>
-  </section>
-</main>
+            <section class="main-section category-section" data-category="Drinks">
+                <div class="category-list" data-main="Drinks"></div>
+            </section>
 
-<!-- Login Popup -->
-<div id="loginPopup" class="popup hidden login-popup">
+            <section class="main-section category-section" data-category="Food" style="display: none;">
+                <div class="category-list" data-main="Food"></div>
+            </section>
+
+            <section class="main-section category-section" data-category="Others" style="display: none;">
+                <div class="category-list" data-main="Others"></div>
+            </section>
+
+            <section class="info-section">
+                <div class="about">
+                    <h3>About Us</h3>
+                    <p><a href="about.html" target="_blank">Learn more about Café Amore</a></p>
+                </div>
+                <div class="terms">
+                    <h3>Terms & Conditions</h3>
+                    <p><a href="#" id="openTerms">Read our Terms & Conditions</a></p>
+                </div>
+                <div class="follow">
+                    <h3>Follow Us</h3>
+                    <p>
+                        <a href="https://www.facebook.com/cafeamorex17s" target="_blank">
+                            <i class="fab fa-facebook-square"></i> Facebook
+                        </a><br>
+                        <a href="https://www.instagram.com/_cafeamore17s_?igsh=cWJnZTE1ZTNmMnZk" target="_blank">
+                            <i class="fab fa-instagram"></i> Instagram
+                        </a>
+                    </p>
+                </div>
+                <div class="contact">
+                    <h3>Contact Us</h3>
+                    <p>
+                        <a><i class="fas fa-envelope"></i> cafeamorex17s@gmail.com</a><br>
+                        <a><i class="fas fa-phone"></i> +63 965 497 1413</a>
+                    </p>
+                </div>
+                <hr class="divider">
+                <div class="credits">
+                    <span>&copy; 2025 Café Amore Team. All rights reserved.</span>
+                </div>
+            </section>
+        </section>
+    </main>
+
+    <div id="loginPopup" class="popup hidden login-popup">
+        <div class="popup-content">
+            <p>Please login first to continue.</p>
+            <button id="loginRedirect" class="login-btn">Go to Login</button>
+            <button class="close-btn">Close</button>
+        </div>
+    </div>
+
+    <div id="termsPopup" class="popup hidden">
   <div class="popup-content">
-    <p>Please login first to continue.</p>
-    <button id="loginRedirect" class="login-btn">Go to Login</button>
-    <button class="close-btn">Close</button>
-  </div>
-</div>
-
-<!-- Add-to-Cart Popup -->
-<div id="cartPopup" class="popup hidden">
-  <div class="popup-content cart-popup">
-    <h2 class="product-name">Product Name</h2>
-    <p class="product-desc">Description goes here</p>
-    <div class="sizes-container"></div>
-    <div class="addons-container"></div>
-    <button class="confirm-add-cart">Add to Cart</button>
-    <button class="close-cart">Close</button>
-  </div>
-</div>
-
-<!-- Reviews Popup -->
-<div id="reviewsPopup" class="popup hidden">
-  <div class="popup-content reviews-popup">
-    <button class="close-btn">&times;</button>
-    <h2>Product Reviews</h2>
-    <div class="reviews-container"></div>
-  </div>
-</div>
-
-<!-- Terms & Conditions Popup -->
-<div id="termsPopup" class="popup hidden">
-  <div class="popup-content">
-    <h3>Terms and Conditions</h3>
     <div class="terms-body">
-      <!-- Terms & Privacy Policy content here (unchanged) -->
+      <p>
+        By accessing or using the Café Amoré x17s Web-Based Product Ordering and Delivery System with Inventory and Sales Management, you agree to the following terms:
+      </p>
+
+      <h3>Platform Overview:</h3>
+      <ul>
+        <li>Allows customers to browse products, place orders, and arrange deliveries.</li>
+        <li>Provides authorized staff and administrators tools for inventory and sales management.</li>
+        <li>Terms may be updated at any time; continued use constitutes acceptance of updates.</li>
+      </ul>
+
+      <h3>User Eligibility:</h3>
+      <ul>
+        <li>Administrative accounts issued solely by management.</li>
+        <li>Users responsible for login credential confidentiality.</li>
+      </ul>
+
+      <h3>Products and Pricing:</h3>
+      <ul>
+        <li>Product availability and prices subject to change without notice.</li>
+        <li>Images and descriptions are for reference only; actual items may vary.</li>
+        <li>Prices are displayed in Philippine Pesos (₱).</li>
+      </ul>
+
+      <h3>Orders and Payment:</h3>
+      <ul>
+        <li>Orders must be reviewed and confirmed before submission.</li>
+        <li>Payment options include cash on delivery and GCash.</li>
+        <li>Orders are considered final once submitted and paid.</li>
+      </ul>
+
+      <h3>Delivery:</h3>
+      <ul>
+        <li>Delivery schedules, fees, and coverage areas displayed at checkout; may be affected by external factors.</li>
+      </ul>
+
+      <h3>Inventory and Sales Management:</h3>
+      <ul>
+        <li>Authorized staff must maintain accurate inventory and sales records.</li>
+        <li>All activities monitored for security and accountability.</li>
+      </ul>
+
+      <h3>Refunds, Returns, and Cancellations:</h3>
+      <ul>
+        <li>Orders may be canceled only under circumstances approved by management.</li>
+        <li>Refunds or replacements issued for incorrect, missing, or defective items only.</li>
+        <li>Issues must be reported within 24 hours of receipt.</li>
+      </ul>
+
+      <h3>User Responsibilities:</h3>
+      <ul>
+        <li>Provide accurate personal, contact, and delivery information.</li>
+        <li>Staff and administrators must handle system data responsibly.</li>
+        <li>Café Amoré x17s not liable for errors or delays caused by inaccurate or incomplete information.</li>
+      </ul>
+
+      <h3>Data Privacy and Security:</h3>
+      <ul>
+        <li>Personal and transactional data used solely for order fulfillment, delivery, and system improvement.</li>
+        <li>Data will not be shared with unauthorized parties.</li>
+        <li>Staff and administrators required to maintain data confidentiality.</li>
+      </ul>
+
+      <h3>Limitation of Liability:</h3>
+      <ul>
+        <li>Café Amoré x17s not responsible for indirect, incidental, or consequential damages from system use or order fulfillment.</li>
+        <li>Liability limited to the total value of the affected order.</li>
+      </ul>
+
+      <h3>Intellectual Property:</h3>
+      <ul>
+        <li>All content, materials, and system functionality are property of Café Amoré x17s.</li>
+        <li>Unauthorized reproduction, modification, or distribution prohibited.</li>
+      </ul>
+
+      <h3>Governing Law:</h3>
+      <ul>
+        <li>Terms governed by the laws of the Republic of the Philippines.</li>
+        <li>Disputes subject to Philippine court jurisdiction.</li>
+      </ul>
+
+      <h3>Acknowledgment:</h3>
+      <ul>
+        <li>By using the platform, users confirm they have read, understood, and agreed to these Terms and Conditions.</li>
+      </ul>
+
+      <hr>
+
+      <h2>Privacy Policy</h2>
+      <p><strong>Effective Date:</strong> [Insert Date]</p>
+      <p>
+        Café Amoré x17s (“we,” “us,” or “our”) is committed to protecting your privacy and ensuring the security of your personal information when using our web-based product ordering and delivery system, which includes inventory and sales management. By using this platform, you agree to the terms outlined below.
+      </p>
+
+      <h3>Information We Collect:</h3>
+      <ul>
+        <li>Personal details: name, email address, delivery address.</li>
+        <li>Order and transaction information: items ordered, payment details (processed securely), order history.</li>
+        <li>Technical information: IP address, device type, browser type, system interactions.</li>
+      </ul>
+
+      <h3>Use of Information:</h3>
+      <ul>
+        <li>Process and fulfill orders efficiently.</li>
+        <li>Communicate order updates and delivery information.</li>
+      </ul>
+
+      <h3>Data Protection:</h3>
+      <ul>
+        <li>Personal and payment information is secured using industry-standard measures.</li>
+        <li>Payment details are processed exclusively through trusted third-party providers.</li>
+        <li>Authorized staff and administrators are bound by confidentiality obligations.</li>
+      </ul>
+
+      <h3>Sharing of Information:</h3>
+      <ul>
+        <li>No selling, trading, or renting of personal information to third parties.</li>
+        <li>Shared only with authorized service providers for order fulfillment or as required by law.</li>
+      </ul>
+
+      <h3>User Rights:</h3>
+      <ul>
+        <li>Access and correct personal information.</li>
+        <li>Opt out of marketing communications.</li>
+        <li>Data retained only as long as necessary for operational, legal, and regulatory purposes.</li>
+      </ul>
+
+      <h3>Policy Updates:</h3>
+      <ul>
+        <li>Privacy Policy may be updated periodically; latest version posted on the platform.</li>
+        <li>Inquiries can be directed to [Insert Contact Email] or [Insert Contact Number].</li>
+      </ul>
+
+      <h3>Acknowledgment:</h3>
+      <ul>
+        <li>By using the platform, users confirm they have read, understood, and agreed to this Privacy Policy.</li>
+      </ul>
     </div>
+
     <button class="close-terms">Close</button>
   </div>
 </div>
 
-<!-- JS -->
-<script type="module" src="index.js"></script>
-<script type="module" src="customer-side.js"></script>
-<script type="module" src="OrderStatusNotif.js"></script>
 
-<script>
-  // Terms popup script
-  const openTermsBtn = document.getElementById('openTerms');
-  const termsPopup = document.getElementById('termsPopup');
-  const closeTermsBtn = termsPopup.querySelector('.close-terms');
+    <script type="module" src="index.js"></script>
+    <script type="module" src="customer-side.js"></script>
+    <script type="module" src="OrderStatusNotif.js"></script>
 
-  openTermsBtn.addEventListener('click', e => {
-    e.preventDefault();
-    termsPopup.style.display = 'flex';
-  });
+    <script>
+        const openTermsBtn = document.getElementById('openTerms');
+        const termsPopup = document.getElementById('termsPopup');
+        const closeTermsBtn = termsPopup.querySelector('.close-terms');
 
-  closeTermsBtn.addEventListener('click', () => {
-    termsPopup.style.display = 'none';
-  });
+        openTermsBtn.addEventListener('click', e => {
+            e.preventDefault();
+            termsPopup.style.display = 'flex';
+        });
 
-  termsPopup.addEventListener('click', e => {
-    if (e.target === termsPopup) {
-      termsPopup.style.display = 'none';
-    }
-  });
+        closeTermsBtn.addEventListener('click', () => {
+            termsPopup.style.display = 'none';
+        });
 
-  // Reviews popup close script
-  const reviewsPopup = document.getElementById('reviewsPopup');
-  const closeReviewsBtn = reviewsPopup.querySelector('.close-reviews');
+        termsPopup.addEventListener('click', e => {
+            if (e.target === termsPopup) {
+                termsPopup.style.display = 'none';
+            }
+        });
+    </script>
 
-  closeReviewsBtn.addEventListener('click', () => {
-    reviewsPopup.style.display = 'none';
-  });
-
-  reviewsPopup.addEventListener('click', e => {
-    if (e.target === reviewsPopup) {
-      reviewsPopup.style.display = 'none';
-    }
-  });
-</script>
 </body>
 </html>
