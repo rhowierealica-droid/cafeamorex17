@@ -33,7 +33,7 @@ body {
   background: #fff8f0;
   padding: 30px 40px;
   border-radius: 20px;
-  box-shadow: 0 15px 40px rgba(0,0,0,0.25);
+  box-shadow: 0 15px 40px rgba(0, 0, 0, 0.25);
   width: 100%;
   max-width: 650px;
 }
@@ -44,7 +44,15 @@ body {
   text-align: center;
 }
 
-/* Tabs */
+.profile-container h3 {
+  color: #552915;
+  margin-bottom: 15px;
+  font-size: 1.2em;
+}
+
+/* =========================
+   Tabs
+========================= */
 .tabs {
   display: flex;
   justify-content: space-between;
@@ -63,27 +71,55 @@ body {
   border-radius: 10px;
 }
 
+.tab-btn:last-child {
+  margin-right: 0;
+}
+
 .tab-btn.active {
   background: #552915;
   color: #fff;
 }
 
-/* Inputs */
-input, select {
-  width: 100%;
-  padding: 12px;
-  margin-bottom: 10px;
-  border-radius: 10px;
-  border: none;
-  outline: none;
-  font-size: 0.95em;
+/* =========================
+   Inputs & Form Structure
+========================= */
+.input-group {
+  display: flex;
+  flex-direction: column;
+  margin-bottom: 15px;
 }
 
-input[disabled], select[disabled] {
+.input-group label {
+  font-weight: 600;
+  color: #552915;
+  font-size: 0.95em;
+  margin-bottom: 5px;
+}
+
+input,
+select {
+  width: 100%;
+  padding: 12px;
+  border-radius: 10px;
+  border: 1px solid #c9c9c9;
+  outline: none;
+  font-size: 0.95em;
+  transition: border-color 0.3s, box-shadow 0.3s;
+}
+
+input:focus,
+select:focus {
+  border-color: #552915;
+  box-shadow: 0 0 5px rgba(85, 41, 21, 0.4);
+}
+
+input[disabled],
+select[disabled] {
   background: #e0e0e0;
   color: #7a7a7a;
   cursor: not-allowed;
   font-style: italic;
+  border: 1px solid #e0e0e0;
 }
 
 .row {
@@ -94,17 +130,23 @@ input[disabled], select[disabled] {
 
 .row .input-group {
   flex: 1;
+  min-width: 200px;
 }
 
-/* Buttons */
+/* =========================
+   Buttons
+========================= */
 .button-group {
   display: flex;
   justify-content: flex-end;
   gap: 10px;
   margin-top: 10px;
+  margin-bottom: 15px;
 }
 
-.edit-btn, .save-btn, .cancel-btn {
+.edit-btn,
+.save-btn,
+.cancel-btn {
   padding: 10px 20px;
   border: none;
   border-radius: 10px;
@@ -123,12 +165,12 @@ input[disabled], select[disabled] {
 }
 
 .save-btn {
-  background: #e0e0e0;
-  color: #552915;
+  background: #4caf50;
+  color: #fff;
 }
 
 .save-btn:hover {
-  background: #c9c9c9;
+  background: #388e3c;
 }
 
 .cancel-btn {
@@ -140,56 +182,161 @@ input[disabled], select[disabled] {
   background: #cc0000;
 }
 
+#saveNameBtn,
+#saveEmailBtn,
+#savePasswordBtn,
+#savePhoneBtn,
+#saveAddressBtn {
+  background: #552915;
+  color: #fff;
+}
+
+#saveNameBtn:hover,
+#saveEmailBtn:hover,
+#savePasswordBtn:hover,
+#savePhoneBtn:hover,
+#saveAddressBtn:hover {
+  background: #6f4e37;
+}
+
 /* =========================
-   Phone Tab Styling
+   Info Tab Styling
 ========================= */
+.tab-content hr {
+  border: 0;
+  height: 1px;
+  background-image: linear-gradient(
+    to right,
+    rgba(85, 41, 21, 0),
+    rgba(85, 41, 21, 0.45),
+    rgba(85, 41, 21, 0)
+  );
+  margin: 25px 0;
+}
+
+.email-edit-fields,
+.password-edit-fields,
 .phone-edit-fields {
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: 5px;
   margin-top: 10px;
 }
 
-.phone-edit-fields .input-group label {
-  font-weight: 600;
-  color: #552915;
-  font-size: 0.95em;
-}
-
-.phone-edit-fields .input-group input {
-  width: 100%;
-  padding: 12px;
+/* =========================
+   Address Tab Styling
+========================= */
+.address-card {
+  background: #fdf6f0;
+  border: 1px solid #ddd;
+  padding: 15px;
   border-radius: 10px;
-  border: 1px solid #c9c9c9;
+  margin-bottom: 15px;
+  transition: box-shadow 0.3s;
+  position: relative;
+}
+
+.address-card:hover {
+  box-shadow: 0 5px 15px rgba(0, 0, 0, 0.1);
+}
+
+.address-card.active-edit {
+  border: 2px solid #552915;
+  box-shadow: 0 0 10px rgba(85, 41, 21, 0.3);
+  margin-bottom: 30px;
+}
+
+.address-card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 10px;
+}
+
+.address-title {
+  font-weight: bold;
+  color: #552915;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.default-tag {
+  background: #552915;
+  color: #fff;
+  font-size: 0.7em;
+  padding: 2px 8px;
+  border-radius: 5px;
+  font-weight: 600;
+}
+
+.address-details {
+  color: #4b3621;
+  line-height: 1.5;
   font-size: 0.95em;
-  outline: none;
-  transition: border-color 0.3s, box-shadow 0.3s;
 }
 
-.phone-edit-fields .input-group input:focus {
-  border-color: #552915;
-  box-shadow: 0 0 5px rgba(85,41,21,0.4);
+.address-card-actions {
+  display: flex;
+  gap: 10px;
 }
 
-.phone-edit-fields .input-group input::placeholder {
-  color: #a39d91;
-  font-style: italic;
+/* === UPDATED EDIT & DELETE BUTTON DESIGN === */
+.address-card-actions button {
+  padding: 8px 18px;
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
+  font-weight: 600;
+  transition: 0.3s;
+  font-size: 0.9em;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
 }
 
-#phone {
-  background: #e0e0e0;
-  color: #7a7a7a;
-  cursor: not-allowed;
-  font-style: italic;
+.address-card-actions .edit-btn-small {
+  background: linear-gradient(135deg, #552915, #6f4e37);
+  color: #fff;
+  border: 1px solid #552915;
 }
 
-/* Buttons specific for Phone Tab */
-#editPhoneBtn { background: #552915; color: #fff; }
-#editPhoneBtn:hover { background: #6f4e37; }
-#savePhoneBtn { background: #e0e0e0; color: #552915; }
-#savePhoneBtn:hover { background: #c9c9c9; }
-#cancelPhoneBtn { background: #ff4d4d; color: #fff; }
-#cancelPhoneBtn:hover { background: #cc0000; }
+.address-card-actions .edit-btn-small:hover {
+  background: linear-gradient(135deg, #6f4e37, #8b5e3c);
+  box-shadow: 0 4px 10px rgba(85, 41, 21, 0.3);
+  transform: translateY(-2px);
+}
+
+.address-card-actions .delete-btn-small {
+  background: linear-gradient(135deg, #f44336, #e53935);
+  color: #fff;
+  border: 1px solid #d32f2f;
+}
+
+.address-card-actions .delete-btn-small:hover {
+  background: linear-gradient(135deg, #e53935, #c62828);
+  box-shadow: 0 4px 10px rgba(255, 77, 77, 0.3);
+  transform: translateY(-2px);
+}
+
+.address-card-actions .edit-btn-small i,
+.address-card-actions .delete-btn-small i {
+  font-size: 0.9em;
+}
+
+/* Address editing container */
+#addressEditContainer {
+  border-top: 1px solid #e0e0e0;
+  padding-top: 15px;
+  margin-top: 15px;
+  margin-bottom: 0;
+}
+
+#addressEditContainer h3 {
+  margin-top: 0;
+  margin-bottom: 15px;
+}
 
 /* =========================
    Sidebar Base
@@ -209,11 +356,18 @@ input[disabled], select[disabled] {
   overflow-y: auto;
   transform: translateX(0);
   transition: transform 0.25s ease-in-out, box-shadow 0.25s ease-in-out;
-  box-shadow: 2px 0 8px rgba(0,0,0,0.1);
+  box-shadow: 2px 0 8px rgba(0, 0, 0, 0.1);
 }
 
-body.sidebar-closed .sidebar { transform: translateX(-240px); box-shadow: none; }
-body.sidebar-closed .profile-wrapper { margin-left: 20px; max-width: calc(100% - 40px); }
+body.sidebar-closed .sidebar {
+  transform: translateX(-240px);
+  box-shadow: none;
+}
+
+body.sidebar-closed .profile-wrapper {
+  margin-left: 20px;
+  max-width: calc(100% - 40px);
+}
 
 /* Logo */
 .sidebar .logo {
@@ -224,11 +378,27 @@ body.sidebar-closed .profile-wrapper { margin-left: 20px; max-width: calc(100% -
   margin: 0;
   cursor: pointer;
 }
-.sidebar .logo img { width: 40px; height: 40px; }
-.sidebar .brand { font-weight: bold; font-size: 1.3em; color: #4b3621; }
+
+.sidebar .logo img {
+  width: 40px;
+  height: 40px;
+}
+
+.sidebar .brand {
+  font-weight: bold;
+  font-size: 1.3em;
+  color: #4b3621;
+}
 
 /* Navigation */
-.sidebar nav ul { list-style: none; padding: 0; margin-top: 10px; display: flex; flex-direction: column; }
+.sidebar nav ul {
+  list-style: none;
+  padding: 0;
+  margin-top: 10px;
+  display: flex;
+  flex-direction: column;
+}
+
 .sidebar nav ul li {
   padding: 12px 18px;
   margin: 4px 10px;
@@ -241,9 +411,17 @@ body.sidebar-closed .profile-wrapper { margin-left: 20px; max-width: calc(100% -
   gap: 10px;
   transition: background 0.3s, color 0.3s, transform 0.2s;
 }
-.sidebar nav ul li:hover, .sidebar nav ul li.active { background: #6f4e37; color: #fff; transform: scale(1.02); }
 
-/* Profile Card */
+.sidebar nav ul li:hover,
+.sidebar nav ul li.active {
+  background: #6f4e37;
+  color: #fff;
+  transform: scale(1.02);
+}
+
+/* =========================
+   Profile Card
+========================= */
 .profile-card {
   margin-top: auto;
   padding: 15px 18px;
@@ -256,13 +434,32 @@ body.sidebar-closed .profile-wrapper { margin-left: 20px; max-width: calc(100% -
   color: #4b3621;
   transition: background 0.25s, color 0.25s;
 }
-.profile-card.active { background: #6f4e37 !important; color: #fff !important; }
-.profile-avatar i { font-size: 2em; color: #552915; }
-.profile-info .profile-name { font-weight: bold; color: #4b3621; }
-.profile-info .edit-text { font-size: 0.85em; color: #777; }
 
-/* Logout & Login */
-.logout, .login-link {
+.profile-card.active {
+  background: #6f4e37 !important;
+  color: #fff !important;
+}
+
+.profile-avatar i {
+  font-size: 2em;
+  color: #552915;
+}
+
+.profile-info .profile-name {
+  font-weight: bold;
+  color: #4b3621;
+}
+
+.profile-info .edit-text {
+  font-size: 0.85em;
+  color: #777;
+}
+
+/* =========================
+   Logout & Login
+========================= */
+.logout,
+.login-link {
   padding: 14px 18px;
   display: none;
   align-items: center;
@@ -273,11 +470,40 @@ body.sidebar-closed .profile-wrapper { margin-left: 20px; max-width: calc(100% -
   color: #552915;
   transition: background 0.25s, color 0.25s;
 }
-.logout:hover, .logout.active, .login-link:hover, .login-link.active { background: #6f4e37; color: #fff; }
 
-/* Hamburger */
-.hamburger { position: fixed; top: 20px; left: 15px; font-size: 2em; color: #552915; cursor: pointer; z-index: 2003; display: none; }
-.sidebar .close-btn { position: absolute; top: 10px; right: 10px; font-size: 1.5em; cursor: pointer; color: #552915; transition: color 0.25s, opacity 0.25s; opacity: 0; z-index: 2010; }
+.logout:hover,
+.logout.active,
+.login-link:hover,
+.login-link.active {
+  background: #6f4e37;
+  color: #fff;
+}
+
+/* =========================
+   Hamburger
+========================= */
+.hamburger {
+  position: fixed;
+  top: 20px;
+  left: 15px;
+  font-size: 2em;
+  color: #552915;
+  cursor: pointer;
+  z-index: 2003;
+  display: none;
+}
+
+.sidebar .close-btn {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  font-size: 1.5em;
+  cursor: pointer;
+  color: #552915;
+  transition: color 0.25s, opacity 0.25s;
+  opacity: 0;
+  z-index: 2010;
+}
 
 /* =========================
    OTP Popup
@@ -289,7 +515,7 @@ body.sidebar-closed .profile-wrapper { margin-left: 20px; max-width: calc(100% -
   left: 0;
   width: 100%;
   height: 100%;
-  background: rgba(0,0,0,0.6);
+  background: rgba(0, 0, 0, 0.6);
   justify-content: center;
   align-items: center;
   z-index: 10000;
@@ -303,12 +529,17 @@ body.sidebar-closed .profile-wrapper { margin-left: 20px; max-width: calc(100% -
   width: 90%;
   max-width: 350px;
   text-align: center;
-  box-shadow: 0 10px 30px rgba(0,0,0,0.25);
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.25);
   position: relative;
   animation: slideDown 0.3s ease-in-out;
 }
 
-#otpPopup h3 { font-size: 1.3em; color: #552915; margin-bottom: 15px; }
+#otpPopup h3 {
+  font-size: 1.3em;
+  color: #552915;
+  margin-bottom: 15px;
+}
+
 #otpPopup input {
   width: 80%;
   padding: 12px;
@@ -319,7 +550,12 @@ body.sidebar-closed .profile-wrapper { margin-left: 20px; max-width: calc(100% -
   outline: none;
   transition: border-color 0.3s, box-shadow 0.3s;
 }
-#otpPopup input:focus { border-color: #552915; box-shadow: 0 0 5px rgba(85,41,21,0.4); }
+
+#otpPopup input:focus {
+  border-color: #552915;
+  box-shadow: 0 0 5px rgba(85, 41, 21, 0.4);
+}
+
 #otpPopup button {
   background: #552915;
   color: #fff;
@@ -330,7 +566,11 @@ body.sidebar-closed .profile-wrapper { margin-left: 20px; max-width: calc(100% -
   cursor: pointer;
   transition: 0.3s;
 }
-#otpPopup button:hover { background: #6f4e37; }
+
+#otpPopup button:hover {
+  background: #6f4e37;
+}
+
 #otpError {
   color: #ff4d4d;
   font-size: 0.9em;
@@ -338,9 +578,18 @@ body.sidebar-closed .profile-wrapper { margin-left: 20px; max-width: calc(100% -
   display: none;
 }
 
-/* Animations */
-@keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
-@keyframes slideDown { from { transform: translateY(-20px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
+/* =========================
+   Animations
+========================= */
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes slideDown {
+  from { transform: translateY(-20px); opacity: 0; }
+  to { transform: translateY(0); opacity: 1; }
+}
 
 /* =========================
    Responsive
@@ -360,4 +609,6 @@ body.sidebar-closed .profile-wrapper { margin-left: 20px; max-width: calc(100% -
   .phone-edit-fields .input-group input { font-size: 0.9em; padding: 10px; }
   #otpPopup .otp-container { padding: 20px; width: 95%; }
   #otpPopup input, #otpPopup button { width: 90%; padding: 10px; }
+  .address-card-header { flex-direction: column; align-items: flex-start; gap: 10px; }
+  .address-card-actions { margin-top: 5px; }
 }
