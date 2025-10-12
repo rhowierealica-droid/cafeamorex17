@@ -1,8 +1,21 @@
 import { db } from './firebase-config.js';
 import { collection, getDocs, query, orderBy } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+import { getAuth, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
 
 // DOM
+const auth = getAuth();  // ← this was missing
 const feedbackContainer = document.getElementById('feedback-container');
+
+// Redirect if not logged in
+onAuthStateChanged(auth, async (user) => {
+  if (!user) {
+    window.location.replace("login.html"); // redirect
+    return;
+  }
+
+  // User is logged in -> initialize the app
+  await init();
+});
 
 // Fetch all DeliveryOrders and display feedback with product name
 async function loadFeedback() {
