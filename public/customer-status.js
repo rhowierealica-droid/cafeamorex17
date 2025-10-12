@@ -23,7 +23,7 @@ let unsubscribeOrders = null;
 onAuthStateChanged(auth, user => {
   currentUser = user;
   if (user) {
-    currentUserEmail = user.email;
+    currentUserEmail = user.email?.toLowerCase();
     listenOrders();
   } else {
     window.location.href = "login.html"; 
@@ -49,12 +49,15 @@ function listenOrders() {
   if (!currentUser) return;
   if (unsubscribeOrders) unsubscribeOrders();
 
+  console.log("Listening for orders for:", currentUserEmail);
+
   unsubscribeOrders = onSnapshot(collection(db, "DeliveryOrders"), snapshot => {
     const userOrders = [];
 
     snapshot.forEach(docSnap => {
       const order = docSnap.data();
-      if (order.customerName?.toLowerCase() === currentUserEmail?.toLowerCase()) {
+      const customerEmail = order.customerEmail?.toLowerCase() || order.customerName?.toLowerCase();
+      if (customerEmail === currentUserEmail) {
         userOrders.push({ id: docSnap.id, ...order });
       }
     });
@@ -62,15 +65,16 @@ function listenOrders() {
     orderItemsDiv.innerHTML = "";
 
     const filteredOrders = userOrders.filter(order => {
-      const status = order.status || "";
-      const refundStatus = order.refundStatus || "";
+      const status = (order.status || "").toLowerCase();
+      const refundStatus = (order.refundStatus || "").toLowerCase();
+      const tab = (currentTab || "").toLowerCase();
 
-      if (currentTab === "To Rate") return status === "Completed by Customer" && !order.feedback;
-      if (currentTab === "To Receive") return status === "Completed" && !order.feedback;
-      if (currentTab === "Completed") return status === "Completed" || status === "Completed by Customer";
-      if (currentTab === "Refund") return ["Requested", "Accepted", "Denied"].includes(refundStatus);
+      if (tab === "to rate") return status === "completed by customer" && !order.feedback;
+      if (tab === "to receive") return status === "completed" && !order.feedback;
+      if (tab === "completed") return ["completed", "completed by customer"].includes(status);
+      if (tab === "refund") return ["requested", "accepted", "denied"].includes(refundStatus);
 
-      return status === currentTab;
+      return status === tab;
     });
 
     if (filteredOrders.length === 0) {
@@ -87,8 +91,9 @@ function listenOrders() {
       const orderHeader = document.createElement("div");
       orderHeader.className = "order-header";
 
+      // ✅ Fixed: Always display order status
       const orderTitle = document.createElement("h3");
-      let titleText = `Order #${order.queueNumber} - Status: ${order.status}`;
+      let titleText = `Order #${order.queueNumber || "N/A"} - Status: ${order.status || "Unknown"}`;
       if (order.estimatedTime) titleText += ` | ETA: ${order.estimatedTime}`;
       if (currentTab === "Refund") titleText += ` | Refund: ${order.refundStatus || "Requested"}`;
       orderTitle.textContent = titleText;
@@ -96,6 +101,7 @@ function listenOrders() {
       orderHeader.appendChild(orderTitle);
       orderContainer.appendChild(orderHeader);
 
+      // Items container
       const itemsContainer = document.createElement("div");
       itemsContainer.className = "order-items-container";
 
@@ -121,6 +127,7 @@ function listenOrders() {
         itemsContainer.appendChild(div);
       });
 
+      // Total price
       const orderTotal = order.items?.reduce((sum, p) => {
         if (!p) return sum;
         const qty = p.qty || p.quantity || 1;
@@ -156,7 +163,7 @@ function listenOrders() {
         }
       }
 
-      // To Receive Tab Refund + Received
+      // To Receive Tab
       if (currentTab === "To Receive") {
         if (paymentMethod.includes("e-payment") || paymentMethod === "g" || paymentMethod === "gcash") {
           const refundBtn = document.createElement("button");
@@ -178,7 +185,7 @@ function listenOrders() {
         }
       }
 
-      // Refund Tab Button with color coding
+      // Refund Tab
       if (currentTab === "Refund") {
         const refundBtn = document.createElement("button");
         refundBtn.textContent = order.refundStatus;
@@ -194,7 +201,7 @@ function listenOrders() {
         itemsContainer.appendChild(refundBtn);
       }
 
-      // To Rate Tab Feedback
+      // To Rate Tab
       if (order.status === "Completed by Customer" && !order.feedback && currentTab === "To Rate") {
         const btn = document.createElement("button");
         btn.textContent = "To Rate";
@@ -243,38 +250,31 @@ async function returnItemsToInventory(orderItems) {
       if (inventorySnap.exists()) {
         const currentQuantity = inventorySnap.data().quantity || 0;
         batch.update(inventoryRef, { quantity: currentQuantity + qtyToReturn });
-        console.log(`Returning ${qtyToReturn} units to Inventory ID: ${inventoryId}`);
-      } else {
-        console.warn(`Inventory item ID ${inventoryId} not found.`);
+        console.log(`Returned ${qtyToReturn} units to Inventory ID: ${inventoryId}`);
       }
     } catch (error) {
       console.error(`Error fetching inventory item ${inventoryId}:`, error);
     }
   }
 
-  try {
-    await batch.commit();
-    console.log("All items returned to inventory successfully.");
-  } catch (error) {
-    console.error("Error committing inventory batch:", error);
-    throw new Error("Failed to update inventory during cancellation.");
-  }
+  await batch.commit();
+  console.log("✅ All items returned to inventory successfully.");
 }
 
 // ==========================
 // Cancel Order
 // ==========================
 async function handleCancelOrder(orderId, orderItems) {
-  if (!confirm("Are you sure you want to cancel this order? Stock will be returned to inventory.")) return;
+  if (!confirm("Are you sure you want to cancel this order?")) return;
 
   try {
     await returnItemsToInventory(orderItems);
     await updateDoc(doc(db, "DeliveryOrders", orderId), { status: "Canceled" });
-    alert("Order canceled successfully and stock returned.");
+    alert("✅ Order canceled successfully and stock returned.");
     listenOrders();
   } catch (err) {
     console.error("Error canceling order:", err);
-    alert("Failed to cancel order. Please try again.");
+    alert("❌ Failed to cancel order. Please try again.");
   }
 }
 
@@ -299,7 +299,7 @@ function showConfirmModal(orderId) {
   confirmModal.appendChild(modalContent);
   document.body.appendChild(confirmModal);
 
-  function closeModal() { confirmModal.remove(); }
+  const closeModal = () => confirmModal.remove();
 
   modalContent.querySelector("#confirm-yes").onclick = async () => {
     await updateDoc(doc(db, "DeliveryOrders", orderId), { status: "Completed by Customer" });
