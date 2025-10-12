@@ -1,7 +1,6 @@
-// /.netlify/functions/refund-payment.js
-
-// Using 'node-fetch' for Netlify Node.js environments
-const fetch = require('node-fetch');
+// The 'node-fetch' library is no longer needed as modern Netlify/Lambda
+// environments provide a built-in global 'fetch' function, which avoids
+// the "ERR_REQUIRE_ESM" module error.
 
 // ==============================
 // PayMongo API Details
@@ -39,7 +38,6 @@ exports.handler = async (event, context) => {
     // ==============================
     // VALIDATION & DEFAULTS
     // ==============================
-    // ✅ Added 'reason' default and safe destructure
     const { paymongoPaymentId, amount, reason } = payload;
     const refundReason = reason || "requested_by_customer"; // Default reason
 
@@ -53,17 +51,24 @@ exports.handler = async (event, context) => {
         };
     }
 
-    // Convert PHP amount to centavos (PayMongo requirement)
-    const amountInCentavos = Math.round(amount * 100);
+    // FIX APPLIED: Assuming 'amount' is already in centavos from the frontend caller.
+    const amountInCentavos = Math.round(amount); 
+    
+    // ⚠️ IMPORTANT DEBUG LOG: Log what we are sending 
+    console.log(`[DEBUG] Attempting refund for Payment ID: ${paymongoPaymentId} with amount (centavos): ${amountInCentavos}`);
+    console.log(`[DEBUG] Using Refund Reason: ${refundReason}`);
+
 
     try {
         // ==============================
         // 3. Send Refund Request to PayMongo
         // ==============================
+        // NOTE: Using native global fetch
         const response = await fetch(PAYMONGO_API_URL, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
+                // Basic Auth requires a colon after the secret key
                 'Authorization': `Basic ${Buffer.from(PAYMONGO_SECRET_KEY + ":").toString('base64')}`
             },
             body: JSON.stringify({
@@ -71,13 +76,18 @@ exports.handler = async (event, context) => {
                     attributes: {
                         payment_id: paymongoPaymentId,
                         amount: amountInCentavos,
-                        reason: refundReason // ✅ Added dynamic reason usage
+                        reason: refundReason
                     }
                 }
             })
         });
 
         const paymongoData = await response.json();
+
+        // ⚠️ IMPORTANT DEBUG LOG: Log PayMongo's raw response for inspection
+        console.log("[DEBUG] PayMongo API Response Status:", response.status);
+        console.log("[DEBUG] PayMongo API Response Body:", JSON.stringify(paymongoData, null, 2));
+
 
         // ==============================
         // 4. Check PayMongo Response
@@ -96,12 +106,15 @@ exports.handler = async (event, context) => {
         // ==============================
         // 5. Refund Initiated Successfully
         // ==============================
+        const finalStatus = paymongoData.data.attributes.status;
+        console.log(`[SUCCESS] Refund initiated successfully for ID: ${paymongoData.data.id}. Status: ${finalStatus}`);
+
         return {
             statusCode: 200,
             body: JSON.stringify({ 
-                message: "Refund initiated successfully.",
+                message: `Refund initiated successfully with status: ${finalStatus}.`,
                 refundId: paymongoData.data.id,
-                paymongoStatus: paymongoData.data.attributes.status 
+                paymongoStatus: finalStatus 
             })
         };
 
