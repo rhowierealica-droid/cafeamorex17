@@ -1,10 +1,10 @@
 // incomingorders.js
 
-// NOTE: You must include the firestore delete functionality import and the increment import
+// NOTE: Ensure you have initialized Firebase correctly in firebase-config.js
 import { db } from './firebase-config.js';
 import { 
-    collection, doc, onSnapshot, updateDoc, getDocs, getDoc, 
-    deleteField, increment 
+    collection, doc, onSnapshot, updateDoc, getDocs, getDoc, 
+    deleteField, increment 
 } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 import { getAuth, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
 
@@ -17,15 +17,16 @@ let selectedTab = "Pending";
 const pendingTimers = {};
 
 // =========================================================
-// POPUP MODULE
+// POPUP MODULE (Custom Modal for Alerts/Confirmations)
 // =========================================================
 let popup = null;
 let popupTitle = null;
 let popupButtonsContainer = null;
 
 function injectPopupStyles() {
-  const style = document.createElement("style");
-  style.textContent = `
+    const style = document.createElement("style");
+    // Ensure styles are included to support the refund badge classes (e.g., refund-refunded, refund-pending)
+    style.textContent = `
     .popup {
       display: none;
       position: fixed;
@@ -49,6 +50,7 @@ function injectPopupStyles() {
     .popup-content h3 {
       margin-bottom: 15px;
       font-size: 1.2rem;
+      color: #6f4e37; /* Match main content h1 color */
     }
     #popupButtonsContainer {
       display: flex;
@@ -65,7 +67,7 @@ function injectPopupStyles() {
       cursor: pointer;
       transition: 0.2s ease;
       width: 80%;
-      font-family: "Poppins", sans-serif;
+      font-weight: bold;
     }
     #popupButtonsContainer button:hover {
       background-color: #6d4428;
@@ -78,116 +80,115 @@ function injectPopupStyles() {
       font-size: 1rem;
       text-align: center;
     }
-    table {
-      width: 100%;
-      border-collapse: collapse;
-    }
-    td {
-      padding: 10px 8px;
-      vertical-align: top;
-    }
-    tr:nth-child(even) {
-      background-color: #fff2e0;
-    }
-    button.accept-btn,
-    button.cancel-btn,
-    button.complete-btn,
-    button.eta-btn,
-    button.view-refund-btn {
-      margin: 3px;
-      padding: 6px 10px;
-      border: none;
-      border-radius: 6px;
-      font-family: "Poppins", sans-serif;
-      cursor: pointer;
-      transition: 0.2s ease;
-    }
-    .accept-btn { background-color: #28a745; color: white; }
-    .cancel-btn { background-color: #dc3545; color: white; }
-    .complete-btn { background-color: #007bff; color: white; }
-    .eta-btn { background-color: #ffc107; color: #552915; }
-    .view-refund-btn { background-color: #795548; color: white; }
+    /* Override for refund buttons in popup */
+    #acceptRefundBtn { background-color: #4caf50; } /* Green */
+    #acceptRefundBtn:hover { background-color: #3e8e41; }
+
+    #declineRefundBtn { background-color: #f44336; } /* Red */
+    #declineRefundBtn:hover { background-color: #d32f2f; }
+
+    #confirmRefundBtn { background-color: #6f4e37; } /* Brown */
+    #confirmRefundBtn:hover { background-color: #50382b; }
+
+    #cancelRefundBtn { background-color: #6c757d; } /* Grey */
+    #cancelRefundBtn:hover { background-color: #5a6268; }
+
     
-    /* === NEW REFUND BADGE STYLES === */
+    /* === REFUND BADGE STYLES (MATCH CSS FILE) === */
     .refund-badge {
         display: inline-block;
         padding: 2px 6px;
-        border-radius: 4px;
+        border-radius: 6px; /* Matched the 6px in CSS */
         font-size: 0.8em;
         font-weight: bold;
         margin-left: 5px;
+        color: white;
     }
-    /* Use a common class for the default status name */
-    .refund-refunded, .refund-succeeded, .refund-manual { background-color: #28a745; color: white; }
-    .refund-denied, .refund-failed, .refund-api-failed { background-color: #dc3545; color: white; }
-    .refund-pending { background-color: #ffc107; color: #552915; }
-    .refund-error { background-color: #6c757d; color: white; } /* Neutral for unexpected states */
-  `;
-  document.head.appendChild(style);
+    /* Use established classes for coloring, matching the CSS definitions */
+    .refund-refunded, .refund-manual { background-color: #4caf50; } /* Green */
+    .refund-denied, .refund-failed, .refund-api-failed { background-color: #f44336; } /* Red */
+    .refund-pending { background-color: #ff9800; color: white; } /* Orange */
+    .refund-error { background-color: #6c757d; } /* Grey for unexpected states */
+
+    /* Match the view-refund-btn style from your provided CSS overrides/buttons */
+    .view-refund-btn { 
+        background-color: #795548; /* Brown/Muted color for viewing details */ 
+        color: white; 
+    }
+    .view-refund-btn:hover { 
+        background-color: #5d4037; 
+    }
+    `;
+    document.head.appendChild(style);
 }
 injectPopupStyles();
 
-// =========================================================
-// AUTH CHECK
-// =========================================================
-
-
-// ... (POPUP CREATION & CONTROL AND HELPERS ARE UNCHANGED AND OK) ...
 function createPopup() {
-  popup = document.createElement("div");
-  popup.className = "popup";
-  popup.innerHTML = `
-    <div class="popup-content">
-      <h3 id="popupTitle">Title</h3>
-      <div id="popupButtonsContainer"></div>
-    </div>
-  `;
-  document.body.appendChild(popup);
-  popupTitle = popup.querySelector("#popupTitle");
-  popupButtonsContainer = popup.querySelector("#popupButtonsContainer");
+    popup = document.createElement("div");
+    popup.className = "popup";
+    popup.innerHTML = `
+      <div class="popup-content">
+        <h3 id="popupTitle">Title</h3>
+        <div id="popupButtonsContainer"></div>
+      </div>
+    `;
+    document.body.appendChild(popup);
+    popupTitle = popup.querySelector("#popupTitle");
+    popupButtonsContainer = popup.querySelector("#popupButtonsContainer");
 
-  popup.addEventListener("click", e => {
-    if (e.target === popup) closePopup();
-  });
+    popup.addEventListener("click", e => {
+        if (e.target === popup) closePopup();
+    });
 }
 
 function showETPopup(title, callback) {
-  if (!popup) createPopup();
-  popup.style.display = "flex";
-  popupTitle.textContent = title;
+    if (!popup) createPopup();
+    popup.style.display = "flex";
+    popupTitle.textContent = title;
 
-  const timeOptions = ["10–20 mins", "20–30 mins", "30–40 mins", "40–50 mins", "50–60 mins"];
-  popupButtonsContainer.innerHTML = timeOptions.map(t => `<button>${t}</button>`).join("");
+    const timeOptions = ["10–20 mins", "20–30 mins", "30–40 mins", "40–50 mins", "50–60 mins"];
+    popupButtonsContainer.innerHTML = timeOptions.map(t => `<button>${t}</button>`).join("");
 
-  Array.from(popupButtonsContainer.children).forEach(btn => {
-    btn.onclick = () => {
-      callback(btn.textContent);
-      closePopup();
-    };
-  });
+    Array.from(popupButtonsContainer.children).forEach(btn => {
+        btn.onclick = () => {
+            callback(btn.textContent);
+            closePopup();
+        };
+    });
+}
+
+// Custom alert function to replace window.alert
+function customAlert(message) {
+    if (!popup) createPopup();
+    popup.style.display = "flex";
+    popupTitle.textContent = "Notification";
+    popupButtonsContainer.innerHTML = `<p style="margin-bottom: 10px;">${message}</p><button id="closeAlertBtn">Close</button>`;
+    document.getElementById("closeAlertBtn").onclick = closePopup;
 }
 
 function closePopup() {
-  popup.style.display = "none";
+    if (popup) {
+        popup.style.display = "none";
+    }
 }
 
 // =========================================================
 // HELPERS
 // =========================================================
 function formatQueueNumber(num) {
-  return num ? num.toString().padStart(4, "0") : "----";
+    return num ? num.toString().padStart(4, "0") : "----";
 }
 
 // =========================================================
 // TAB SWITCH
 // =========================================================
 tabButtons.forEach(btn => {
-  btn.addEventListener("click", () => {
-    tabButtons.forEach(b => b.classList.remove("active"));
-    btn.classList.add("active");
-    selectedTab = btn.dataset.status;
-    renderOrders();
-  });
+    btn.addEventListener("click", () => {
+        tabButtons.forEach(b => b.classList.remove("active"));
+        btn.classList.add("active");
+        selectedTab = btn.dataset.status;
+        renderOrders();
+    });
 });
 
 // =========================================================
@@ -197,165 +198,177 @@ onSnapshot(collection(db, "InStoreOrders"), s => handleOrderSnapshot(s, "In-Stor
 onSnapshot(collection(db, "DeliveryOrders"), s => handleOrderSnapshot(s, "Delivery", "DeliveryOrders"));
 
 function handleOrderSnapshot(snapshot, type, collectionName) {
-  snapshot.docChanges().forEach(change => {
-    const docSnap = change.doc;
-    const order = {
-      id: docSnap.id,
-      type,
-      collection: collectionName,
-      data: { status: docSnap.data().status || "Pending", ...docSnap.data() }
-    };
+    snapshot.docChanges().forEach(change => {
+        const docSnap = change.doc;
+        const order = {
+            id: docSnap.id,
+            type,
+            collection: collectionName,
+            data: { status: docSnap.data().status || "Pending", ...docSnap.data() }
+        };
 
-    const existingIndex = ordersData.findIndex(o => o.id === docSnap.id);
-    if (change.type === "removed") {
-      ordersData = ordersData.filter(o => o.id !== docSnap.id);
-      if (pendingTimers[docSnap.id]) {
-        clearTimeout(pendingTimers[docSnap.id]);
-        delete pendingTimers[docSnap.id];
-      }
-    } else if (existingIndex >= 0) {
-      ordersData[existingIndex] = order;
-    } else {
-      ordersData.push(order);
-    }
-
-    // Automatic Cancellation Timer
-    if (order.data.status === "Pending" && !order.data.refundRequest && !pendingTimers[order.id]) {
-      pendingTimers[order.id] = setTimeout(() => {
-        // For e-payment orders, automatically cancel only if there's no payment ID (i.e., payment failed or timed out)
-        if (!order.data.paymongoPaymentId || order.data.paymentMethod === "Cash") {
-          updateOrderStatus(order.id, order.collection, "Canceled");
+        const existingIndex = ordersData.findIndex(o => o.id === docSnap.id);
+        if (change.type === "removed") {
+            ordersData = ordersData.filter(o => o.id !== docSnap.id);
+            if (pendingTimers[docSnap.id]) {
+                clearTimeout(pendingTimers[docSnap.id]);
+                delete pendingTimers[docSnap.id];
+            }
+        } else if (existingIndex >= 0) {
+            ordersData[existingIndex] = order;
         } else {
-          // If it's a paid e-payment order that hasn't been accepted after 60s,
-          // log it but don't auto-cancel. Staff needs to manually review or refund.
-          console.warn(`E-payment order ${order.id} still Pending after 60s.`);
+            ordersData.push(order);
         }
-        delete pendingTimers[order.id];
-      }, 60000);
-    }
 
-    if (order.data.status !== "Pending" && pendingTimers[order.id]) {
-      clearTimeout(pendingTimers[order.id]);
-      delete pendingTimers[order.id];
-    }
-  });
-  renderOrders();
+        // Automatic Cancellation Timer (60 seconds)
+        if (order.data.status === "Pending" && !order.data.refundRequest && !pendingTimers[order.id]) {
+            pendingTimers[order.id] = setTimeout(() => {
+                // For e-payment orders, automatically cancel only if there's no payment ID (i.e., payment failed or timed out)
+                if (!order.data.paymongoPaymentId || order.data.paymentMethod === "Cash") {
+                    // Stock is returned in updateOrderStatus only if no payment ID is present
+                    updateOrderStatus(order.id, order.collection, "Canceled"); 
+                } else {
+                    // For paid E-Payment orders, staff must manually accept/cancel
+                    console.warn(`E-payment order ${order.id} still Pending after 60s. Awaiting staff action.`);
+                }
+                delete pendingTimers[order.id];
+            }, 60000);
+        }
+
+        if (order.data.status !== "Pending" && pendingTimers[order.id]) {
+            clearTimeout(pendingTimers[docSnap.id]);
+            delete pendingTimers[docSnap.id];
+        }
+    });
+    renderOrders();
 }
 
 // =========================================================
 // RENDER ORDERS
 // =========================================================
 function renderOrders() {
-  ordersBody.innerHTML = "";
+    ordersBody.innerHTML = "";
 
-  ordersData
-    .filter(o => {
-      // ⭐ CORRECTED: Tab filtering logic
-      if (selectedTab === "Pending") {
-        return o.data.status === "Pending" || o.data.refundRequest;
-      }
-      if (selectedTab === "Completed") {
-        // Include final completed, refunded, and manual statuses
-        return ["Completed", "Refunded"].includes(o.data.status) || o.data.finalRefundStatus === "Manual";
-      }
-      if (selectedTab === "Canceled") {
-        // Include all cancelled, failed, and denied statuses
-        return ["Canceled", "Manually Canceled (E-Pay)", "Refund Failed", "Refund Denied"].includes(o.data.status) || o.data.finalRefundStatus === "API Failed";
-      }
-      return o.data.status === selectedTab;
-    })
-    .forEach(orderItem => {
-      const order = orderItem.data;
-      const orderId = orderItem.id;
+    ordersData
+        .filter(o => {
+            const status = o.data.status;
+            const finalRefundStatus = o.data.finalRefundStatus;
+            
+            switch (selectedTab) {
+                case "Pending":
+                    // Show all orders that are Pending OR have an active refund request
+                    return status === "Pending" || o.data.refundRequest;
+                case "Completed":
+                    // Include final completed, refunded, and manual refund success statuses
+                    return status === "Completed" || ["Succeeded", "Manual"].includes(finalRefundStatus);
+                case "Canceled":
+                    // Include all cancelled, failed, and denied statuses
+                    return ["Canceled", "Manually Canceled (E-Pay)", "Refund Failed", "Refund Denied"].includes(status) || 
+                           ["Failed", "API Failed", "Denied"].includes(finalRefundStatus);
+                default:
+                    // For Preparing and Delivery tabs
+                    return status === selectedTab;
+            }
+        })
+        .forEach(orderItem => {
+            const order = orderItem.data;
+            const orderId = orderItem.id;
 
-      const tr = document.createElement("tr");
+            const tr = document.createElement("tr");
 
-      // Calculate Order HTML and Total (Correct logic retained)
-      const orderHtml = (order.products || order.items || []).map(p => {
-        const addons = p.addons?.length ? ` (Add-ons: ${p.addons.map(a => `${a.name}: ₱${(a.price || 0).toFixed(2)}`).join(", ")})` : "";
-        const sizeText = p.size ? (typeof p.size === "string" ? ` [${p.size}]` : ` [${p.size.name}]`) : "";
-        const qty = p.qty || p.quantity || 1;
-        // Use saved total from POS for consistency
-        const total = (p.total || ((p.sizePrice || 0) + (p.addonsPrice || 0)) * qty); 
-        return `<div>${qty} × ${p.product}${sizeText}${addons} — ₱${total.toFixed(2)}</div>`;
-      }).join("");
+            // Calculate Order HTML and Total
+            const orderHtml = (order.products || order.items || []).map(p => {
+                const addons = p.addons?.length ? ` (Add-ons: ${p.addons.map(a => `${a.name}: ₱${(a.price || 0).toFixed(2)}`).join(", ")})` : "";
+                const sizeText = p.size ? (typeof p.size === "string" ? ` [${p.size}]` : ` [${p.size.name}]`) : "";
+                const qty = p.qty || p.quantity || 1;
+                // Use saved total from POS for consistency
+                const total = (p.total || ((p.sizePrice || 0) + (p.addonsPrice || 0)) * qty); 
+                return `<div>${qty} × ${p.product}${sizeText}${addons} — ₱${total.toFixed(2)}</div>`;
+            }).join("");
 
-      const grandTotal = order.total; // Use the saved total from POS for consistency
-        
-      const totalDisplay = grandTotal.toFixed(2);
+            const grandTotal = order.total; // Use the saved total from POS for consistency
+            const totalDisplay = grandTotal.toFixed(2);
 
-      const queue = formatQueueNumber(order.queueNumber);
-      const etaText = order.estimatedTime ? `<div>ETA: ${order.estimatedTime}</div>` : "";
+            const queue = formatQueueNumber(order.queueNumber);
+            const etaText = order.estimatedTime ? `<div>ETA: ${order.estimatedTime}</div>` : "";
 
-      // ⭐ UPDATED: Simplified Refund Badge Logic for robustness
-      let statusBadge = `<td>${order.status}</td>`;
-      const mainStatus = order.status;
-      const finalRefundStatus = order.finalRefundStatus || order.refundStatus; // Prefer final status from webhook/handler
+            // UPDATED: Refund Badge Logic for robustness
+            const mainStatus = order.status;
+            const finalRefundStatus = order.finalRefundStatus; 
+            let mainStatusDisplay = mainStatus;
+            let refundBadgeHtml = "";
 
-      if (finalRefundStatus) {
-          const badgeText = finalRefundStatus;
-          // Convert status like "Refund Failed" to "refund-failed"
-          let badgeClass = badgeText.toLowerCase().replace(/\s/g, '-').replace('(e-pay)', '').trim();
+            if (finalRefundStatus) {
+                const badgeText = finalRefundStatus;
+                let badgeClass = 'refund-error'; 
 
-          // Map to established CSS classes for coloring
-          if (badgeClass.includes('refunded') || badgeClass === 'pending') badgeClass = 'refund-pending';
-          else if (badgeClass.includes('failed') || badgeClass.includes('api-failed')) badgeClass = 'refund-failed';
-          else if (badgeClass.includes('denied')) badgeClass = 'refund-denied';
-          else if (badgeClass === 'manual') badgeClass = 'refund-manual';
-          else badgeClass = 'refund-error'; // Catch-all for unexpected states
-        
-          // Show the main status (Completed, Refund Pending, Refund Denied, Refund Failed) plus the badge
-          const mainStatusDisplay = (mainStatus === badgeText || mainStatus === "Completed") ? "Completed" : mainStatus;
+                switch (badgeText) {
+                    case "Succeeded": case "Manual": 
+                        badgeClass = 'refund-refunded';
+                        mainStatusDisplay = "Refunded"; // Clearer main status
+                        break;
+                    case "Pending": 
+                        badgeClass = 'refund-pending'; 
+                        mainStatusDisplay = "Refund Pending";
+                        break;
+                    case "Failed": case "API Failed": case "Denied": case "Manually Canceled (E-Pay)":
+                        badgeClass = 'refund-failed';
+                        if (badgeText === "Denied") mainStatusDisplay = "Refund Denied";
+                        else if (badgeText === "Manually Canceled (E-Pay)") mainStatusDisplay = "Manually Canceled";
+                        else mainStatusDisplay = "Refund Failed";
+                        break;
+                }
+                
+                refundBadgeHtml = ` <span class="refund-badge ${badgeClass}">${badgeText}</span>`;
+            }
+            
+            const statusBadge = `<td>${mainStatusDisplay}${refundBadgeHtml}</td>`;
 
-          const refundBadgeHtml = ` <span class="refund-badge ${badgeClass}">${badgeText}</span>`;
-          statusBadge = `<td>${mainStatusDisplay}${refundBadgeHtml}</td>`;
-      }
+            let actionBtnHtml = "";
+            
+            // If an active refund request exists, show the action button regardless of main status
+            if (order.refundRequest) {
+                actionBtnHtml = `<button class="view-refund-btn" data-id="${orderId}" data-collection="${orderItem.collection}">View Refund Request</button>`;
+            } else {
+                switch(order.status) {
+                    case "Pending":
+                        actionBtnHtml = orderItem.type === "Delivery"
+                            ? `<button class="accept-btn" data-id="${orderId}" data-collection="${orderItem.collection}" data-type="Delivery">Preparing (Set ET)</button>
+                               <button class="cancel-btn" data-id="${orderId}" data-collection="${orderItem.collection}">Cancel</button>`
+                            : `<button class="accept-btn" data-id="${orderId}" data-collection="${orderItem.collection}" data-type="In-Store">Preparing</button>
+                               <button class="cancel-btn" data-id="${orderId}" data-collection="${orderItem.collection}">Cancel</button>`;
+                        break;
+                    case "Preparing":
+                        actionBtnHtml = orderItem.type === "Delivery"
+                            ? `<button class="eta-btn" data-id="${orderId}" data-collection="${orderItem.collection}" data-status="Delivery">Set ET for Delivery</button>`
+                            : `<button class="complete-btn" data-id="${orderId}" data-collection="${orderItem.collection}">Completed</button>`;
+                        break;
+                    case "Delivery":
+                        actionBtnHtml = `<button class="complete-btn" data-id="${orderId}" data-collection="${orderItem.collection}">Completed</button>`;
+                        break;
+                    case "Refund Pending":
+                        actionBtnHtml = `<button class="view-refund-btn" disabled>Refund Processing...</button>`;
+                        break;
+                    case "Completed":
+                    case "Canceled": // Keep the action cell blank for final states
+                    case "Refund Denied":
+                    case "Refund Failed":
+                        actionBtnHtml = "";
+                        break;
+                }
+            }
 
+            tr.innerHTML = `
+                <td>${queue}</td>
+                <td>${orderItem.type}</td>
+                <td>${orderHtml || "No products"}${etaText}<div><strong>Total: ₱${totalDisplay}</strong></div></td>
+                ${statusBadge}
+                <td>${actionBtnHtml}</td>
+            `;
+            ordersBody.appendChild(tr);
+        });
 
-      let actionBtnHtml = "";
-      switch(order.status) {
-        case "Pending":
-          actionBtnHtml = order.refundRequest
-            ? `<button class="view-refund-btn" data-id="${orderId}" data-collection="${orderItem.collection}">View Refund Request</button>`
-            : orderItem.type === "Delivery"
-              ? `<button class="accept-btn" data-id="${orderId}" data-collection="${orderItem.collection}" data-type="Delivery">Preparing (Set ET)</button>
-                 <button class="cancel-btn" data-id="${orderId}" data-collection="${orderItem.collection}">Cancel</button>`
-              : `<button class="accept-btn" data-id="${orderId}" data-collection="${orderItem.collection}" data-type="In-Store">Preparing</button>
-                 <button class="cancel-btn" data-id="${orderId}" data-collection="${orderItem.collection}">Cancel</button>`;
-          break;
-        case "Preparing":
-          actionBtnHtml = orderItem.type === "Delivery"
-            ? `<button class="eta-btn" data-id="${orderId}" data-collection="${orderItem.collection}" data-status="Delivery">Set ET for Delivery</button>`
-            : `<button class="complete-btn" data-id="${orderId}" data-collection="${orderItem.collection}">Completed</button>`;
-          break;
-        case "Delivery":
-          actionBtnHtml = `<button class="complete-btn" data-id="${orderId}" data-collection="${orderItem.collection}">Completed</button>`;
-          break;
-        case "Completed":
-        case "Refund Pending":
-        case "Refund Denied":
-        case "Refunded": 
-        case "Refund Failed": 
-          // Show refund button if a refundRequest flag is set, regardless of main status
-          if (order.refundRequest) {
-            actionBtnHtml = `<button class="view-refund-btn" data-id="${orderId}" data-collection="${orderItem.collection}">View Refund Request</button>`;
-          } else if (order.status === "Refund Pending") {
-                actionBtnHtml = `<button class="view-refund-btn" disabled>Refund Processing...</button>`;
-          }
-          break;
-      }
-
-      tr.innerHTML = `
-        <td>${queue}</td>
-        <td>${orderItem.type}</td>
-        <td>${orderHtml || "No products"}${etaText}<div><strong>Total: ₱${totalDisplay}</strong></div></td>
-        ${statusBadge}
-        <td>${actionBtnHtml}</td>
-      `;
-      ordersBody.appendChild(tr);
-    });
-
-  attachActionHandlers();
+    attachActionHandlers();
 }
 
 // ---------------------
@@ -393,6 +406,9 @@ function attachActionHandlers() {
         btn.addEventListener("click", e => updateOrderStatus(e.target.dataset.id, e.target.dataset.collection, "Completed"));
     });
 
+    // =========================================================
+    // CRITICALLY UPDATED: Refund Button Logic
+    // =========================================================
     document.querySelectorAll(".view-refund-btn").forEach(btn => {
         btn.addEventListener("click", async e => {
             const orderId = e.target.dataset.id;
@@ -402,38 +418,43 @@ function attachActionHandlers() {
             if(!orderSnap.exists()) return;
 
             const orderData = orderSnap.data();
+            
+            // Ensure a refund request is actually pending staff action
+            if (!orderData.refundRequest) {
+                customAlert("There is no active refund request for this order.");
+                return;
+            }
+
+            // --- Build Order Details HTML for Popup ---
             let productsHtml = (orderData.products || orderData.items || []).map(p => {
                 const addons = p.addons?.length ? ` (Add-ons: ${p.addons.map(a => `${a.name}:₱${(a.price || 0).toFixed(2)}`).join(", ")})` : "";
                 const sizeText = p.size ? (typeof p.size === "string" ? ` [${p.size}]` : ` [${p.size.name}]`) : "";
                 const qty = p.qty || p.quantity || 1;
-                const sizePrice = p.basePrice || 0; 
-                const addonsPrice = p.addons.reduce((sum, a) => sum + (a.price || 0), 0); 
-                const totalPrice = ((sizePrice + addonsPrice) * qty).toFixed(2);
-
+                const totalPrice = (p.total || ((p.sizePrice || 0) + (p.addonsPrice || 0)) * qty).toFixed(2);
                 return `<div>${qty} x ${p.product}${sizeText}${addons} - ₱${totalPrice}</div>`;
             }).join("");
-            
-            // Add delivery fee to refund calculation if applicable
+            
             const deliveryFee = orderData.deliveryFee || 0;
             if (deliveryFee > 0) {
                 productsHtml += `<div>1 x Delivery Fee - ₱${deliveryFee.toFixed(2)}</div>`;
             }
-
-            // Calculate correct max refund per order
+            
             const maxRefundable = orderData.total; 
 
-            // Show first popup with Accept/Decline
+            // --- Show First Refund Popup (Accept/Deny) ---
+            if (!popup) createPopup();
+            popupTitle.textContent = "Order Details";
+
             popupButtonsContainer.innerHTML = `
                 <h3>Refund Request for Queue #${formatQueueNumber(orderData.queueNumber)}</h3>
-                <div style="text-align: left; margin-bottom: 15px;">${productsHtml}</div>
-                <div style="font-weight: bold; margin-bottom: 15px;">Total Order: ₱${orderData.total.toFixed(2)}</div>
+                <div style="text-align: left; margin-bottom: 15px; width: 90%; max-width: 350px;">${productsHtml}</div>
+                <div style="font-weight: bold; margin-bottom: 15px;">Total Order: ₱${maxRefundable.toFixed(2)}</div>
                 <div>
-                    <button id="acceptRefundBtn" style="background-color:#28a745; margin-top:10px;">Accept Refund</button>
-                    <button id="declineRefundBtn" style="background-color:#dc3545; margin-top:5px;">Deny Refund</button>
+                    <button id="acceptRefundBtn">Accept Refund</button>
+                    <button id="declineRefundBtn">Deny Refund</button>
                 </div>
             `;
             popup.style.display = "flex";
-            popupTitle.textContent = "Order Details"; // Change generic title
 
             document.getElementById("acceptRefundBtn").onclick = () => {
                 closePopup();
@@ -455,23 +476,30 @@ function showRefundAmountPopup(orderId, collectionName, maxRefundable, paymongoP
     if(!popup) createPopup();
     popupTitle.textContent = "Enter Refund Amount";
 
+    const isEPayment = !!paymongoPaymentId;
+    const warningHtml = isEPayment ? '' : '<div style="color:#dc3545; margin-top:5px; font-weight:bold;">⚠️ NOT E-Payment: Manual Cash Refund Required.</div>';
+
     popupButtonsContainer.innerHTML = `
         <label>Refund Amount (max ₱${maxRefundable.toFixed(2)}):</label>
         <input type="number" id="refundInput" value="${maxRefundable.toFixed(2)}" max="${maxRefundable}" min="0.01" step="0.01" style="width: 100%; margin-top:5px;">
-        ${paymongoPaymentId ? '' : '<div style="color:#dc3545; margin-top:5px; font-weight:bold;">⚠️ NOT E-Payment: Manual Cash Refund Required.</div>'}
+        ${warningHtml}
         <button id="confirmRefundBtn" style="margin-top:10px;">Confirm Refund</button>
         <button id="cancelRefundBtn" style="margin-top:5px;">Cancel</button>
     `;
     popup.style.display = "flex";
 
     document.getElementById("confirmRefundBtn").onclick = () => {
-        const refundAmount = parseFloat(document.getElementById("refundInput").value);
+        const inputElement = document.getElementById("refundInput");
+        const refundAmount = parseFloat(inputElement.value);
+        
         if(isNaN(refundAmount) || refundAmount <= 0 || refundAmount > maxRefundable){
-            alert("Invalid amount. Must be >₱0 and ≤ the max refundable amount.");
+            customAlert("Invalid amount. Must be >₱0 and ≤ the max refundable amount.");
             return;
         }
+        
         closePopup();
-        handleRefundAction(orderId, collectionName, "Accepted", refundAmount);
+        // Pass the PayMongo ID status to handleRefundAction
+        handleRefundAction(orderId, collectionName, "Accepted", refundAmount, isEPayment);
     };
 
     document.getElementById("cancelRefundBtn").onclick = () => {
@@ -482,7 +510,7 @@ function showRefundAmountPopup(orderId, collectionName, maxRefundable, paymongoP
 // ---------------------
 // Handle Refund Action
 // ---------------------
-async function handleRefundAction(orderId, collectionName, action, refundAmount = 0) {
+async function handleRefundAction(orderId, collectionName, action, refundAmount = 0, isEPayment = false) {
     try {
         const orderRef = doc(db, collectionName, orderId);
         const orderSnap = await getDoc(orderRef);
@@ -491,65 +519,79 @@ async function handleRefundAction(orderId, collectionName, action, refundAmount 
         const orderData = orderSnap.data();
 
         if(action === "Accepted") {
-            // Check if it was an E-Payment order
-            if(orderData.paymongoPaymentId) {
-                // ⭐ CRITICAL FIX: Ensure correct path to Netlify function
+            if(isEPayment) {
+                // CRITICAL: Call the Netlify function to process the PayMongo refund
                 const endpoint = "/.netlify/functions/refund-payment";
-                
+                
+                // 1. Temporarily update status while API call is in progress
+                await updateDoc(orderRef, { 
+                    status: "Refund Pending"
+                });
+                customAlert("PayMongo API call initiated. Status is 'Refund Pending'.");
+
                 const response = await fetch(endpoint, {
                     method: "POST",
                     headers: { "Content-Type": "application/json" },
-                    body: JSON.stringify({ paymongoPaymentId: orderData.paymongoPaymentId, amount: refundAmount })
+                    body: JSON.stringify({ paymongoPaymentId: orderData.paymongoPaymentId, amount: refundAmount * 100 }) // PayMongo uses centavos
                 });
+                
                 const data = await response.json();
                 console.log("Refund response:", data);
-                
+                
                 if (data.error) {
-                    alert(`PayMongo Refund failed: ${data.details || data.error}. Please check the PayMongo dashboard.`);
-                    
-                    // Update status to reflect the API failure (prevents it from hanging in "Refund Pending")
+                    // 2. API Call Failed - Update status to final error state
+                    customAlert(`PayMongo Refund failed: ${data.details || data.error}. Please check the PayMongo dashboard.`);
                     await updateDoc(orderRef, { 
                         refundRequest: deleteField(), 
-                        refundStatus: deleteField(), 
-                        finalRefundStatus: "API Failed", // Set final error state
-                        status: "Refund Failed" // Set main status to Refund Failed
+                        finalRefundStatus: "API Failed", 
+                        status: "Refund Failed"
                     });
                     return; 
                 }
-                
-                // Update status immediately to reflect request sent (only if API call succeeded)
+                
+                // 3. API Call Succeeded - Status is updated by Webhook, but we clear the request flag
                 await updateDoc(orderRef, { 
-                    refundStatus: deleteField(), 
-                    finalRefundStatus: "Pending", // Set to Pending until webhook confirms success/failure
-                    refundRequest: deleteField(), 
-                    status: "Refund Pending"
+                    refundRequest: deleteField(),
+                    finalRefundStatus: "Pending", // Webhook will update this to "Succeeded" or "Failed"
+                    status: "Refund Pending" // Maintain this status until webhook confirmation
                 });
+
             } else {
-                // Not a PayMongo order (Cash/Manual)
-                alert(`This was a Cash/Manual order. Please complete the ₱${refundAmount.toFixed(2)} refund manually.`);
+                // Not an E-Payment order (Cash/Manual) - Immediate Final Status
+                customAlert(`This was a Cash/Manual order. Please complete the ₱${refundAmount.toFixed(2)} refund manually and return stock.`);
+                
+                // Manual refunds should also return stock!
+                await returnStock(orderData.products || orderData.items); 
+
                 await updateDoc(orderRef, { 
-                    refundStatus: deleteField(), 
-                    finalRefundStatus: "Manual", // Mark as manual success
                     refundRequest: deleteField(), 
-                    status: "Refunded" // Treat as refunded after manual confirmation
+                    finalRefundStatus: "Manual", // Mark as manual success
+                    status: "Refunded" // Final status
                 });
             }
         } else if(action === "Denied") {
-            // Denied refund request
+            // Denied refund request - Final Status
             await updateDoc(orderRef, { 
-                refundStatus: deleteField(), 
+                refundRequest: deleteField(), 
                 finalRefundStatus: "Denied",
-                refundRequest: deleteField(), 
-                // Change status to Refund Denied for clear visibility
                 status: "Refund Denied" 
             });
-            alert(`Refund request for Order #${orderData.queueNumber || 'N/A'} has been denied. Status updated to "Refund Denied".`);
+            customAlert(`Refund request for Order #${orderData.queueNumber || 'N/A'} has been denied. Status updated.`);
         }
 
-        renderOrders();
+        renderOrders(); // Re-render to show the updated status
     } catch(err) {
         console.error("Refund Action Handler Error:", err);
-        alert("Failed to process refund. Check console logs and PayMongo.");
+        customAlert("A critical error occurred while processing the refund action.");
+        // In case of error, you might want to reset the status or log an event
+        try {
+            await updateDoc(orderRef, {
+                status: "Completed", // Revert to completed if the refund process failed before final status was set
+                refundRequest: true // Re-enable the button for staff to try again
+            });
+        } catch(resetErr) {
+            console.error("Failed to reset order status after refund error:", resetErr);
+        }
     }
 }
 
@@ -567,30 +609,33 @@ async function updateOrderStatus(orderId, collectionName, newStatus, eta = "") {
     try {
         const orderData = ordersData.find(o => o.id === orderId)?.data;
         if(!orderData) return;
-        
+        
         const updatePayload = { 
             status: newStatus,
             estimatedTime: eta || deleteField() 
         };
 
-        // Stock return only for non-PayMongo (e.g., cash) cancelled orders
+        // Stock return only for Cash/Manual cancelled orders
         if(newStatus === "Canceled") {
-            // Only perform stock return if it wasn't a PayMongo order (i.e., Cash)
+            // If there is NO payment ID (Cash/Manual), perform stock return
             if(!orderData.paymongoPaymentId) {
-             await returnStock(orderData.products || orderData.items); // Pass the array of order items
+              await returnStock(orderData.products || orderData.items); 
+              customAlert(`Order #${orderData.queueNumber} canceled and stock returned.`);
             } else {
-                // E-Payment orders that are canceled manually should prompt the staff
-                // to use the refund flow, but if they cancel, mark it clearly.
-                updatePayload.status = "Manually Canceled (E-Pay)"; // Change main status
-                updatePayload.finalRefundStatus = "Manually Canceled (E-Pay)"; // Use final status field
+                // If it is E-Payment, mark it as a manual cancel and prompt for separate refund
+                updatePayload.status = "Manually Canceled (E-Pay)";
+                updatePayload.finalRefundStatus = "Manually Canceled (E-Pay)";
+                customAlert(`Order #${orderData.queueNumber} is E-Payment. It was manually canceled. Refund must be processed separately.`);
             }
         }
         
-        // Remove refund flags if accepting a request that was in 'Pending' or moving status forward
+        // Clear refund flags when moving to a new non-refund status (Preparing, Delivery, Completed)
         if (newStatus === "Preparing" || newStatus === "Delivery" || newStatus === "Completed") {
             updatePayload.refundRequest = deleteField(); 
-            updatePayload.refundStatus = deleteField(); 
-            updatePayload.finalRefundStatus = deleteField(); 
+            if (newStatus === "Completed") {
+                // Clear final status only if it's a clean completion, not a refund final status
+                updatePayload.finalRefundStatus = deleteField(); 
+            }
         }
 
         await updateDoc(doc(db, collectionName, orderId), updatePayload);
@@ -598,80 +643,80 @@ async function updateOrderStatus(orderId, collectionName, newStatus, eta = "") {
         renderOrders();
     } catch(err) {
         console.error(err);
-        alert("Failed to update order status.");
+        customAlert("Failed to update order status.");
     }
 }
 
 // ----------------------------------------------------
-// ✅ CRITICALLY CORRECTED: Return stock (Reverse of POS deduction logic)
+// CRITICALLY CORRECTED: Return stock (Reverse of POS deduction logic)
 // ----------------------------------------------------
 async function returnStock(orderItems) {
-    // Helper function to safely return to inventory using the imported increment
-    const returnItem = async (id, amount) => {
-        if (!id) return;
-        const invRef = doc(db, "Inventory", id);
-        try {
-            // Use the imported increment() function to add stock back
-            await updateDoc(invRef, { quantity: increment(Math.abs(amount)) });
-            console.log(`✅ Returned ${Math.abs(amount)} of ID: ${id} to stock.`);
-        } catch (e) {
-            console.error(`Failed to return ${amount} to ID: ${id}.`, e);
-        }
-    };
-    
-    // We get the order items from orderData.items (or .products)
-    for (const item of orderItems || []) {
-        const productQty = item.qty || item.quantity || 1;
+    // Helper function to safely return to inventory using the imported increment
+    const returnItem = async (id, amount) => {
+        if (!id) return;
+        const invRef = doc(db, "Inventory", id);
+        try {
+            // Use the imported increment() function to add stock back
+            await updateDoc(invRef, { quantity: increment(Math.abs(amount)) });
+            console.log(`✅ Returned ${Math.abs(amount)} of ID: ${id} to stock.`);
+        } catch (e) {
+            console.error(`Failed to return ${amount} to ID: ${id}.`, e);
+        }
+    };
+    
+    // We get the order items from orderData.items (or .products)
+    for (const item of orderItems || []) {
+        const productQty = item.qty || item.quantity || 1;
 
-        // 1. Return all BASE ingredients/others required for the product
-        for (const ing of item.ingredients || []) {
-            await returnItem(ing.id, (ing.qty || 1) * productQty);
-        }
-        for (const other of item.others || []) {
-            await returnItem(other.id, (other.qty || 1) * productQty);
-        }
-        
-        // 2. Return the SIZE item itself and its associated raw materials
-        if (item.sizeId) {
-            // A. Return the inventory item representing the size (e.g., the cup/container)
-            await returnItem(item.sizeId, productQty); 
-            
-            // B. Look up the size item's NESTED raw material requirements from the saved productSizes
-            const productSizeData = (item.productSizes || []).find(s => s.id === item.sizeId);
+        // 1. Return all BASE ingredients/others required for the product
+        for (const ing of item.ingredients || []) {
+            await returnItem(ing.id, (ing.qty || 1) * productQty);
+        }
+        for (const other of item.others || []) {
+            await returnItem(other.id, (other.qty || 1) * productQty);
+        }
+        
+        // 2. Return the SIZE item itself and its associated raw materials
+        if (item.sizeId) {
+            // A. Return the inventory item representing the size (e.g., the cup/container)
+            await returnItem(item.sizeId, productQty); 
+            
+            // B. Look up the size item's NESTED raw material requirements from the saved productSizes
+            const productSizeData = (item.productSizes || []).find(s => s.id === item.sizeId);
 
-            if (productSizeData) {
-                // Return ingredients/others associated with the SIZE
-                for (const ing of productSizeData.ingredients || []) {
-                    await returnItem(ing.id, (ing.qty || 1) * productQty);
-                }
-                for (const other of productSizeData.others || []) {
-                    await returnItem(other.id, (other.qty || 1) * productQty);
-                }
-            }
-        }
-        
-        // 3. Return ADD-ONS (Requires fetching Addon details from Inventory)
-        for (const addon of item.addons || []) {
-            // A. Return the inventory item representing the addon itself
-            await returnItem(addon.id, productQty); 
+            if (productSizeData) {
+                // Return ingredients/others associated with the SIZE
+                for (const ing of productSizeData.ingredients || []) {
+                    await returnItem(ing.id, (ing.qty || 1) * productQty);
+                }
+                for (const other of productSizeData.others || []) {
+                    await returnItem(other.id, (other.qty || 1) * productQty);
+                }
+            }
+        }
+        
+        // 3. Return ADD-ONS
+        for (const addon of item.addons || []) {
+            // A. Return the inventory item representing the addon itself (This assumes addon is an inventory item)
+            await returnItem(addon.id, productQty); 
 
-            // B. Look up the add-on item's NESTED raw material requirements from Inventory
-            try {
-                const addonSnap = await getDoc(doc(db, "Inventory", addon.id));
-                const addonData = addonSnap.data();
+            // B. Look up the add-on item's NESTED raw material requirements from Inventory
+            try {
+                const addonSnap = await getDoc(doc(db, "Inventory", addon.id));
+                const addonData = addonSnap.data();
 
-                if (addonData) {
-                    // Return ingredients/others associated with the ADDON
-                    for (const ing of addonData.ingredients || []) {
-                        await returnItem(ing.id, (ing.qty || 1) * productQty);
-                    }
-                    for (const other of addonData.others || []) {
-                        await returnItem(other.id, (other.qty || 1) * productQty);
-                    }
-                }
-            } catch (e) {
-                console.warn(`Could not fetch Addon ID ${addon.id} for stock return. Skipping nested return.`);
-            }
-        }
-    }
+                if (addonData) {
+                    // Return ingredients/others associated with the ADDON
+                    for (const ing of addonData.ingredients || []) {
+                        await returnItem(ing.id, (ing.qty || 1) * productQty);
+                    }
+                    for (const other of addonData.others || []) {
+                        await returnItem(other.id, (other.qty || 1) * productQty);
+                    }
+                }
+            } catch (e) {
+                console.warn(`Could not fetch Addon ID ${addon.id} for stock return. Skipping nested return.`);
+            }
+        }
+    }
 }
