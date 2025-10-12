@@ -100,6 +100,7 @@ navLinks.forEach(link => {
     (currentPage === "menumanagement.html" && text === "menu management") ||
     (currentPage === "orders.html" && text === "orders") ||
     (currentPage === "incomingorder.html" && text === "incoming orders") ||
+    (currentPage === "admin-feedback.html" && text === "feedback") ||
     (currentPage === "inventory.html" && text === "inventory") ||
     (currentPage === "sales.html" && text === "sales")
   ) {
