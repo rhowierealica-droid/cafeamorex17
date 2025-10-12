@@ -1,125 +1,118 @@
-require('dotenv').config();
-const admin = require('firebase-admin');
-const crypto = require('crypto');
+// /.netlify/functions/refund-payment.js
 
-// ---------------------
-// Initialize Firebase Admin SDK
-// ---------------------
-let db;
-try {
-  const serviceAccount = JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT_KEY);
-  admin.initializeApp({
-    credential: admin.credential.cert(serviceAccount),
-  });
-  db = admin.firestore();
-  console.log("✅ Firebase Admin SDK initialized.");
-} catch (e) {
-  console.error("⚠️ Firebase Admin SDK initialization failed:", e.message);
+// Using 'node-fetch' for Netlify Node.js environments
+const fetch = require('node-fetch');
+
+// ==============================
+// PayMongo API Details
+// ==============================
+const PAYMONGO_API_URL = "https://api.paymongo.com/v1/refunds";
+const PAYMONGO_SECRET_KEY = process.env.PAYMONGO_SECRET_KEY;
+
+if (!PAYMONGO_SECRET_KEY) {
+    console.error("FATAL ERROR: PAYMONGO_SECRET_KEY is not defined in environment variables.");
 }
 
-// ---------------------
-// Helper Functions
-// ---------------------
-function safeParse(value, fallback = []) {
-  try {
-    return typeof value === 'string' ? JSON.parse(value) : value || fallback;
-  } catch {
-    return fallback;
-  }
-}
-
-// ---------------------
-// Netlify Function Handler
-// ---------------------
+// ==============================
+// Lambda Handler
+// ==============================
 exports.handler = async (event, context) => {
-  if (event.httpMethod !== "POST") {
-    return { statusCode: 405, body: "Method Not Allowed" };
-  }
-
-  const WEBHOOK_SECRET = process.env.WEBHOOK_SECRET;
-  let payload;
-
-  try {
-    payload = JSON.parse(event.body);
-  } catch (err) {
-    return { statusCode: 400, body: "Invalid JSON payload" };
-  }
-
-  // --------------------- Signature Verification ---------------------
-  try {
-    const sigHeader = event.headers["paymongo-signature"] || "";
-    if (WEBHOOK_SECRET && sigHeader) {
-      const v1 = sigHeader.split(",").find(p => p.startsWith("v1="))?.replace("v1=", "");
-      const expectedHash = crypto.createHmac("sha256", WEBHOOK_SECRET).update(event.body).digest("hex");
-      if (v1 !== expectedHash) console.warn("⚠️ Signature mismatch");
-    } else {
-      console.warn("⚠️ Skipping signature verification (local test)");
+    // 1. Validate HTTP method
+    if (event.httpMethod !== 'POST') {
+        return { statusCode: 405, body: 'Method Not Allowed' };
     }
-  } catch (err) {
-    console.warn("⚠️ Signature verification failed:", err.message);
-  }
-
-  const eventType = payload?.data?.attributes?.type;
-  const dataObject = payload?.data?.attributes?.data;
-
-  // -------------------- Refund Events --------------------
-  if (eventType === "payment.refunded" || eventType === "payment.refund.updated") {
-    console.log("💸 Refund event received:", dataObject?.id);
-
-    if (db && dataObject?.attributes?.payment_id) {
-      const paymentId = dataObject.attributes.payment_id;
-      const deliveryOrdersRef = db.collection("DeliveryOrders");
-      const snapshot = await deliveryOrdersRef.where("paymongoPaymentId", "==", paymentId).limit(1).get();
-      if (!snapshot.empty) {
-        const orderRef = snapshot.docs[0].ref;
-        await orderRef.update({ status: "Refunded", paymongoRefundId: dataObject.id });
-        console.log(`✅ Updated order ${orderRef.id} status to Refunded`);
-      }
+    if (!PAYMONGO_SECRET_KEY) {
+        return {
+            statusCode: 500,
+            body: JSON.stringify({ error: "Configuration Error", details: "Server Secret Key missing." })
+        };
     }
 
-    return { statusCode: 200, body: JSON.stringify({ received: true, processedRefund: true }) };
-  }
-
-  // -------------------- Payment Paid Events --------------------
-  if (eventType === "payment.paid" || eventType === "checkout_session.payment.paid") {
-    const metadata = dataObject?.attributes?.metadata || {};
-    const orderItems = safeParse(metadata.items || metadata.orderItems);
-    const cartItemIds = safeParse(metadata.cartItemIds);
-
-    if (!metadata.userId || !metadata.queueNumber) {
-      return { statusCode: 400, body: "Missing metadata" };
+    // 2. Parse JSON payload
+    let payload;
+    try {
+        payload = JSON.parse(event.body);
+    } catch (e) {
+        return { statusCode: 400, body: 'Invalid JSON payload' };
     }
 
-    // Calculate total if not provided
-    const totalAmount = Number(metadata.orderTotal) || 
-      orderItems.reduce((sum, i) => sum + (i.total || 0), 0) + Number(metadata.deliveryFee || 0);
+    // ==============================
+    // VALIDATION & DEFAULTS
+    // ==============================
+    // ✅ Added 'reason' default and safe destructure
+    const { paymongoPaymentId, amount, reason } = payload;
+    const refundReason = reason || "requested_by_customer"; // Default reason
 
-    // Save order to Firestore
-    const orderRef = await db.collection("DeliveryOrders").add({
-      userId: metadata.userId,
-      customerName: metadata.customerName || "",
-      customerEmail: metadata.customerEmail || "", // optional for receipts
-      address: metadata.address || "",
-      queueNumber: metadata.queueNumber,
-      queueNumberNumeric: Number(metadata.queueNumberNumeric) || 0,
-      orderType: "Delivery",
-      items: orderItems,
-      deliveryFee: Number(metadata.deliveryFee) || 0,
-      total: totalAmount,
-      paymentMethod: "E-Payment",
-      status: "Pending",
-      createdAt: admin.firestore.FieldValue.serverTimestamp(),
-      paymongoPaymentId: dataObject.id,
-      cartItemIds: cartItemIds
-    });
+    if (!paymongoPaymentId || !amount || typeof amount !== 'number' || amount <= 0) {
+        return { 
+            statusCode: 400, 
+            body: JSON.stringify({ 
+                error: "Invalid Request", 
+                details: "Missing or invalid paymongoPaymentId or amount in body." 
+            }) 
+        };
+    }
 
-    console.log("💾 Order saved with ID:", orderRef.id);
+    // Convert PHP amount to centavos (PayMongo requirement)
+    const amountInCentavos = Math.round(amount * 100);
 
-    // TODO: Deduct inventory if needed
+    try {
+        // ==============================
+        // 3. Send Refund Request to PayMongo
+        // ==============================
+        const response = await fetch(PAYMONGO_API_URL, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Basic ${Buffer.from(PAYMONGO_SECRET_KEY + ":").toString('base64')}`
+            },
+            body: JSON.stringify({
+                data: {
+                    attributes: {
+                        payment_id: paymongoPaymentId,
+                        amount: amountInCentavos,
+                        reason: refundReason // ✅ Added dynamic reason usage
+                    }
+                }
+            })
+        });
 
-    return { statusCode: 200, body: JSON.stringify({ received: true, orderId: orderRef.id }) };
-  }
+        const paymongoData = await response.json();
 
-  // -------------------- Default Response --------------------
-  return { statusCode: 200, body: JSON.stringify({ received: true }) };
+        // ==============================
+        // 4. Check PayMongo Response
+        // ==============================
+        if (!response.ok || paymongoData.errors) {
+            console.error("PayMongo Refund API Error:", paymongoData.errors || { status: response.status, statusText: response.statusText });
+            return {
+                statusCode: 500,
+                body: JSON.stringify({ 
+                    error: "PayMongo API Error", 
+                    details: paymongoData.errors?.[0]?.detail || `API returned status ${response.status}.`
+                })
+            };
+        }
+
+        // ==============================
+        // 5. Refund Initiated Successfully
+        // ==============================
+        return {
+            statusCode: 200,
+            body: JSON.stringify({ 
+                message: "Refund initiated successfully.",
+                refundId: paymongoData.data.id,
+                paymongoStatus: paymongoData.data.attributes.status 
+            })
+        };
+
+    } catch (error) {
+        console.error("Server Refund Processing Error:", error);
+        return {
+            statusCode: 500,
+            body: JSON.stringify({ 
+                error: "Internal Server Error", 
+                details: error.message 
+            })
+        };
+    }
 };
