@@ -53,14 +53,14 @@ table {
 }
 
 th, td {
-  border: 1px solid #d8c4aa;
+  border: 1px solid #f5e8dc;
   padding: 8px;
   text-align: center;
   font-size: 14px;
 }
 
 th {
-  background: #d2b48c;
+  background: #f5e8dc;
   color: #4b3621;
   font-weight: bold;
 }
