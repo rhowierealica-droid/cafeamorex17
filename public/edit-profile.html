@@ -1,226 +1,234 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Café Amore | Edit Profile</title>
-  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
-  <link rel="stylesheet" href="edit-profile.css">
-  <link rel="stylesheet" href="customer-side.css">
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Café Amore | Edit Profile</title>
+
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css" />
+    <link rel="stylesheet" href="edit-profile.css" />
+    <link rel="stylesheet" href="customer-side.css" />
 </head>
 <body>
 
-  <div class="top-bar">
-    <div class="hamburger" id="hamburger"><i class="fas fa-bars"></i></div>
-    <div class="mobile-logo">
-      <img src="logo.png" alt="Café Amore Logo">
-      <span class="brand">Café Amore</span>
+    <div class="top-bar">
+        <div class="hamburger" id="hamburger"><i class="fas fa-bars"></i></div>
+        <div class="mobile-logo">
+            <img src="logo.png" alt="Café Amore Logo" />
+            <span class="brand">Café Amore</span>
+        </div>
     </div>
-  </div>
 
-  <aside class="sidebar" id="sidebar">
-    <div class="logo">
-      <img src="logo.png" alt="Café Amore Logo">
-      <span class="brand">Café Amore</span>
+    <aside class="sidebar" id="sidebar">
+        <div class="logo">
+            <img src="logo.png" alt="Café Amore Logo" />
+            <span class="brand">Café Amore</span>
+        </div>
+
+        <nav>
+            <ul>
+                <li class="menu-link"><i class="fas fa-utensils"></i> Menu</li>
+                <li class="cart-link"><i class="fas fa-shopping-cart"></i> Cart</li>
+                <li class="order-status-link"><i class="fas fa-truck"></i> Order Status</li>
+                <li class="favorites-link"><i class="fas fa-heart"></i> Favorites</li>
+            </ul>
+        </nav>
+
+        <div class="login-link"><i class="fas fa-sign-in-alt"></i> Login</div>
+
+        <div class="profile-card">
+            <div class="profile-avatar"><i class="fas fa-user-circle"></i></div>
+            <div class="profile-info">
+                <p class="profile-name">Customer</p>
+                <p class="edit-text">Edit Profile</p>
+            </div>
+        </div>
+
+        <div class="logout"><i class="fas fa-sign-out-alt"></i> Log Out</div>
+        <div class="close-btn hidden" id="closeBtn">&times;</div>
+    </aside>
+
+    <div class="profile-wrapper">
+        <div class="profile-container">
+            <h2>Edit Profile</h2>
+
+            <div class="tabs">
+                <button class="tab-btn active" data-tab="infoTab">Information</button>
+                <button class="tab-btn" data-tab="addressTab">Address</button>
+            </div>
+
+            <div class="tab-content" id="infoTab" style="display: block;">
+                <h3>Personal Information</h3>
+                <form id="nameForm">
+                    <div class="row">
+                        <div class="input-group">
+                            <label for="firstName">First Name</label>
+                            <input type="text" id="firstName" disabled />
+                        </div>
+                        <div class="input-group">
+                            <label for="lastName">Last Name</label>
+                            <input type="text" id="lastName" disabled />
+                        </div>
+                    </div>
+                    <div class="button-group">
+                        <button type="button" class="edit-btn" id="editNameBtn">Edit</button>
+                        <button type="submit" class="save-btn" id="saveNameBtn" style="display:none;">Save</button>
+                        <button type="button" class="cancel-btn" id="cancelNameBtn" style="display:none;">Cancel</button>
+                    </div>
+                </form>
+
+                <hr />
+
+                <h3>Email Settings</h3>
+                <form id="emailForm">
+                    <div class="input-group">
+                        <label for="email">Current Email (Masked)</label>
+                        <input type="email" id="email" disabled />
+                    </div>
+
+                    <div class="email-edit-fields" id="emailEditFields" style="display:none;">
+                        <div class="input-group">
+                            <label for="currentEmailInput">Confirm Current Email</label>
+                            <input type="email" id="currentEmailInput" placeholder="Enter current email" required />
+                        </div>
+                        <div class="input-group">
+                            <label for="newEmail">Enter New Email</label>
+                            <input type="email" id="newEmail" placeholder="Enter new email" required />
+                        </div>
+                        <div class="input-group">
+                            <label for="currentPassword">Enter Current Password</label>
+                            <input type="password" id="currentPassword" placeholder="Enter current password" required />
+                        </div>
+                    </div>
+
+                    <div class="button-group">
+                        <button type="button" class="edit-btn" id="editEmailBtn">Edit</button>
+                        <button type="submit" class="save-btn" id="saveEmailBtn" style="display:none;">Save</button>
+                        <button type="button" class="cancel-btn" id="cancelEmailBtn" style="display:none;">Cancel</button>
+                    </div>
+                </form>
+
+                <hr />
+
+                <h3>Change Password</h3>
+                <form id="passwordForm">
+                    <div class="input-group">
+                        <label>Password Status</label>
+                        <input type="text" value="******** (Click Edit to Change)" disabled />
+                    </div>
+
+                    <div class="password-edit-fields" id="passwordEditFields" style="display:none;">
+                        <div class="input-group">
+                            <label for="currentPasswordForChange">Enter Current Password</label>
+                            <input type="password" id="currentPasswordForChange" placeholder="Enter current password" required />
+                        </div>
+                        <div class="input-group">
+                            <label for="password">New Password</label>
+                            <input type="password" id="password" placeholder="Enter new password" required />
+                        </div>
+                        <div class="input-group">
+                            <label for="confirmPassword">Confirm Password</label>
+                            <input type="password" id="confirmPassword" placeholder="Confirm new password" required />
+                        </div>
+                    </div>
+
+                    <div class="button-group">
+                        <button type="button" class="edit-btn" id="editPasswordBtn">Edit</button>
+                        <button type="submit" class="save-btn" id="savePasswordBtn" style="display:none;">Save</button>
+                        <button type="button" class="cancel-btn" id="cancelPasswordBtn" style="display:none;">Cancel</button>
+                    </div>
+                </form>
+
+                <hr />
+
+                <h3>Phone Number</h3>
+                <form id="phoneForm">
+                    <div class="input-group">
+                        <label for="phone">Current Phone (Masked)</label>
+                        <input type="text" id="phone" disabled />
+                    </div>
+
+                    <div class="phone-edit-fields" id="phoneEditFields" style="display:none;">
+                        <div class="input-group">
+                            <label for="currentPhoneInput">Confirm Current Phone</label>
+                            <input type="text" id="currentPhoneInput" placeholder="09xxxxxxxxx" required />
+                        </div>
+                        <div class="input-group">
+                            <label for="newPhone">Enter New Phone</label>
+                            <input type="text" id="newPhone" placeholder="09xxxxxxxxx" required />
+                        </div>
+                        <div class="input-group">
+                            <label for="currentPhonePassword">Enter Current Password</label>
+                            <input type="password" id="currentPhonePassword" placeholder="Enter current password" required />
+                        </div>
+                    </div>
+
+                    <div class="button-group">
+                        <button type="button" class="edit-btn" id="editPhoneBtn">Edit</button>
+                        <button type="submit" class="save-btn" id="savePhoneBtn" style="display:none;">Save</button>
+                        <button type="button" class="cancel-btn" id="cancelPhoneBtn" style="display:none;">Cancel</button>
+                    </div>
+                </form>
+            </div>
+
+            <div class="tab-content" id="addressTab" style="display:none;">
+                <div id="address-saved-list" style="margin-top: 18px; margin-bottom: 20px;"></div>
+                <hr/>
+
+                <div id="addressEditContainer" style="display: none;">
+                    <h3>Edit Address</h3>
+                    <form id="addressForm">
+                        <div class="row">
+                            <div class="input-group">
+                                <label for="barangay">Barangay</label>
+                                <select id="barangay" disabled>
+                                    <option value="">Choose Barangay</option>
+                                </select>
+                            </div>
+                            <div class="input-group">
+                                <label for="houseNumber">Street Name, Building, House No.</label>
+                                <input type="text" id="houseNumber" disabled />
+                            </div>
+                        </div>
+
+                        <div class="row">
+                            <div class="input-group">
+                                <label>Region</label>
+                                <input type="text" id="region" disabled />
+                            </div>
+                            <div class="input-group">
+                                <label>Province</label>
+                                <input type="text" id="province" disabled />
+                            </div>
+                            <div class="input-group">
+                                <label>City</label>
+                                <input type="text" id="city" disabled />
+                            </div>
+                        </div>
+
+                        <div class="button-group">
+                            <button type="button" class="edit-btn" id="editAddressBtn">Edit</button>
+                            <button type="submit" class="save-btn" id="saveAddressBtn" style="display:none;">Save</button>
+                            <button type="button" class="cancel-btn" id="cancelAddressBtn" style="display:none;">Cancel</button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
     </div>
-    <nav>
-      <ul>
-        <li class="menu-link"><i class="fas fa-utensils"></i> Menu</li>
-        <li class="cart-link"><i class="fas fa-shopping-cart"></i> Cart</li>
-        <li class="order-status-link"><i class="fas fa-truck"></i> Order Status</li>
-        <li class="favorites-link"><i class="fas fa-heart"></i> Favorites</li>
-       <!-- <li class="history-link"><i class="fas fa-history"></i> History</li> -->
-      </ul>
-    </nav>
 
-    <div class="login-link"><i class="fas fa-sign-in-alt"></i> Login</div>
-    <div class="profile-card">
-      <div class="profile-avatar"><i class="fas fa-user-circle"></i></div>
-      <div class="profile-info">
-        <p class="profile-name">Customer</p>
-        <p class="edit-text">Edit Profile</p>
-      </div>
+    <div id="recaptcha-container"></div>
+
+    <div id="otpPopup">
+        <div class="otp-container">
+            <h3>Enter OTP</h3>
+            <input type="text" id="otpCode" placeholder="Enter OTP" />
+            <div id="otpError"></div>
+            <button type="button" id="verifyOtpBtn">Verify OTP</button>
+        </div>
     </div>
-    <div class="logout"><i class="fas fa-sign-out-alt"></i> Log Out</div>
-    <div class="close-btn hidden" id="closeBtn">&times;</div>
-  </aside>
 
-  <div class="profile-wrapper">
-    <div class="profile-container">
-      <h2>Edit Profile</h2>
-
-      <div class="tabs">
-        <button class="tab-btn active" data-tab="infoTab">Information</button>
-        <button class="tab-btn" data-tab="addressTab">Address</button>
-        <button class="tab-btn" data-tab="emailTab">Email</button>
-        <button class="tab-btn" data-tab="passwordTab">Password</button>
-        <button class="tab-btn" data-tab="phoneTab">Phone</button>
-      </div>
-
-      <!-- Information Tab -->
-      <div class="tab-content" id="infoTab">
-        <form id="infoForm">
-          <div class="row">
-            <div class="input-group">
-              <label for="firstName">First Name</label>
-              <input type="text" id="firstName" disabled>
-            </div>
-            <div class="input-group">
-              <label for="lastName">Last Name</label>
-              <input type="text" id="lastName" disabled>
-            </div>
-          </div>
-          <div class="button-group">
-            <button type="button" class="edit-btn" id="editInfoBtn">Edit</button>
-            <button type="submit" class="save-btn" id="saveInfoBtn" style="display:none;">Save</button>
-            <button type="button" class="cancel-btn" id="cancelInfoBtn" style="display:none;">Cancel</button>
-          </div>
-        </form>
-      </div>
-
-      <!-- Address Tab -->
-      <div class="tab-content" id="addressTab" style="display:none;">
-        <form id="addressForm">
-          <div class="row">
-            <div class="input-group">
-              <label for="barangay">Barangay</label>
-              <select id="barangay" disabled>
-                <option value="">Choose Barangay</option>
-              </select>
-            </div>
-            <div class="input-group">
-              <label for="houseNumber">Street Name, Building, House No.</label>
-              <input type="text" id="houseNumber" disabled>
-            </div>
-          </div>
-          <div class="row">
-            <div class="input-group">
-              <label>Region</label>
-              <input type="text" id="region" disabled>
-            </div>
-            <div class="input-group">
-              <label>Province</label>
-              <input type="text" id="province" disabled>
-            </div>
-            <div class="input-group">
-              <label>City</label>
-              <input type="text" id="city" disabled>
-            </div>
-          </div>
-          <div class="button-group">
-            <button type="button" class="edit-btn" id="editAddressBtn">Edit</button>
-            <button type="submit" class="save-btn" id="saveAddressBtn" style="display:none;">Save</button>
-            <button type="button" class="cancel-btn" id="cancelAddressBtn" style="display:none;">Cancel</button>
-          </div>
-        </form>
-      </div>
-
-      <!-- Email Tab -->
-      <div class="tab-content" id="emailTab" style="display:none;">
-        <form id="emailForm">
-          <div class="input-group">
-            <label for="email">Current Email</label>
-            <input type="email" id="email" disabled>
-          </div>
-          <div class="email-edit-fields" style="display:none;">
-            <div class="input-group">
-              <label for="currentEmailInput">Enter Current Email</label>
-              <input type="email" id="currentEmailInput" placeholder="Enter current email">
-            </div>
-            <div class="input-group">
-              <label for="newEmail">Enter New Email</label>
-              <input type="email" id="newEmail" placeholder="Enter new email">
-            </div>
-            <div class="input-group">
-              <label for="currentPassword">Enter Current Password</label>
-              <input type="password" id="currentPassword" placeholder="Enter current password">
-            </div>
-          </div>
-          <div class="button-group">
-            <button type="button" class="edit-btn" id="editEmailBtn">Edit</button>
-            <button type="submit" class="save-btn" id="saveEmailBtn" style="display:none;">Save</button>
-            <button type="button" class="cancel-btn" id="cancelEmailBtn" style="display:none;">Cancel</button>
-          </div>
-        </form>
-      </div>
-
-     <!-- Password Tab -->
-<div class="tab-content" id="passwordTab" style="display:none;">
-  <form id="passwordForm">
-    <div class="password-edit-fields">
-      <div class="input-group">
-        <label for="currentPasswordForChange">Enter Current Password</label>
-        <input type="password" id="currentPasswordForChange" placeholder="Enter current password" disabled>
-      </div>
-      <div class="input-group">
-        <label for="password">New Password</label>
-        <input type="password" id="password" placeholder="Enter new password" disabled>
-      </div>
-      <div class="input-group">
-        <label for="confirmPassword">Confirm Password</label>
-        <input type="password" id="confirmPassword" placeholder="Confirm new password" disabled>
-      </div>
-    </div>
-    <div class="button-group">
-      <button type="button" class="edit-btn" id="editPasswordBtn">Edit</button>
-      <button type="submit" class="save-btn" id="savePasswordBtn" style="display:none;">Save</button>
-      <button type="button" class="cancel-btn" id="cancelPasswordBtn" style="display:none;">Cancel</button>
-    </div>
-  </form>
-</div>
-
-      <!-- Phone Tab -->
-      <div class="tab-content" id="phoneTab" style="display:none;">
-        <form id="phoneForm">
-          <div class="input-group">
-            <label for="phone">Current Phone</label>
-            <input type="text" id="phone" disabled>
-          </div>
-          <div class="phone-edit-fields" style="display:none;">
-            <div class="input-group">
-              <label for="currentPhoneInput">Enter Current Phone</label>
-              <input type="text" id="currentPhoneInput" placeholder="09xxxxxxxxx">
-            </div>
-            <div class="input-group">
-              <label for="newPhone">Enter New Phone</label>
-              <input type="text" id="newPhone" placeholder="09xxxxxxxxx">
-            </div>
-            <div class="input-group">
-              <label for="currentPhonePassword">Enter Current Password</label>
-              <input type="password" id="currentPhonePassword" placeholder="Enter current password">
-            </div>
-          </div>
-          <div class="button-group">
-            <button type="button" class="edit-btn" id="editPhoneBtn">Edit</button>
-            <button type="submit" class="save-btn" id="savePhoneBtn" style="display:none;">Save</button>
-            <button type="button" class="cancel-btn" id="cancelPhoneBtn" style="display:none;">Cancel</button>
-          </div>
-        </form>
-      </div>
-
-    </div>
-  </div>
-   <!-- reCAPTCHA container (required for phone auth) -->
-  <div id="recaptcha-container"></div>
-
-  <!-- OTP Verification Popup -->
-  <div id="otpPopup">
-    <div class="otp-container">
-      <h3>Enter OTP</h3>
-      <input type="text" id="otpCode" placeholder="Enter OTP">
-      <div id="otpError"></div>
-      <button type="button" id="verifyOtpBtn">Verify OTP</button>
-    </div>
-  </div>
-
-  <script type="module" src="edit-profile.js"></script>
-  <script type="module" src="customer-side.js"></script>
-</body>
-</html>
-
-
-
-  <script type="module" src="edit-profile.js"></script>
-  <script type="module" src="customer-side.js"></script>
+    <script type="module" src="edit-profile.js"></script>
+    <script type="module" src="customer-side.js"></script>
 </body>
 </html>
