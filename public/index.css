@@ -372,7 +372,7 @@ a {
 .cart-popup .sizes-container,
 .cart-popup .addons-container {
   display: flex;
-  flex-wrap: wrap;
+  flex-direction: column; /* ← makes items vertical */
   gap: 10px;
   margin-bottom: 12px;
 }
