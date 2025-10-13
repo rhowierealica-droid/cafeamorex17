@@ -2,7 +2,6 @@
    Sidebar Base
 ========================== */
 
-
 .sidebar {
   position: fixed;
   top: 0;
@@ -98,6 +97,16 @@
 .profile-card:hover .profile-avatar i,
 .profile-card:hover .profile-info .profile-name,
 .profile-card:hover .profile-info .edit-text {
+  color: #fff;
+}
+
+/* === NEW: Active Profile Card === */
+.profile-card.active {
+  background: #552915;
+}
+.profile-card.active .profile-avatar i,
+.profile-card.active .profile-info .profile-name,
+.profile-card.active .profile-info .edit-text {
   color: #fff;
 }
 
