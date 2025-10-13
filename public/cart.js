@@ -49,7 +49,7 @@ let cartAddresses = [];
 
 // Global realtime maps (single source of truth)
 let inventoryMap = {}; // inventoryMap[id] = { id, name, quantity, active, ... }
-let productMap = {};   // productMap[id] = { id, ...productData }
+let productMap = {};   // productMap[id] = { id, ...productData }
 
 // ==========================
 // --- TOAST FUNCTION ---
@@ -110,6 +110,10 @@ export async function addToCart(product, selectedSize = null, selectedAddons = [
     id: a.id || null
   }));
   const addonsPrice = addons.reduce((sum, a) => sum + a.price, 0);
+  
+  // 🛠️ FIX: Standardize addons for comparison (sort by ID)
+  addons.sort((a, b) => (a.id || "").localeCompare(b.id || ""));
+
   const unitPrice = basePrice + sizePrice + addonsPrice;
   const totalPrice = unitPrice * quantity;
 
@@ -121,7 +125,16 @@ export async function addToCart(product, selectedSize = null, selectedAddons = [
       const data = docSnap.data();
       const sameProduct = data.productId === product.id;
       const sameSize = data.sizeId === selectedSize?.id;
-      const sameAddons = JSON.stringify(data.addons || []) === JSON.stringify(addons || []);
+
+      // 🛠️ FIX: Standardize existing cart item's addons for comparison (sort by ID)
+      const existingAddons = (data.addons || []).map(a => ({
+          name: a.name,
+          price: Number(a.price || 0),
+          id: a.id || null
+      })).sort((a, b) => (a.id || "").localeCompare(b.id || ""));
+      
+      const sameAddons = JSON.stringify(existingAddons) === JSON.stringify(addons);
+
       if (sameProduct && sameSize && sameAddons) existingDoc = { id: docSnap.id, data };
     });
 
@@ -142,7 +155,7 @@ export async function addToCart(product, selectedSize = null, selectedAddons = [
         quantity,
         size: selectedSize?.name || null,
         sizeId: selectedSize?.id || null,
-        addons,
+        addons, // Storing the sorted/standardized version
         ingredients: selectedSizeData?.ingredients || [],
         others: selectedSizeData?.others || [],
         addedAt: new Date(),
@@ -363,7 +376,7 @@ function renderCartItemsFromState() {
         <img src="${item.image || 'placeholder.png'}" alt="${item.name}"
             style="height:70px; width:70px; object-fit:cover; border-radius:6px; flex-shrink:0;">
         <div style="flex:1; opacity:${!available ? 0.5 : 1};">
-          <strong>${item.name}                             </strong> <span style="margin-left: 10px;">(Stock: ${stock})</span><br>  
+          <strong>${item.name}                             </strong> <span style="margin-left: 10px;">(Stock: ${stock})</span><br>  
           ${item.size ? `Size: ${item.size} - ₱${Number(item.sizePrice || item.sizePrice || 0).toFixed(2)}` : 'Size: N/A'}<br>
           ${addonsHTML}<br>
           <label>Qty: <input type="number" min="1" max="${stock}" value="${displayQty}" class="qty-input" style="width:60px;" ${disabledAttr}></label><br>
@@ -696,8 +709,7 @@ finalConfirmBtn?.addEventListener("click", async () => {
       showToast(`Order placed! Queue #${queueNumber}. (Payment: Cash)`, 3000, "green", true);
       modal.style.display = "none";
     } else if (paymentMethod === "E-Payment") {
-        // 🛑 THE CRITICAL FIX IS HERE
-        const response = await fetch("/.netlify/functions/create-checkout", {
+        const response = await fetch("/.netlify/functions/create-checkout", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -710,10 +722,10 @@ finalConfirmBtn?.addEventListener("click", async () => {
             queueNumber,
             queueNumberNumeric,
             address: selectedAddress,
-            **orderItems: JSON.stringify(orderItems)**, // ⬅️ UPDATED: Must be stringified JSON
+            orderItems,
             deliveryFee: userDeliveryFee,
             orderTotal,
-            **cartItemIds: JSON.stringify(selectedItemIds)** // ⬅️ UPDATED: Must be stringified JSON
+            cartItemIds: selectedItemIds
           }
         })
       });
