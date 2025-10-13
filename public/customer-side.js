@@ -1,6 +1,17 @@
-import { getAuth, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
-import { getFirestore, doc, getDoc } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+import { 
+  getAuth, 
+  onAuthStateChanged, 
+  signOut 
+} from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
+import { 
+  getFirestore, 
+  doc, 
+  getDoc 
+} from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 
+/* ===============================
+   DOM ELEMENTS
+=============================== */
 const sidebar = document.getElementById('sidebar');
 const hamburger = document.getElementById('hamburger');
 const closeBtn = document.getElementById('closeBtn');
@@ -12,7 +23,9 @@ const logout = document.querySelector('.logout');
 const logo = document.querySelector('.logo');
 const welcomeHeader = document.querySelector('.main-content header h1');
 
-// Create overlay element
+/* ===============================
+   CREATE OVERLAY
+=============================== */
 let overlay = document.getElementById('overlay');
 if (!overlay) {
   overlay = document.createElement('div');
@@ -20,95 +33,101 @@ if (!overlay) {
   document.body.appendChild(overlay);
 }
 
+/* ===============================
+   FIREBASE INIT
+=============================== */
 const db = getFirestore();
 const auth = getAuth();
 
-// Initial state
+/* ===============================
+   INITIAL STATE
+=============================== */
 if (closeBtn) closeBtn.style.display = 'none';
 
-// Function to update responsive elements
+/* ===============================
+   RESPONSIVE ELEMENTS HANDLER
+=============================== */
 function updateResponsiveElements() {
   if (window.innerWidth > 1024) {
     sidebar.classList.remove('active');
-    hamburger.style.display = 'none';
+    if (hamburger) hamburger.style.display = 'none';
     if (closeBtn) closeBtn.style.display = 'none';
     if (topBar) topBar.style.display = 'none';
     overlay.classList.remove('active');
   } else {
-    hamburger.style.display = 'block';
+    if (hamburger) hamburger.style.display = 'block';
     if (closeBtn) closeBtn.style.display = 'none';
     if (topBar) topBar.style.display = 'flex';
   }
 }
 
-// Initial call
+// Initial call + listener
 updateResponsiveElements();
-
-// Update on resize
 window.addEventListener('resize', updateResponsiveElements);
 
-// Function to open sidebar
+/* ===============================
+   SIDEBAR TOGGLE FUNCTIONS
+=============================== */
 function openSidebar() {
   sidebar.classList.add('active');
-  hamburger.style.display = 'none';
+  if (hamburger) hamburger.style.display = 'none';
   if (closeBtn) {
     closeBtn.style.display = 'block';
-    closeBtn.style.opacity = '1';  // Ensure visible
+    closeBtn.style.opacity = '1';
   }
   overlay.classList.add('active');
-  if (topBar) topBar.style.display = 'none'; // hide top bar when sidebar is open
+  if (topBar) topBar.style.display = 'none';
 }
 
-// Function to close sidebar
 function closeSidebar() {
   sidebar.classList.remove('active');
-  hamburger.style.display = 'block';
+  if (hamburger) hamburger.style.display = 'block';
   if (closeBtn) {
     closeBtn.style.display = 'none';
     closeBtn.style.opacity = '0';
   }
   overlay.classList.remove('active');
-  if (topBar) topBar.style.display = 'flex'; // show top bar when sidebar is closed
+  if (topBar) topBar.style.display = 'flex';
 }
 
-// Hamburger toggle
-hamburger.addEventListener('click', openSidebar);
-
-// Close button toggle
+/* ===============================
+   EVENT LISTENERS
+=============================== */
+hamburger?.addEventListener('click', openSidebar);
 closeBtn?.addEventListener('click', closeSidebar);
-
-// Overlay click to close sidebar
 overlay.addEventListener('click', closeSidebar);
 
-// Navigation links
-const navLinks = sidebar.querySelectorAll('nav ul li');
+/* ===============================
+   NAVIGATION LINKS
+=============================== */
+const navLinks = sidebar?.querySelectorAll('nav ul li') || [];
 const linkMap = {
   "menu-link": "index.html",
   "cart-link": "cart.html",
   "order-status-link": "customer-status.html",
   "favorites-link": "favorites.html",
-  // "history-link": "history.html"  
+  // "history-link": "history.html"
 };
 
 navLinks.forEach(link => {
   link.addEventListener('click', () => {
     const target = linkMap[link.classList[0]];
     if (target) window.location.href = target;
-    closeSidebar(); // close sidebar after navigation
+    closeSidebar();
   });
 });
 
-// Login button click
+/* ===============================
+   LOGIN / PROFILE / LOGOUT
+=============================== */
 loginLink?.addEventListener('click', () => {
   window.location.href = "login.html";
 });
 
-// Profile card click
 profileCard?.addEventListener('click', () => {
   window.location.href = "edit-profile.html";
 });
 
-// Logout
 logout?.addEventListener('click', async (e) => {
   e.stopPropagation();
   try {
@@ -120,44 +139,53 @@ logout?.addEventListener('click', async (e) => {
   }
 });
 
-// Logo click
 logo?.addEventListener('click', () => {
-  window.location.href = "customer-menu.html";
+  window.location.href = "index.html";
 });
 
-// Auth state observer
+/* ===============================
+   AUTH STATE OBSERVER
+=============================== */
 onAuthStateChanged(auth, async (user) => {
   const isLoggedIn = !!user;
 
-  // Menu always visible
-  navLinks[0].style.display = "flex";
+  // Ensure navLinks exist before modifying
+  if (navLinks.length > 0) {
+    // Menu (always visible)
+    if (navLinks[0]) navLinks[0].style.display = "flex";
 
-  // Other nav links based on login
-  navLinks[1].style.display = isLoggedIn ? "flex" : "none"; // Cart
-  navLinks[2].style.display = isLoggedIn ? "flex" : "none"; // Order Status
-  navLinks[3].style.display = isLoggedIn ? "flex" : "none"; // Favorites
-  // navLinks[4].style.display = isLoggedIn ? "flex" : "none"; // History
+    // Show/Hide other links based on login
+    if (navLinks[1]) navLinks[1].style.display = isLoggedIn ? "flex" : "none"; // Cart
+    if (navLinks[2]) navLinks[2].style.display = isLoggedIn ? "flex" : "none"; // Order Status
+    if (navLinks[3]) navLinks[3].style.display = isLoggedIn ? "flex" : "none"; // Favorites
+    // if (navLinks[4]) navLinks[4].style.display = isLoggedIn ? "flex" : "none"; // History
+  }
 
-  // Profile, logout, login
-  profileCard.style.display = isLoggedIn ? "flex" : "none";
-  logout.style.display = isLoggedIn ? "flex" : "none";
-  loginLink.style.display = isLoggedIn ? "none" : "flex";
+  // Profile & login visibility
+  if (profileCard) profileCard.style.display = isLoggedIn ? "flex" : "none";
+  if (logout) logout.style.display = isLoggedIn ? "flex" : "none";
+  if (loginLink) loginLink.style.display = isLoggedIn ? "none" : "flex";
 
+  // Default name
   let fullName = "Customer";
 
-  // Try reading name from localStorage first
+  // Get stored name or fetch from Firestore
   const storedName = localStorage.getItem("currentUserName");
-  if (storedName) fullName = storedName;
-  else if (isLoggedIn && user.uid) {
+  if (storedName) {
+    fullName = storedName;
+  } else if (isLoggedIn && user.uid) {
     try {
       const userDoc = await getDoc(doc(db, "users", user.uid));
-      const data = userDoc.exists() ? userDoc.data() : {};
-      fullName = `${data.firstName || ""} ${data.lastName || ""}`.trim() || "Customer";
+      if (userDoc.exists()) {
+        const data = userDoc.data();
+        fullName = `${data.firstName || ""} ${data.lastName || ""}`.trim() || "Customer";
+      }
     } catch (err) {
       console.error("Error fetching user data:", err);
     }
   }
 
-  profileNameEl.textContent = fullName;
-  welcomeHeader.textContent = `Welcome, ${fullName}`;
+  // Update UI
+  if (profileNameEl) profileNameEl.textContent = fullName;
+  if (welcomeHeader) welcomeHeader.textContent = `Welcome, ${fullName}`;
 });
