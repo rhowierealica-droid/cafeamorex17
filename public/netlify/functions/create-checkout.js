@@ -41,8 +41,8 @@ exports.handler = async (event, context) => {
             {
                 data: {
                     attributes: {
-                        success_url: process.env.SUCCESS_URL || 'https://remarkable-cassata-a847b0.netlify.app/customer-status.html',
-                        cancel_url: process.env.CANCEL_URL || 'https://remarkable-cassata-a847b0.netlify.app/cart.html',
+                        success_url: process.env.SUCCESS_URL || 'https://shimmering-zuccutto-772d50.netlify.app/customer-status.html',
+                        cancel_url: process.env.CANCEL_URL || 'https://shimmering-zuccutto-772d50.netlify.app/cart.html',
                         send_email_receipt: false,
                         description: description || `Payment for Order #${metadata.queueNumber}`,
                         line_items: lineItems,
@@ -70,3 +70,4 @@ exports.handler = async (event, context) => {
         return { statusCode: 500, body: JSON.stringify({ error: "Failed to create checkout session", details: error.response?.data || error.message }) };
     }
 };
+
