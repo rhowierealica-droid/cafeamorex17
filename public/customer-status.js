@@ -193,7 +193,7 @@ function listenOrders() {
         refundBtn.className = "action-btn";
         refundBtn.style.cursor = "not-allowed";
 
-        if (order.refundStatus === "Requested") refundBtn.style.backgroundColor = "yellow";
+        if (order.refundStatus === "Requested") refundBtn.style.backgroundColor = "green";
         else if (order.refundStatus === "Accepted") refundBtn.style.backgroundColor = "green";
         else if (order.refundStatus === "Denied") refundBtn.style.backgroundColor = "red";
         else refundBtn.style.backgroundColor = "#ccc"; 
