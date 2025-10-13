@@ -3,7 +3,7 @@ const admin = require("firebase-admin");
 const crypto = require("crypto");
 
 // ---------------------
-// 1. Initialize Firebase Admin SDK
+// 1. Initialize Firebase Admin SDK 
 // ---------------------
 let db;
 try {
@@ -301,3 +301,4 @@ exports.handler = async (event, context) => {
 
     return { statusCode: 200, body: JSON.stringify({ received: true }) };
 };
+
