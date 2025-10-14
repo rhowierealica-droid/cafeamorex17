@@ -121,7 +121,7 @@ navLinks.forEach(link => {
    LOGIN / PROFILE / LOGOUT
 =============================== */
 loginLink?.addEventListener('click', () => {
-  window.location.href = "login.html";
+  window.location.href = '/login';
 });
 
 profileCard?.addEventListener('click', () => {
@@ -189,3 +189,4 @@ onAuthStateChanged(auth, async (user) => {
   if (profileNameEl) profileNameEl.textContent = fullName;
   if (welcomeHeader) welcomeHeader.textContent = `Welcome, ${fullName}`;
 });
+
