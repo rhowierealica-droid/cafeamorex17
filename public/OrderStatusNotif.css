@@ -1,0 +1,131 @@
+/* Bell container */
+#notifBellContainer {
+    position: fixed;
+    top: 20px;
+    right: 20px;
+    z-index: 9999;
+    cursor: pointer;
+    font-size: 26px;
+    color: #333;
+    transition: color 0.2s;
+}
+
+#notifBellContainer:hover {
+    color: #f59e0b;
+}
+
+#notifBellContainer .badge {
+    position: absolute;
+    top: -6px;
+    right: -6px;
+    background: #f59e0b;
+    color: #fff;
+    font-size: 12px;
+    font-weight: bold;
+    padding: 2px 6px;
+    border-radius: 50%;
+    box-shadow: 0 0 2px rgba(0,0,0,0.3);
+}
+
+/* Notification dropdown */
+#notifDropdown {
+    display: none;
+    position: fixed;
+    top: 60px;
+    right: 20px;
+    width: 320px;
+    max-height: 400px;
+    overflow-y: auto;
+    background: #fff;
+    border: 1px solid #ddd;
+    border-radius: 12px;
+    box-shadow: 0 6px 18px rgba(0,0,0,0.2);
+    flex-direction: column;
+    gap: 6px;
+    padding: 8px 0;
+    font-family: Arial, sans-serif;
+    z-index: 9999;
+}
+
+/* Individual notification */
+#notifDropdown .notifItem {
+    padding: 12px 16px;
+    font-size: 14px;
+    border-bottom: 1px solid #eee;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    background: #fefefe;
+    transition: background 0.2s;
+}
+
+#notifDropdown .notifItem:hover {
+    background: #fef3c7; /* soft yellow hover */
+}
+
+#notifDropdown .notifItem:last-child {
+    border-bottom: none;
+}
+
+#notifDropdown .notifItem .notifText {
+    flex: 1;
+    margin-right: 10px;
+    word-break: break-word;
+}
+
+#notifDropdown .notifItem .notifClose {
+    cursor: pointer;
+    font-weight: bold;
+    color: #92400e;
+    font-size: 16px;
+    transition: color 0.2s;
+}
+
+#notifDropdown .notifItem .notifClose:hover {
+    color: #b45309;
+}
+
+/* Toast container */
+#toastContainer {
+    position: fixed;
+    top: 20px;
+    right: 20px;
+    z-index: 99999;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    pointer-events: none; /* allow clicks through container */
+}
+
+/* Toast message */
+.toast {
+    background: #f59e0b;
+    color: #fff;
+    padding: 10px 16px;
+    border-radius: 8px;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+    font-size: 14px;
+    opacity: 0;
+    transform: translateX(100%);
+    transition: opacity 0.3s ease, transform 0.3s ease;
+    pointer-events: auto; /* allow clicks on toast */
+    white-space: pre-wrap; /* wrap long messages */
+}
+
+/* Toast visible state */
+.toast.show {
+    opacity: 1;
+    transform: translateX(0);
+}
+
+/* Optional: add slight slide-down stacking effect for multiple toasts */
+#toastContainer .toast + .toast {
+    margin-top: 8px;
+}
+
+/* Highlight unread notifications */
+#notifDropdown .notifItem.unread {
+    background: #fff4e5; /* soft yellow background for unread */
+    font-weight: bold;   /* optional: make text bold */
+}
+
