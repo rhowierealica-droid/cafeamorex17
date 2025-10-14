@@ -1,650 +1,188 @@
-import { db } from './firebase-config.js';
-import { 
-  collection, getDocs, doc, setDoc, getDoc, deleteDoc, 
-  onSnapshot, query, where
-} from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
-import { getAuth, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
-import { addToCart } from './cart.js';
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Café Amore | Favorites</title>
 
-// ===================================
-// 🔥 CRITICAL CHANGE: Global Inventory Map
-// This must be declared outside any function so loadProductsRealtime can update it, 
-// and openCartPopup can read it.
-// ===================================
-let inventoryMap = {};
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
 
-// ==========================
-// Toast Notification
-// ==========================
-function showToast(message = "Item added!", duration = 2000, type = "success") {
-  let toast = document.querySelector('.toast');
-  if (!toast) {
-    toast = document.createElement('div');
-    toast.className = 'toast';
-    document.body.appendChild(toast);
-    Object.assign(toast.style, {
-      position: 'fixed',
-      bottom: '20px',
-      left: '50%',
-      transform: 'translateX(-50%)',
-      color: '#fff',
-      padding: '12px 20px',
-      borderRadius: '8px',
-      boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
-      fontWeight: '500',
-      zIndex: 9999,
-      opacity: 0,
-      transition: 'opacity 0.3s, transform 0.3s',
-    });
-  }
-  toast.style.backgroundColor = type === "error" ? "#dc2626" : "#16a34a";
-  toast.textContent = message;
-  toast.style.opacity = 1;
-  toast.style.transform = 'translateX(-50%) translateY(0)';
-  setTimeout(() => {
-    toast.style.opacity = 0;
-    toast.style.transform = 'translateX(-50%) translateY(20px)';
-  }, duration);
-}
+  <link rel="stylesheet" href="favorites.css">
+  <link rel="stylesheet" href="OrderStatusNotif.css">
+  <link rel="stylesheet" href="customer-side.css">
+</head>
+<body>
 
-// ==========================
-// DOM Elements
-// ==========================
-const drinksSection = document.querySelector('section.main-section .category-list[data-main="Drink"]')?.parentElement;
-const drinksContainer = document.querySelector('.category-list[data-main="Drink"]');
-const sandwichSection = document.querySelector('section.main-section .category-list[data-main="Sandwich"]')?.parentElement;
-const sandwichContainer = document.querySelector('.category-list[data-main="Sandwich"]');
-const loginPopup = document.getElementById('loginPopup');
-const loginRedirect = document.getElementById('loginRedirect');
-const termsPopup = document.getElementById('termsPopup');
-const profileNameEl = document.querySelector('.profile-name');
-const welcomeHeader = document.querySelector('.main-content header h1');
-
-// ==========================
-// Popup System
-// ==========================
-function openPopup(popupEl) {
-  if (!popupEl) return;
-  popupEl.style.display = 'flex';
-
-  const outsideClickHandler = (e) => {
-    if (e.target === popupEl) closePopup(popupEl);
-  };
-  popupEl.addEventListener('click', outsideClickHandler);
-
-  const closeBtn = popupEl.querySelector('.close, .close-cart, .close-terms, .close-reviews, .close-btn');
-  if (closeBtn) {
-    closeBtn.onclick = () => closePopup(popupEl);
-  }
-
-  popupEl._outsideClickHandler = outsideClickHandler;
-}
-
-function closePopup(popupEl) {
-  if (!popupEl) return;
-  popupEl.style.display = 'none';
-  if (popupEl._outsideClickHandler) {
-    popupEl.removeEventListener('click', popupEl._outsideClickHandler);
-    popupEl._outsideClickHandler = null;
-  }
-}
-
-// Create a simple, temporary cart popup element if it doesn't exist
-const cartPopup = document.createElement('div');
-cartPopup.id = 'cartPopup';
-cartPopup.className = 'popup';
-
-// ==========================
-// Cart Popup (dynamic)
-// ==========================
-cartPopup.innerHTML = `
-  <div class="popup-content cart-popup">
-    <h2 class="product-name"></h2>
-    <p class="product-desc"></p>
-    <div class="sizes-container"></div>
-    <div class="addons-container"></div>
-
-    <div class="quantity-wrapper">
-      <button type="button" class="decrease-qty">−</button>
-      <input type="number" class="quantity-input" value="1" min="1">
-      <button type="button" class="increase-qty">+</button>
+  <div class="top-bar">
+    <div class="hamburger" id="hamburger"><i class="fas fa-bars"></i></div>
+    <div class="mobile-logo">
+      <img src="logo.png" alt="Café Amore Logo">
+      <span class="brand">Café Amore</span>
     </div>
-
-    <button class="confirm-add-cart">Add to Cart</button>
-    <button class="close-cart">Close</button>
   </div>
-`;
-document.body.appendChild(cartPopup);
 
-// Quantity button functionality
-document.addEventListener("click", (e) => {
-  const qtyInput = cartPopup.querySelector(".quantity-input");
-  if (!qtyInput) return;
+  <aside class="sidebar" id="sidebar">
+    <div class="logo">
+      <img src="logo.png" alt="Café Amore Logo">
+      <span class="brand">Café Amore</span>
+    </div>
+    <nav>
+      <ul>
+        <li class="menu-link"><i class="fas fa-utensils"></i> Menu</li>
+        <li class="cart-link"><i class="fas fa-shopping-cart"></i> Cart</li>
+        <li class="order-status-link"><i class="fas fa-truck"></i> Order Status</li>
+        <li class="favorites-link active"><i class="fas fa-heart"></i> Favorites</li>
+      <!-- <li class="history-link"><i class="fas fa-history"></i> History</li> -->
+      </ul>
+    </nav>
+    <div class="login-link"><i class="fas fa-sign-in-alt"></i> Login</div>
+    <div class="profile-card">
+      <div class="profile-avatar"><i class="fas fa-user-circle"></i></div>
+      <div class="profile-info">
+        <p class="profile-name">Customer</p>
+        <p class="edit-text">Edit Profile</p>
+      </div>
+    </div>
+    <div class="logout"><i class="fas fa-sign-out-alt"></i> Log Out</div>
+    <div class="close-btn hidden" id="closeBtn">&times;</div>
+  </aside>
 
-  if (e.target.classList.contains("decrease-qty")) {
-    let val = parseInt(qtyInput.value) || 1;
-    if (val > 1) qtyInput.value = val - 1;
-  }
+  <div id="notifBellContainer">
+    <i class="fas fa-bell"></i>
+    <span class="badge">0</span>
+  </div>
+  <div id="notifDropdown"></div>
 
-  if (e.target.classList.contains("increase-qty")) {
-    let val = parseInt(qtyInput.value) || 1;
-    qtyInput.value = val + 1;
-  }
-});
+  <main class="menu-container">
+    <header>
+      <h1>Your Favorite Items</h1>
+    </header>
 
+    <section class="main-section">
+      <h2>Favorites</h2>
+      
+      <section class="category-section" data-section="Drink">
+        <div class="category-list" data-main="Drink"></div>
+      </section>
 
-// ==========================
-// Load User Name
-// ==========================
-const storedName = localStorage.getItem("currentUserName");
-if (storedName) {
-  if (profileNameEl) profileNameEl.textContent = storedName;
-  if (welcomeHeader) welcomeHeader.textContent = `Welcome, ${storedName}`;
-}
+      <section class="category-section" data-section="Sandwich">
+        <div class="category-list" data-main="Sandwich"></div>
+      </section>
+    </section>
 
-// ==========================
-// Firebase Auth
-// ==========================
-const auth = getAuth();
-let currentUser = null;
-onAuthStateChanged(auth, async (user) => {
-  currentUser = user;
-  if (!user) {
-    // If user logs out, re-run to show login prompt
-    loadProductsRealtime();
-    return;
-  }
-  if (!storedName) {
-    try {
-      const userDoc = await getDoc(doc(db, "users", user.uid));
-      const data = userDoc.exists() ? userDoc.data() : {};
-      const fullName = `${data.firstName || ""} ${data.lastName || ""}`.trim() || "Customer";
-      if (profileNameEl) profileNameEl.textContent = fullName;
-      if (welcomeHeader) welcomeHeader.textContent = `Welcome, ${fullName}`;
-      localStorage.setItem("currentUserName", fullName);
-    } catch (err) {
-      console.error("Error fetching user data:", err);
-    }
-  }
+    <section class="info-section">
+      <div class="about">
+        <h3>About Us</h3>
+        <p><a href="about.html" target="_blank">Learn more about Café Amore</a></p>
+      </div>
+      <div class="terms">
+        <h3>Terms & Conditions</h3>
+        <p><a href="#" id="openTerms">Read our Terms & Conditions</a></p>
+      </div>
+      <div class="follow">
+        <h3>Follow Us</h3>
+        <p>
+          <a href="https://www.facebook.com/cafeamorex17s" target="_blank"><i class="fab fa-facebook-square"></i> Facebook</a><br>
+          <a href="https://www.instagram.com/_cafeamore17s_?igsh=cWJnZTE1ZTNmMnZk" target="_blank"><i class="fab fa-instagram"></i> Instagram</a>
+        </p>
+      </div>
+      <div class="contact">
+        <h3>Contact Us</h3>
+        <p>
+          <a><i class="fas fa-envelope"></i> cafeamorex17s@gmail.com</a><br>
+          <a><i class="fas fa-phone"></i> +63 965 497 1413</a>
+        </p>
+      </div>
+      <hr class="divider">
+      <div class="credits">
+        <span>&copy; 2025 Café Amore Team. All rights reserved.</span>
+      </div>
+    </section>
+  </main>
 
-  // When auth state changes, re-run loader to show favorites for logged-in user
-  loadProductsRealtime();
-});
-loginRedirect?.addEventListener('click', () => window.location.href = 'login.html');
+  <div id="loginPopup" class="popup hidden login-popup">
+    <div class="popup-content">
+      <p>Please login first to continue.</p>
+      <button id="loginRedirect" class="login-btn">Go to Login</button>
+      <button class="close-btn">Close</button>
+    </div>
+  </div>
 
-// ==========================
-// Stock Calculation (FIXED)
-// ==========================
-function calculateProductStock(product, inventoryMap) {
-  let stockPerSize = [];
-  if (product.sizes?.length) {
-    for (const size of product.sizes) {
-      let possible = Infinity;
+  <div id="cartPopup" class="popup hidden">
+    <div class="popup-content cart-popup">
+      <h2 class="product-name">Product Name</h2>
+      <p class="product-desc">Description goes here</p>
+      <div class="sizes-container"></div>
+      <div class="addons-container"></div>
 
-      const sizeItem = inventoryMap[size.id];
-      if (sizeItem) {
-        const maxFromSize = Math.floor(sizeItem.quantity / (size.qty || 1));
-        possible = Math.min(possible, maxFromSize);
-      }
+      <!-- Fixed Quantity Layout -->
+      <div class="quantity-wrapper">
+        <button class="decrease-qty">-</button>
+        <input type="number" class="quantity-input" value="1" min="1">
+        <button class="increase-qty">+</button>
+      </div>
 
-      if (size.ingredients?.length) {
-        for (const ing of size.ingredients) {
-          const invItem = inventoryMap[ing.id];
-          if (invItem) {
-            const maxFromIng = Math.floor(invItem.quantity / (ing.qty || 1));
-            possible = Math.min(possible, maxFromIng);
-          }
-        }
-      }
+      <button class="confirm-add-cart">Add to Cart</button>
+      <button class="close-cart">Close</button>
+    </div>
+  </div>
 
-      if (size.others?.length) {
-        for (const other of size.others) {
-          const invItem = inventoryMap[other.id];
-          if (invItem) {
-            const maxFromOther = Math.floor(invItem.quantity / (other.qty || 1));
-            possible = Math.min(possible, maxFromOther);
-          }
-        }
-      }
+  <div id="reviewsPopup" class="popup hidden">
+    <div class="popup-content reviews-popup">
+      <button class="close-btn">&times;</button>
+      <h2>Product Reviews</h2>
+      <div class="reviews-container"></div>
+    </div>
+  </div>
 
-      if (size.addons?.length) {
-        for (const addon of size.addons) {
-          const invItem = inventoryMap[addon.id];
-          if (invItem && (addon.qty || 0) > 0) {
-            const maxFromAddon = Math.floor(invItem.quantity / (addon.qty || 1));
-            possible = Math.min(possible, maxFromAddon);
-          }
-        }
-      }
+  <div id="termsPopup" class="popup hidden">
+    <div class="popup-content">
+      <h3>Terms and Conditions</h3>
+      <div class="terms-body"></div>
+      <button class="close-terms">Close</button>
+    </div>
+  </div>
 
-      stockPerSize.push({ ...size, stock: possible === Infinity ? 0 : possible });
-    }
-  }
-  return stockPerSize;
-}
+  <script type="module" src="favorites.js"></script>
+  <script type="module" src="customer-side.js"></script>
+  <script type="module" src="OrderStatusNotif.js"></script>
 
-function loadProductsRealtime() {
-  if (!drinksContainer && !sandwichContainer) return;
+  <script>
+    // Terms popup script
+    const openTermsBtn = document.getElementById('openTerms');
+    const termsPopup = document.getElementById('termsPopup');
+    const closeTermsBtn = termsPopup.querySelector('.close-terms');
 
-  if (!currentUser) {
-    if (drinksContainer) drinksContainer.innerHTML = `<p style="padding:12px;"></p>`;
-    if (sandwichContainer) sandwichContainer.innerHTML = "";
-    return;
-  }
-
-  // 1. Listen to Inventory in real-time
-  onSnapshot(collection(db, "Inventory"), inventorySnapshot => {
-    inventoryMap = {};
-    inventorySnapshot.forEach(docSnap => {
-      inventoryMap[docSnap.id] = { id: docSnap.id, ...docSnap.data() };
+    openTermsBtn.addEventListener('click', e => {
+      e.preventDefault();
+      termsPopup.style.display = 'flex';
     });
 
-    // 2. Listen to Favorites in real-time
-    const favQuery = query(collection(db, "favorites"), where("userId", "==", currentUser.uid));
-    onSnapshot(favQuery, async favSnapshot => {
-      const favoriteProductIds = favSnapshot.docs.map(d => d.data().productId);
-      if (!favoriteProductIds.length) return renderProducts([]);
+    closeTermsBtn.addEventListener('click', () => {
+      termsPopup.style.display = 'none';
+    });
 
-      // 3. Listen to Products in real-time
-      const productsQuery = query(collection(db, "products"));
-      onSnapshot(productsQuery, productSnapshot => {
-        const products = productSnapshot.docs
-          .map(doc => ({ id: doc.id, ...doc.data() }))
-          .filter(p => favoriteProductIds.includes(p.id));
+    termsPopup.addEventListener('click', e => {
+      if (e.target === termsPopup) {
+        termsPopup.style.display = 'none';
+      }
+    });
 
-        // Render products with latest inventory and availability
-        renderProducts(products, favoriteProductIds);
+    // Reviews popup close script
+    const reviewsPopup = document.getElementById('reviewsPopup');
+    const closeReviewsBtn = reviewsPopup.querySelector('.close-btn');
+
+    if (closeReviewsBtn) {
+      closeReviewsBtn.addEventListener('click', () => {
+        reviewsPopup.style.display = 'none';
       });
+    }
+
+    reviewsPopup.addEventListener('click', e => {
+      if (e.target === reviewsPopup) {
+        reviewsPopup.style.display = 'none';
+      }
     });
-  });
-}
-
-
-// ==========================
-// Product Rendering Logic (Centralized)
-// ==========================
-function renderProducts(products, favoriteProductIds = []) {
-  drinksContainer.innerHTML = "";
-  sandwichContainer.innerHTML = "";
-
-  // Display no favorites message if the list is empty
-  if (!products.length && currentUser) {
-    if (drinksContainer) drinksContainer.innerHTML = `<p style="padding:12px;">You have no favorite products yet.</p>`;
-    return;
-  }
-
-  const grouped = {};
-  for (const product of products) {
-    const mainCategory = ["Ice Espresso", "Non-Coffee", "Iced Cold Brew", "Hot Coffee"].includes(product.category)
-      ? "Drink" : "Sandwich";
-    const subCategory = product.category || "Others";
-    if (!grouped[mainCategory]) grouped[mainCategory] = {};
-    if (!grouped[mainCategory][subCategory]) grouped[mainCategory][subCategory] = [];
-    grouped[mainCategory][subCategory].push(product);
-  }
-
-  const mainCats = [
-    { name: "Drink", container: drinksContainer, section: drinksSection },
-    { name: "Sandwich", container: sandwichContainer, section: sandwichSection }
-  ];
-
-  mainCats.forEach(({ name, container, section }) => {
-    container.innerHTML = "";
-    let mainCatHasProducts = false;
-
-    if (grouped[name]) {
-      for (const subCat in grouped[name]) {
-        const productsArray = grouped[name][subCat];
-        if (!productsArray.length) continue;
-
-        mainCatHasProducts = true;
-        const subCatSection = document.createElement('div');
-        subCatSection.className = 'subcategory-section';
-        subCatSection.innerHTML = `<h3 class="subcategory-title">${subCat}</h3>`;
-
-        const horizontalContainer = document.createElement('div');
-        horizontalContainer.className = 'subcategory-products';
-        horizontalContainer.style.display = 'flex';
-        horizontalContainer.style.flexWrap = 'wrap';
-        horizontalContainer.style.gap = '15px';
-        subCatSection.appendChild(horizontalContainer);
-        container.appendChild(subCatSection);
-
-        for (const product of productsArray) {
-          const stockInfo = calculateProductStock(product, inventoryMap);
-          const card = document.createElement('div');
-          card.classList.add('product-card');
-
-          let displayPrice = product.price || 0;
-          if (stockInfo.length) displayPrice = Math.min(...stockInfo.map(s => s.price || Infinity));
-          const isUnavailable = !product.available || stockInfo.every(s => s.stock <= 0);
-          if (isUnavailable) card.classList.add('unavailable');
-
-          const imgHTML = product.image ? `<img src="${product.image}" alt="${product.name}" style="width:100%; border-radius:10px; margin-bottom:10px; margin-top:20px;">` : '';
-
-          card.innerHTML = `
-            ${imgHTML}
-            <h3>${product.name || 'Unnamed Product'}</h3>
-            ${product.description ? `<p class="product-desc-card">${product.description}</p>` : ''}
-            <p>₱${displayPrice.toFixed(2)}</p>
-            ${!isUnavailable ? `<button class="add-cart-btn">Add to Cart</button>` : ''}
-          `;
-
-          const starsContainer = document.createElement('div');
-          starsContainer.className = 'stars-outer';
-          const starsInner = document.createElement('div');
-          starsInner.className = 'stars-inner';
-          starsContainer.appendChild(starsInner);
-          const ratingNumber = document.createElement('span');
-          ratingNumber.className = 'rating-number';
-          card.appendChild(starsContainer);
-          card.appendChild(ratingNumber);
-
-          // ASYNC FUNCTION WRAPPED IN A SELF-EXECUTING FUNCTION TO HANDLE RATING FETCH
-          (async () => {
-            // You should consider moving this data aggregation to a cloud function or pre-calculating it
-            // for performance, but keeping it here for continuity.
-            const orderSnapshot = await getDocs(collection(db, "DeliveryOrders"));
-            let totalRating = 0, count = 0;
-            orderSnapshot.forEach(docSnap => {
-              const order = docSnap.data();
-              order.items?.forEach((item, index) => {
-                if (item.product === product.name && order.feedbackRating?.[index] != null) {
-                  totalRating += order.feedbackRating[index];
-                  count++;
-                }
-              });
-            });
-            let avgRating = count ? totalRating / count : 0;
-            starsInner.style.width = `${(avgRating / 5) * 100}%`;
-            ratingNumber.textContent = count ? `(${avgRating.toFixed(1)})` : '';
-          })();
-
-          horizontalContainer.appendChild(card);
-
-          const addBtn = card.querySelector('.add-cart-btn');
-          if (!isUnavailable && addBtn) {
-            addBtn.addEventListener('click', () => {
-              if (!currentUser) { openPopup(loginPopup); return; }
-              openCartPopup(product, stockInfo);
-            });
-          }
-
-          // Favorite Icon Logic
-          const favIcon = document.createElement('i');
-          // On the favorites page, the heart is always solid.
-          favIcon.className = 'fa-solid fa-heart favorite-icon favorited';
-          card.appendChild(favIcon);
-
-          // Clicking unfavorites it
-          favIcon.addEventListener('click', async () => {
-            if (!currentUser) { openPopup(loginPopup); return; }
-            const favRef = doc(db, "favorites", `${currentUser.uid}_${product.id}`);
-            try {
-              await deleteDoc(favRef);
-              showToast(`${product.name} removed from favorites`, 1500, "error");
-              // *** CRITICAL UPDATE: Instead of card.remove(), let the onSnapshot listener re-render ***
-              // The onSnapshot listener on the 'favorites' collection handles the UI update automatically
-              // which avoids race conditions when multiple unfavorites occur or if inventory changes.
-            } catch (err) { console.error("Error removing favorite:", err); }
-          });
-
-          const reviewBtn = document.createElement('button');
-          reviewBtn.textContent = "Reviews";
-          reviewBtn.className = "reviews-btn";
-          card.appendChild(reviewBtn);
-
-          reviewBtn.addEventListener('click', async () => {
-            const orderSnapshot = await getDocs(collection(db, "DeliveryOrders"));
-            const feedbacks = [];
-            orderSnapshot.forEach(docSnap => {
-              const order = docSnap.data();
-              order.items?.forEach((item, index) => {
-                if (item.product === product.name && order.feedback?.[index]) {
-                  feedbacks.push({ text: order.feedback[index], customerEmail: order.customerName || "" });
-                }
-              });
-            });
-            showReviewsPopup(product.name, feedbacks);
-          });
-        }
-      }
-    }
-
-    if (section) section.style.display = mainCatHasProducts ? '' : 'none';
-  });
-}
-
-// ==========================
-// Cart Popup (UPDATED WITH FIXED ADD-ONS)
-// ==========================
-function openCartPopup(product, stockInfo = []) {
-  openPopup(cartPopup);
-  cartPopup.querySelector('.product-name').textContent = product.name || 'Unnamed Product';
-  cartPopup.querySelector('.product-desc').textContent = product.description || '';
-
-  const sizesContainer = cartPopup.querySelector('.sizes-container');
-  sizesContainer.innerHTML = '';
-  let selectedSize = null;
-  let selectedAddons = []; // Reset selected addons when popup opens
-
-  if (Array.isArray(stockInfo) && stockInfo.length) {
-    const heading = document.createElement('p'); heading.textContent = 'Sizes:'; sizesContainer.appendChild(heading);
-    
-    const updateMaxQty = (size) => {
-      const quantityInput = cartPopup.querySelector('.quantity-input');
-      const maxStock = size ? size.stock : 1;
-      quantityInput.max = maxStock;
-      if (parseInt(quantityInput.value) > maxStock) {
-        quantityInput.value = maxStock > 0 ? maxStock : 1;
-      }
-      if (maxStock <= 0) {
-        cartPopup.querySelector('.confirm-add-cart').disabled = true;
-      } else {
-        cartPopup.querySelector('.confirm-add-cart').disabled = false;
-      }
-    };
-
-    stockInfo.forEach(size => {
-      const label = document.createElement('label'); label.classList.add('size-btn');
-      const availableQty = size.stock || 0;
-      
-      label.textContent = `${size.name} - ₱${(size.price || 0).toFixed(2)} (Stock: ${availableQty})`;
-      
-      const input = document.createElement('input'); input.type = 'radio'; input.name = 'size';
-      
-      if (availableQty <= 0) { 
-        input.disabled = true; 
-        label.classList.add('unavailable'); 
-      }
-      else if (!selectedSize) { 
-        input.checked = true; 
-        label.classList.add('selected'); 
-        selectedSize = { ...size }; 
-        updateMaxQty(selectedSize);
-      }
-      
-      input.addEventListener('change', () => {
-        sizesContainer.querySelectorAll('label').forEach(l => l.classList.remove('selected'));
-        label.classList.add('selected'); 
-        selectedSize = { ...size };
-        updateMaxQty(selectedSize);
-
-        // Reload add-ons for the newly selected size
-        loadAddons(selectedSize);
-      });
-      
-      label.prepend(input); 
-      sizesContainer.appendChild(label);
-    });
-  }
-
-  const addonsContainer = cartPopup.querySelector('.addons-container');
-  
-  function loadAddons(size) {
-    addonsContainer.innerHTML = '';
-    selectedAddons = []; // Clear selected addons on size change
-    if (!size?.addons?.length) return;
-    const heading = document.createElement('p'); heading.textContent = 'Add-ons:'; addonsContainer.appendChild(heading);
-
-    size.addons.forEach(addon => {
-      const inventoryItem = inventoryMap[addon.id];
-      const stock = inventoryItem ? Math.floor(inventoryItem.quantity / (addon.qty || 1)) : 0;
-      
-      const label = document.createElement('label'); 
-      label.classList.add('addon-btn'); 
-      label.textContent = `${addon.name} - ₱${(addon.price || 0).toFixed(2)} (Stock: ${stock})`;
-      
-      const input = document.createElement('input'); 
-      input.type = 'checkbox';
-      
-      const isOutOfStock = stock <= 0;
-      
-      if (isOutOfStock) { 
-        input.disabled = true; 
-        label.classList.add('unavailable'); 
-      }
-      
-      input.addEventListener('change', () => {
-        if (input.checked) {
-          if (!isOutOfStock) {
-            selectedAddons.push(addon);
-          } else {
-            input.checked = false;
-            showToast(`${addon.name} is out of stock!`, 2000, "error");
-          }
-        }
-        else selectedAddons = selectedAddons.filter(a => a.id !== addon.id);
-      });
-      
-      label.prepend(input); 
-      addonsContainer.appendChild(label);
-    });
-  }
-
-  // Initial load for add-ons
-  if (selectedSize) loadAddons(selectedSize);
-
-  const quantityInput = cartPopup.querySelector('.quantity-input');
-  quantityInput.value = 1; 
-  quantityInput.min = 1; 
-  
-  if (!selectedSize) {
-    quantityInput.max = 1;
-    cartPopup.querySelector('.confirm-add-cart').disabled = true;
-  }
-
-  const confirmBtn = cartPopup.querySelector('.confirm-add-cart');
-  confirmBtn.onclick = () => {
-    const quantity = parseInt(quantityInput.value) || 1;
-    
-    if (!selectedSize) { showToast("Please select a size first!", 2000, "error"); return; }
-    if (quantity <= 0) { showToast("Quantity must be greater than 0!", 2000, "error"); return; }
-    if (quantity > selectedSize.stock) { showToast(`Only ${selectedSize.stock} left in stock for the selected size!`, 2000, "error"); return; }
-    
-    for (const addon of selectedAddons) {
-      const inventoryItem = inventoryMap[addon.id];
-      const requiredStock = (addon.qty || 1) * quantity;
-      if (!inventoryItem || inventoryItem.quantity < requiredStock) {
-        showToast(`Not enough stock for the selected quantity of ${addon.name}!`, 2000, "error");
-        return;
-      }
-    }
-
-    const sizeToPass = { id: selectedSize.id, name: selectedSize.name, price: Number(selectedSize.price || 0) };
-    addToCart(product, sizeToPass, selectedAddons, quantity);
-    closePopup(cartPopup);
-    showToast(`${product.name} added to cart!`, 2000, "success");
-  };
-}
-
-// ==========================
-// Reviews Popup (modern)
-// ==========================
-function showReviewsPopup(productName, feedbacks) {
-  const popup = document.createElement('div'); 
-  popup.className = 'popup reviews-popup'; 
-  popup.style.display = 'flex';
-  Object.assign(popup.style, { justifyContent: 'center', alignItems: 'center' });
-
-  const popupContent = document.createElement('div'); 
-  popupContent.className = 'popup-content';
-  Object.assign(popupContent.style, {
-    position: 'relative',
-    backgroundColor: '#fff',
-    padding: '20px',
-    borderRadius: '10px',
-    maxWidth: '400px',
-    width: '90%',
-    maxHeight: '80vh',
-    overflowY: 'auto',
-    boxShadow: '0 8px 20px rgba(0,0,0,0.2)'
-  });
-
-  const closeBtn = document.createElement('button');
-  closeBtn.className = 'close-reviews';
-  closeBtn.innerHTML = '&times;';
-  Object.assign(closeBtn.style, { position: 'absolute', top: '10px', right: '10px', background: 'none', border: 'none', fontSize: '24px', cursor: 'pointer', color: '#333' });
-  closeBtn.onclick = () => popup.remove();
-
-  const title = document.createElement('h3'); 
-  title.textContent = `Reviews for ${productName}`;
-  title.style.marginTop = '0';
-  title.style.marginBottom = '15px';
-
-  const list = document.createElement('div'); 
-  list.className = 'feedback-list';
-  list.style.display = 'flex';
-  list.style.flexDirection = 'column';
-  list.style.gap = '10px';
-
-  if (feedbacks.length) {
-    feedbacks.forEach(f => {
-      let emailMasked = f.customerEmail;
-      if (emailMasked) { 
-        const [name, domain] = emailMasked.split('@'); 
-        emailMasked = `${name.slice(0,3)}****@${domain}`; 
-      }
-      const p = document.createElement('p'); 
-      p.textContent = `${emailMasked}: ${f.text}`; 
-      list.appendChild(p);
-    });
-  } else {
-    const p = document.createElement('p');
-    p.textContent = "No reviews yet.";
-    list.appendChild(p);
-  }
-
-  popupContent.append(closeBtn, title, list); 
-  popup.appendChild(popupContent); 
-  document.body.appendChild(popup);
-
-  popup.addEventListener('click', e => { 
-    if (e.target === popup) popup.remove(); 
-  });
-}
-
-// ==========================
-// Terms Popup
-// ==========================
-if (termsPopup) {
-  const closeTerms = termsPopup.querySelector('.close-terms');
-  if (closeTerms) closeTerms.addEventListener('click', () => closePopup(termsPopup));
-}
-
-// ==========================
-// Stars CSS
-// ==========================
-const style = document.createElement('style');
-style.textContent = `
-.stars-outer { position: relative; display: inline-block; color: #ccc; font-size: 16px; font-family: Arial, sans-serif; }
-.stars-inner { position: absolute; top: 0; left: 0; white-space: nowrap; overflow: hidden; color: gold; }
-.stars-outer::before, .stars-inner::before { content: "★★★★★"; }
-.rating-number { margin-left: 5px; font-weight: 500; color: #333; font-size: 14px; }
-`;
-document.head.appendChild(style);
-
-// ==========================
-// INIT
-// ==========================
-loadProductsRealtime();
+  </script>
+</body>
+</html>
