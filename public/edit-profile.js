@@ -10,7 +10,8 @@ import {
     query,
     where,
     getDocs,
-    deleteDoc
+    deleteDoc,
+    setDoc
 } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 import {
     updatePassword,
@@ -88,7 +89,7 @@ if (!addressSavedListEl) {
     }
 }
 
-// Address Edit Container
+// Address Edit Container (The form container)
 const addressEditContainer = document.getElementById("addressEditContainer");
 
 // Edit/Field Containers
@@ -107,6 +108,7 @@ const otpCode = document.getElementById("otpCode");
 const otpError = document.getElementById("otpError");
 const verifyOtpBtn = document.getElementById("verifyOtpBtn");
 const closeOtpBtn = document.getElementById("closeOtpBtn");
+const recaptchaContainer = document.getElementById('recaptcha-container');
 
 // Recaptcha
 let recaptchaVerifierInitialized = false;
@@ -128,6 +130,9 @@ function clearOtpError() {
 if (closeOtpBtn) {
     closeOtpBtn.addEventListener('click', () => {
         otpPopup.style.display = 'none';
+        // Reset phone number fields on OTP cancel
+        if (newPhoneInput) newPhoneInput.value = "";
+        if (currentPhonePasswordInput) currentPhonePasswordInput.value = "";
     });
 }
 
@@ -184,18 +189,18 @@ async function loadUserData() {
         phoneInput.value = maskPhone(data.phoneNumber || "");
 
         if (currentEmailInput) currentEmailInput.value = user.email || data.email || "";
-        if (currentPhoneInput) currentPhoneInput.value = data.phoneNumber || "";
+        if (currentPhoneInput) currentPhoneInput.value = maskPhone(data.phoneNumber || ""); // Keep this masked on load for security
 
         // Address form fields
         barangayInput.value = data.barangay || "";
         houseNumberInput.value = data.houseNumber || "";
-        regionInput.value = data.region || "South Luzon"; 
+        regionInput.value = data.region || "South Luzon";
         provinceInput.value = data.province || "Cavite";
         cityInput.value = data.city || "Bacoor";
 
-        // Initial state: Default address fields are DISABLED (read-only)
-        barangayInput.disabled = true; // FIX: Start disabled
-        houseNumberInput.disabled = true; // FIX: Start disabled
+        // Initial state: All address fields are DISABLED (read-only)
+        barangayInput.disabled = true; 
+        houseNumberInput.disabled = true; 
         regionInput.disabled = true;
         provinceInput.disabled = true;
         cityInput.disabled = true;
@@ -232,9 +237,23 @@ function setupEditSaveCancel(editBtnId, saveBtnId, cancelBtnId, inputs, formId, 
             inputs.forEach(i => i.disabled = false);
         } else {
             // Address Form (Default Address Edit)
-            const addressInputs = [barangayInput, houseNumberInput];
+            // 1. Set ID to default and store original values for *all* fields (for reset)
+            editingAddressIdInput.value = 'default';
+            const addressInputs = [houseNumberInput, barangayInput, regionInput, provinceInput, cityInput];
             addressInputs.forEach(i => originalValues[i.id] = i.value);
-            addressInputs.forEach(i => i.disabled = false);
+            
+            // 2. ENABLE only editable fields (houseNumber and barangay)
+            houseNumberInput.disabled = false;
+            barangayInput.disabled = false;
+            houseNumberInput.removeAttribute('disabled');
+            barangayInput.removeAttribute('disabled');
+            // The rest are deliberately disabled (fixed location)
+            regionInput.disabled = true;
+            provinceInput.disabled = true;
+            cityInput.disabled = true;
+
+            // Ensure address form container is visible in its default location
+            if (addressEditContainer) addressEditContainer.style.display = 'block';
         }
 
         editBtn.style.display = "none";
@@ -244,95 +263,101 @@ function setupEditSaveCancel(editBtnId, saveBtnId, cancelBtnId, inputs, formId, 
 
         // Ensure address edit container is hidden if it was open for a saved address
         if (formId === "addressForm" && addressEditContainer) {
-            addressEditContainer.style.display = 'none';
+            // When clicking Edit Default, the container should be in the main tab and visible
+            if (editingAddressIdInput.value === 'default') {
+                if (addressEditContainer.parentNode !== document.getElementById("addressTab")) {
+                    document.getElementById("addressTab").appendChild(addressEditContainer);
+                }
+                addressEditContainer.style.display = 'block';
+            }
             document.querySelectorAll('.address-card.active-edit').forEach(card => card.classList.remove('active-edit'));
         }
     });
 
     cancelBtn.addEventListener("click", () => {
+        // Reset form fields to original values
         if (formId !== "addressForm") {
             // Standard forms (Name, Email, Password, Phone)
             inputs.forEach(i => i.value = originalValues[i.id]);
             inputs.forEach(i => i.disabled = true);
+            // Special case for email/phone: reset current inputs to display only
+            if (formId === "emailForm") {
+                 emailInput.value = maskEmail(auth.currentUser.email);
+            }
+            if (formId === "phoneForm") {
+                 loadUserData(); // Reload to get masked number
+            }
         } else {
             // Address Form (Used for Default and Saved Addresses)
-            
-            // Check if we are canceling the main address form's edit (the default address)
-            if (editBtn.style.display === "none") {
-                 // If the main edit button is hidden, it means the main form is in edit mode
-                const addressInputs = [barangayInput, houseNumberInput];
-                addressInputs.forEach(i => {
-                    if (originalValues[i.id] !== undefined) {
-                        i.value = originalValues[i.id];
-                    }
-                    i.disabled = true; // FIX: Disable fields when canceling default address edit
-                });
-            } else {
-                // This branch handles cancelling an IN-CARD saved address edit
-                const addressInputs = [barangayInput, houseNumberInput, regionInput, provinceInput, cityInput];
-                addressInputs.forEach(i => {
-                    if (currentAddressOriginalValues[i.id] !== undefined) {
-                        i.value = currentAddressOriginalValues[i.id];
-                    }
-                    i.disabled = true; // Disable fields when cancelling saved address edit
-                });
-            }
-            // These are always disabled
+            // Determine the source of original values
+            const sourceValues = editingAddressIdInput.value === 'default' ? originalValues : currentAddressOriginalValues;
+
+            const addressInputs = [houseNumberInput, barangayInput, regionInput, provinceInput, cityInput];
+
+            // 1. Reset fields to original values
+            addressInputs.forEach(i => {
+                // Use the stored original value for reset
+                if (sourceValues[i.id] !== undefined) {
+                    i.value = sourceValues[i.id];
+                }
+                i.disabled = true; // Always disable on cancel
+            });
+            editingAddressIdInput.value = ''; // Clear address ID
+
+            // 2. Ensure non-editable fields remain disabled (redundant but safe)
             regionInput.disabled = true;
             provinceInput.disabled = true;
             cityInput.disabled = true;
 
-            // Reset buttons if canceling the default address edit
-            if (editBtn.style.display === "none") {
-                editBtn.style.display = "inline-block";
-                saveBtn.style.display = "none";
-                cancelBtn.style.display = "none";
+            // 3. Move the address form container back to the main tab and hide it
+            if (addressEditContainer) {
+                document.getElementById("addressTab").appendChild(addressEditContainer);
+                addressEditContainer.style.display = 'none';
+                document.querySelectorAll('.address-card.active-edit').forEach(card => card.classList.remove('active-edit'));
             }
         }
-        
-        // Reset button visibility if this is not the address form (standard behavior)
-        if (formId !== "addressForm" || (formId === "addressForm" && editBtn.style.display === "none")) {
-            editBtn.style.display = "inline-block";
-            saveBtn.style.display = "none";
-            cancelBtn.style.display = "none";
-        }
 
+        // Reset button visibility for the form associated with these buttons
+        editBtn.style.display = "inline-block";
+        saveBtn.style.display = "none";
+        cancelBtn.style.display = "none";
 
         if (onCancelExtra) onCancelExtra();
-
-        // Handle address edit container reset for saved addresses
-        if (formId === "addressForm" && addressEditContainer && addressSavedListEl) {
-            document.getElementById("addressTab").appendChild(addressEditContainer);
-            addressEditContainer.style.display = 'none';
-            document.querySelectorAll('.address-card.active-edit').forEach(card => card.classList.remove('active-edit'));
-        }
     });
 
     form.addEventListener("submit", async (e) => {
         e.preventDefault();
         try {
             await onSave();
+            
+            // Re-load data after successful save
             await loadUserData();
 
+            // Reset field states after successful save
             if (formId !== "addressForm") {
                 inputs.forEach(i => i.disabled = true);
             } else {
-                // Disable address fields after save
+                // Address: Disable all fields and hide inline container if it was active
                 barangayInput.disabled = true;
                 houseNumberInput.disabled = true;
+                regionInput.disabled = true;
+                provinceInput.disabled = true;
+                cityInput.disabled = true;
+
+                if (addressEditContainer) {
+                    // Move the container back to the main tab and hide it
+                    document.getElementById("addressTab").appendChild(addressEditContainer);
+                    addressEditContainer.style.display = 'none';
+                    document.querySelectorAll('.address-card.active-edit').forEach(card => card.classList.remove('active-edit'));
+                }
             }
-            
+
+            // Reset button visibility
             editBtn.style.display = "inline-block";
             saveBtn.style.display = "none";
             cancelBtn.style.display = "none";
             if (onCancelExtra) onCancelExtra();
 
-            // Handle address edit container reset for saved addresses
-            if (formId === "addressForm" && addressEditContainer && addressSavedListEl) {
-                document.getElementById("addressTab").appendChild(addressEditContainer);
-                addressEditContainer.style.display = 'none';
-                document.querySelectorAll('.address-card.active-edit').forEach(card => card.classList.remove('active-edit'));
-            }
         } catch (err) {
             if (!err.message.includes("Failed to send OTP")) {
                 alert("Error: " + err.message);
@@ -400,7 +425,7 @@ function showReLoginPopup(message) {
 }
 
 // ===================================
-// Information Tab Logic (No Change)
+// Information Tab Logic
 // ===================================
 
 // --- Section 1: Name ---
@@ -426,6 +451,7 @@ setupEditSaveCancel(
         alert("Name updated successfully!");
     }
 );
+
 // --- Section 2: Email ---
 setupEditSaveCancel(
     "editEmailBtn",
@@ -438,8 +464,9 @@ setupEditSaveCancel(
         if (!user) throw new Error("No account detected.");
         if (!currentEmailInput.value || !newEmailInput.value || !currentPasswordInput.value)
             throw new Error("All fields are required");
-        if (currentEmailInput.value !== user.email)
-            throw new Error("Current email does not match account email.");
+        // User.email is the source of truth for current email
+        if (currentEmailInput.value !== user.email) 
+            throw new Error("Current email does not match account email. Please cancel and try again.");
 
         await reload(user);
         const credential = EmailAuthProvider.credential(user.email, currentPasswordInput.value);
@@ -481,7 +508,7 @@ setupEditSaveCancel(
         if (!currentPasswordForChange.value || !passwordInput.value || !confirmPasswordInput.value)
             throw new Error("All fields are required");
         if (passwordInput.value !== confirmPasswordInput.value)
-            throw new Error("Passwords do not match");
+            throw new Error("New passwords do not match");
 
         const credential = EmailAuthProvider.credential(user.email, currentPasswordForChange.value);
         await reauthenticateWithCredential(user, credential);
@@ -518,17 +545,22 @@ setupEditSaveCancel(
         if (!docSnap.exists()) throw new Error("User data not found.");
         const data = docSnap.data();
 
-        if (currentPhoneInput.value !== data.phoneNumber)
-            throw new Error("Current phone does not match saved number.");
-
+        // Check if the masked current phone matches the masked saved phone
+        if (currentPhoneInput.value !== maskPhone(data.phoneNumber))
+             throw new Error("Current phone does not match saved number. Please cancel and try again.");
+        
+        // Re-authenticate using email/password
         const credential = EmailAuthProvider.credential(user.email, currentPhonePasswordInput.value);
         await reauthenticateWithCredential(user, credential);
 
         let newPhoneNumber = newPhoneInput.value.trim();
+        // Format to E.164 (e.g., +639XXXXXXXXX) for Firebase
         if (newPhoneNumber.startsWith("09")) newPhoneNumber = "+63" + newPhoneNumber.slice(1);
         else if (!newPhoneNumber.startsWith("+63")) newPhoneNumber = "+63" + newPhoneNumber.replace(/[^0-9]/g, "").slice(-10);
 
         if (!recaptchaVerifierInitialized) {
+            // Check if the reCAPTCHA container is available
+            if (!recaptchaContainer) throw new Error("reCAPTCHA container not found.");
             window.recaptchaVerifier = new RecaptchaVerifier(auth, 'recaptcha-container', { size: 'invisible' });
             recaptchaVerifierInitialized = true;
         }
@@ -537,27 +569,41 @@ setupEditSaveCancel(
             const confirmationResult = await signInWithPhoneNumber(auth, newPhoneNumber, window.recaptchaVerifier);
             otpPopup.style.display = "flex";
             clearOtpError();
+            
+            // Wait for OTP verification
+            return new Promise((resolve, reject) => {
+                const handleVerify = async () => {
+                    verifyOtpBtn.removeEventListener('click', handleVerify); // Prevent multiple handlers
 
-            verifyOtpBtn.onclick = async () => {
-                const otp = otpCode.value.trim();
-                if (!otp) return showOtpError("Please enter the OTP.");
-                try {
-                    await confirmationResult.confirm(otp);
-                    await updateDoc(docRef, { phoneNumber: newPhoneNumber });
-                    showReLoginPopup("Phone number updated successfully! Please login again.");
-                } catch {
-                    showOtpError("Wrong OTP. Please try again.");
-                }
-            };
+                    const otp = otpCode.value.trim();
+                    if (!otp) {
+                        verifyOtpBtn.addEventListener('click', handleVerify); // Re-attach on error
+                        return showOtpError("Please enter the OTP.");
+                    }
+                    try {
+                        await confirmationResult.confirm(otp);
+                        await updateDoc(docRef, { phoneNumber: newPhoneNumber });
+                        otpPopup.style.display = "none";
+                        showReLoginPopup("Phone number updated successfully! Please login again.");
+                        resolve(); // Resolve the main promise on success
+                    } catch (e) {
+                        console.error("OTP confirmation error:", e);
+                        showOtpError("Wrong OTP. Please try again.");
+                        verifyOtpBtn.addEventListener('click', handleVerify); // Re-attach on error
+                    }
+                };
+
+                verifyOtpBtn.addEventListener('click', handleVerify);
+            });
         } catch (err) {
             console.error("OTP send error:", err);
-            throw new Error("Failed to send OTP. Check phone number format.");
+            // Handle reCAPTCHA not solved error more gracefully if needed
+            throw new Error("Failed to send OTP. Check phone number format or reCAPTCHA setup.");
         }
     },
     () => {
         if (phoneEditFields) phoneEditFields.style.display = "block";
         if (phoneInput) phoneInput.disabled = true;
-        if (currentPhoneInput) currentPhoneInput.value = currentPhoneInput.value;
     },
     () => {
         if (phoneEditFields) phoneEditFields.style.display = "none";
@@ -567,73 +613,33 @@ setupEditSaveCancel(
     }
 );
 
+
 // ===================================
-// Address Tab Logic (UPDATED FOR INLINE POPUP) 🚀
+// Address Tab Logic
 // ===================================
-setupEditSaveCancel(
-    "editAddressBtn",
-    "saveAddressBtn",
-    "cancelAddressBtn",
-    [barangayInput, houseNumberInput, regionInput, provinceInput, cityInput, editingAddressIdInput],
-    "addressForm",
-    async () => {
-        const user = auth.currentUser;
-        if (!user) throw new Error("No account detected.");
 
-        const addressData = {
-            barangay: barangayInput.value,
-            houseNumber: houseNumberInput.value,
-            region: regionInput.value,
-            province: provinceInput.value,
-            city: cityInput.value,
-        };
-
-        const addressId = editingAddressIdInput.value;
-
-        if (addressId === 'default') {
-            await updateDoc(doc(db, "users", user.uid), addressData);
-            alert("Default Address updated successfully! (Barangay/House Number changed)");
-            // Ensure address form fields are disabled after save
-            barangayInput.disabled = true;
-            houseNumberInput.disabled = true;
-        } else {
-            await updateDoc(doc(db, "users", user.uid, "addresses", addressId), addressData);
-            alert("Saved Address updated successfully! (Barangay/House Number changed)");
-            // These fields are managed by the in-card edit/cancel/save, no need to manually disable here
-            // as loadAddressesIntoAddressTab will be called.
-        }
-
-        await loadAddressesIntoAddressTab();
-    },
-    () => {
-        // onEditExtra for default address edit
-        editingAddressIdInput.value = 'default';
-        const addressInputs = [houseNumberInput, barangayInput];
-        addressInputs.forEach(i => currentAddressOriginalValues[i.id] = i.value);
-    },
-    () => {
-        // onCancelExtra for default address edit (handled by setupEditSaveCancel cancel logic)
-        editingAddressIdInput.value = '';
-    }
-);
-
-// ==========================
-// Additional Address Tab Helpers (UPDATED) 🚀
-// ==========================
+/**
+ * Formats address data into a readable string.
+ */
 function formatAddress(data = {}) {
     return [data.houseNumber, data.barangay, data.city, data.province, data.region].filter(Boolean).join(", ");
 }
 
+/**
+ * Populates the address form with specific data and stores original values for cancel.
+ * Also explicitly enables HouseNumber and Barangay inputs.
+ */
 function populateAddressForm(data, addressId) {
     if (editingAddressIdInput) editingAddressIdInput.value = addressId;
 
+    // Set form values
     houseNumberInput.value = data.houseNumber || "";
     barangayInput.value = data.barangay || "";
     cityInput.value = data.city || "";
     provinceInput.value = data.province || "";
     regionInput.value = data.region || "";
 
-    // Store original values for cancel functionality
+    // Store original values (including fixed fields) for cancel functionality
     currentAddressOriginalValues = {
         houseNumber: houseNumberInput.value,
         barangay: barangayInput.value,
@@ -643,39 +649,102 @@ function populateAddressForm(data, addressId) {
         editingAddressId: editingAddressIdInput.value
     };
 
-    // Enable editable fields for the saved address
+    // CRITICAL FIX: Ensure editable fields are enabled and remove disabled attribute
     houseNumberInput.disabled = false;
     barangayInput.disabled = false;
+    
+    // Use removeAttribute as a backup to counter aggressive browser disabling
+    houseNumberInput.removeAttribute('disabled');
+    barangayInput.removeAttribute('disabled');
+
+
     // Disable fixed fields
     regionInput.disabled = true;
     provinceInput.disabled = true;
     cityInput.disabled = true;
 
-    // Hide the main form's edit button and show save/cancel buttons
+    // Show save/cancel buttons for the inline form
     document.getElementById("editAddressBtn").style.display = "none";
     document.getElementById("saveAddressBtn").style.display = "inline-block";
     document.getElementById("cancelAddressBtn").style.display = "inline-block";
 }
 
+/**
+ * Handles the click event for editing a saved address, moving the form inline.
+ */
 function handleAddressEditClick(data, addressId, cardElement) {
-    document.querySelectorAll('.address-card.active-edit').forEach(card => {
-        card.classList.remove('active-edit');
-    });
+    // 1. Reset all card states and hide any open inline edit containers
+    document.querySelectorAll('.address-card.active-edit').forEach(card => card.classList.remove('active-edit'));
+    
+    // Ensure the container is moved to the main tab and hidden if it was NOT this card
+    if (addressEditContainer && addressEditContainer.parentNode !== document.getElementById("addressTab")) {
+        document.getElementById("addressTab").appendChild(addressEditContainer); 
+        addressEditContainer.style.display = "none";
+    }
 
+    // 2. Hide the main edit button
+    document.getElementById("editAddressBtn").style.display = "none";
+
+    // 3. Move the address form (addressEditContainer) into the clicked card
     if (addressEditContainer) {
         cardElement.appendChild(addressEditContainer);
         addressEditContainer.style.display = "block";
     }
 
+    // 4. Set the card as active and populate the form (which enables the inputs)
     cardElement.classList.add('active-edit');
     populateAddressForm(data, addressId);
+
+    // 5. CRITICAL FIX: Manually ensure buttons are visible since we bypassed the default handler
+    // The populateAddressForm already does this, but we make sure here again.
+    document.getElementById("saveAddressBtn").style.display = "inline-block";
+    document.getElementById("cancelAddressBtn").style.display = "inline-block";
 }
 
+/**
+ * Promotes a saved address to the default address and demotes the old default.
+ */
+async function promoteAddressToDefault(savedAddressId, savedAddressData, defaultAddressData) {
+    const user = auth.currentUser;
+    if (!user) throw new Error("No account detected.");
+
+    const userDocRef = doc(db, "users", user.uid);
+    const savedAddressDocRef = doc(db, "users", user.uid, "addresses", savedAddressId);
+
+    // 1. Prepare the old default address data to become a saved address
+    const newSavedAddressData = {
+        houseNumber: defaultAddressData.houseNumber || "",
+        barangay: defaultAddressData.barangay || "",
+        city: defaultAddressData.city || "",
+        province: defaultAddressData.province || "",
+        region: defaultAddressData.region || "",
+    };
+
+    // 2. Update the saved address document with the old default data
+    await setDoc(savedAddressDocRef, newSavedAddressData);
+
+    // 3. Update the main user document (default address) with the promoted address data
+    await updateDoc(userDocRef, {
+        houseNumber: savedAddressData.houseNumber,
+        barangay: savedAddressData.barangay,
+        city: savedAddressData.city,
+        province: savedAddressData.province,
+        region: savedAddressData.region,
+    });
+
+    alert("Default Address updated successfully! The old default is now a saved address.");
+    await loadUserData(); // Reload all data to refresh the display
+}
+
+/**
+ * Renders the default and saved addresses into the address tab.
+ */
 async function loadAddressesIntoAddressTab() {
     try {
         const user = auth.currentUser;
         if (!user) return;
 
+        // Ensure addressSavedListEl exists
         if (!addressSavedListEl) {
             const addressTab = document.getElementById("addressTab");
             if (!addressTab) return;
@@ -690,49 +759,32 @@ async function loadAddressesIntoAddressTab() {
         const userDocRef = doc(db, "users", user.uid);
         const userSnap = await getDoc(userDocRef);
         let index = 1;
+        let defaultAddressData = {}; // Store default address data for promotion logic
 
         if (userSnap.exists()) {
             const userData = userSnap.data();
-            const defaultAddressStr = formatAddress({
+            defaultAddressData = {
                 houseNumber: userData.houseNumber,
                 barangay: userData.barangay,
                 city: userData.city,
                 province: userData.province,
                 region: userData.region
-            });
+            };
+
+            const defaultAddressStr = formatAddress(defaultAddressData);
 
             if (defaultAddressStr) {
                 const card = document.createElement("div");
                 card.className = "address-card default-address-card";
                 card.setAttribute('data-address-id', 'default');
+                // The main edit/save/cancel buttons below the default address are used for editing
                 card.innerHTML = `
                     <div style="flex:1;">
                         <strong>Default Address</strong><br>
                         <span class="addr-text">${defaultAddressStr}</span>
                     </div>
-                    <div style="margin-left:10px; display:flex; gap:8px;">
-                        <button type="button" class="edit-address-btn btn-edit-addr" data-source="default">Edit</button>
-                    </div>
                 `;
                 addressSavedListEl.appendChild(card);
-                
-                // --- DESIGN STYLES FOR EDIT BUTTON (Default Address) ---
-                const editBtn = card.querySelector(".edit-address-btn");
-                editBtn.style.padding = "5px 12px";
-                editBtn.style.borderRadius = "5px";
-                editBtn.style.border = "1px solid #552915";
-                editBtn.style.backgroundColor = "#fff";
-                editBtn.style.color = "#552915";
-                editBtn.style.cursor = "pointer";
-                // ----------------------------------------------------
-
-                editBtn.addEventListener("click", () => {
-                    // This click should activate the main edit button, which is outside the card.
-                    // Instead of calling handleAddressEditClick, we trigger the main edit button's logic.
-                    // This is for better separation of concerns, even though the layout might be confusing.
-                    document.getElementById("editAddressBtn").click(); 
-                });
-                index++;
             }
         }
 
@@ -744,44 +796,38 @@ async function loadAddressesIntoAddressTab() {
                 const id = docSnap.id;
                 const data = docSnap.data();
                 const full = formatAddress(data);
+                index++;
 
                 const card = document.createElement("div");
                 card.className = "address-card saved-address-item";
                 card.setAttribute('data-address-id', id);
 
                 card.innerHTML = `
-                    <div style="flex:1;">
-                        <strong>Saved Address ${index}</strong><br>
-                        <span class="addr-text">${full}</span>
+                    <div class="address-card-header">
+                        <div class="address-title">
+                            Address ${index}
+                        </div>
+                        <div class="address-card-actions">
+                            <button type="button" class="set-default-btn edit-btn-small" data-id="${id}" style="background:#007bff; border:1px solid #007bff; color:white;">
+                                <i class="fas fa-star"></i> Set as Default
+                            </button>
+                            <button type="button" class="edit-address-btn edit-btn-small" data-id="${id}">
+                                <i class="fas fa-edit"></i> Edit
+                            </button>
+                            <button type="button" class="delete-address-btn delete-btn-small" data-id="${id}" title="Delete Address">
+                                <i class="fas fa-trash-alt"></i> Delete
+                            </button>
+                        </div>
                     </div>
-                    <div style="margin-left:10px; display:flex; gap:8px;">
-                        <button type="button" class="edit-address-btn btn-edit-addr" data-id="${id}">Edit</button>
-                        <button type="button" class="delete-address-btn btn-delete-addr" data-id="${id}" title="Delete Address">Delete</button>
-                    </div>
+                    <div class="address-details addr-text">${full}</div>
                 `;
 
                 addressSavedListEl.appendChild(card);
-                
-                // --- DESIGN STYLES FOR EDIT AND DELETE BUTTONS (Saved Addresses) ---
-                const editBtn = card.querySelector(".edit-address-btn");
-                const deleteBtn = card.querySelector(".delete-address-btn");
-                
-                // Edit Button Styles
-                editBtn.style.padding = "5px 12px";
-                editBtn.style.borderRadius = "5px";
-                editBtn.style.border = "1px solid #552915";
-                editBtn.style.backgroundColor = "#fff";
-                editBtn.style.color = "#552915";
-                editBtn.style.cursor = "pointer";
-                
-                // Delete Button Styles
-                deleteBtn.style.padding = "5px 12px";
-                deleteBtn.style.borderRadius = "5px";
-                deleteBtn.style.border = "1px solid #dc3545"; // Red border
-                deleteBtn.style.backgroundColor = "#dc3545"; // Red background
-                deleteBtn.style.color = "#fff"; // White text
-                deleteBtn.style.cursor = "pointer";
-                // -----------------------------------------------------------------
+
+                // EVENT LISTENERS
+                card.querySelector(".set-default-btn").addEventListener("click", () => {
+                    promoteAddressToDefault(id, data, defaultAddressData);
+                });
 
                 card.querySelector(".edit-address-btn").addEventListener("click", () => {
                     handleAddressEditClick(data, id, card);
@@ -802,8 +848,6 @@ async function loadAddressesIntoAddressTab() {
                         alert("Failed to delete address. Try again.");
                     }
                 });
-
-                index++;
             });
         } else {
             if (addressSavedListEl.children.length === 0) {
@@ -815,15 +859,78 @@ async function loadAddressesIntoAddressTab() {
             }
         }
 
-        // Ensure the address edit container is at the bottom and hidden initially/after load
+        // Final check to ensure the address edit container is at the bottom and hidden initially/after load
         if (addressEditContainer && addressEditContainer.parentNode !== document.getElementById("addressTab")) {
             document.getElementById("addressTab").appendChild(addressEditContainer);
         }
-        if (addressEditContainer) addressEditContainer.style.display = 'none';
+        // Check if the main 'Edit Address' button is visible. If not, the form is in 'edit' state for default address, so keep it visible.
+        const editAddressBtn = document.getElementById("editAddressBtn");
+        if (editAddressBtn && editAddressBtn.style.display !== "none") {
+            if (addressEditContainer) addressEditContainer.style.display = 'none';
+        }
+
         document.querySelectorAll('.address-card.active-edit').forEach(card => card.classList.remove('active-edit'));
 
     } catch (err) {
         console.error("Error loading addresses into tab:", err);
         if (addressSavedListEl) addressSavedListEl.innerHTML = "<p>Failed to load saved addresses.</p>";
+    }
+}
+
+// --- Address Save/Cancel Setup ---
+setupEditSaveCancel(
+    "editAddressBtn",
+    "saveAddressBtn",
+    "cancelAddressBtn",
+    [barangayInput, houseNumberInput, regionInput, provinceInput, cityInput, editingAddressIdInput],
+    "addressForm",
+    async () => {
+        const user = auth.currentUser;
+        if (!user) throw new Error("No account detected.");
+
+        const addressData = {
+            barangay: barangayInput.value,
+            houseNumber: houseNumberInput.value,
+            // These fields are non-editable but must be included in the update for saved addresses
+            region: regionInput.value,
+            province: provinceInput.value,
+            city: cityInput.value,
+        };
+
+        const addressId = editingAddressIdInput.value;
+
+        if (addressId === 'default') {
+            // Only update the editable fields (barangay, houseNumber) for the default address
+            await updateDoc(doc(db, "users", user.uid), {
+                barangay: addressData.barangay,
+                houseNumber: addressData.houseNumber,
+            });
+            alert("Default Address updated successfully! (Barangay/House Number changed)");
+        } else {
+            // Update a saved address document (updates all fields)
+            await updateDoc(doc(db, "users", user.uid, "addresses", addressId), addressData);
+            alert("Saved Address updated successfully! (Barangay/House Number changed)");
+        }
+
+        await loadAddressesIntoAddressTab();
+    },
+    () => {
+        // onEditExtra for default address edit
+        editingAddressIdInput.value = 'default';
+    },
+    () => {
+        // onCancelExtra for default address edit / saved address edit
+        editingAddressIdInput.value = '';
+    }
+);
+
+// --- Inline Address Edit Close Button Handler (For saved addresses) ---
+if (addressEditContainer) {
+    const closeAddressEditBtn = document.getElementById("closeAddressEditBtn");
+    if (closeAddressEditBtn) {
+        // This close button acts identically to the main 'Cancel' button when editing a saved address
+        closeAddressEditBtn.addEventListener("click", () => {
+            document.getElementById("cancelAddressBtn").click();
+        });
     }
 }
