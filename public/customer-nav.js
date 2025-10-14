@@ -27,5 +27,5 @@ loginPopup.addEventListener('click', (e) => {
 
 // Redirect button inside popup
 loginRedirect.addEventListener('click', () => {
-  window.location.href = 'login.html'; // change to your login page
-});
+window.location.href = '/login';});
+
