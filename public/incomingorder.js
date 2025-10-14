@@ -257,14 +257,14 @@ function renderOrders() {
             switch (selectedTab) {
                 case "Pending":
                     // Show all orders that are Pending OR have an active refund request
-                    return status === "Pending" || o.data.refundRequest;
+                    return status === "Refunded" || o.data.refundRequest;
                 case "Completed":
                     // Include final completed, refunded, and manual refund success statuses
-                    return status === "Completed" || ["Succeeded", "Manual"].includes(finalRefundStatus) || status === "Refunded";
+                    return status === "Completed" || ["Succeeded", "Manual"].includes(finalRefundStatus);
                 case "Canceled":
                     // Include all cancelled, failed, and denied statuses
-                    return ["Canceled", "Refund Failed", "Refund Denied", "Refunded"].includes(status) ||
-                           ["Failed", "API Failed", "Denied", "Canceled"].includes(finalRefundStatus);
+                    return ["Canceled", "Canceled", "Refund Failed", "Refund Denied"].includes(status) ||
+                           ["Failed", "API Failed", "Denied"].includes(finalRefundStatus);
                 default:
                     // For Preparing and Delivery tabs
                     return status === selectedTab;
@@ -286,8 +286,8 @@ function renderOrders() {
                 return `<div>${qty} × ${p.product}${sizeText}${addons} — ₱${total.toFixed(2)}</div>`;
             }).join("");
 
-            const grandTotal = order.total || 0; // Use the saved total from POS for consistency
-            const totalDisplay = Number.isFinite(grandTotal) ? grandTotal.toFixed(2) : (grandTotal || 0).toFixed(2);
+            const grandTotal = order.total; // Use the saved total from POS for consistency
+            const totalDisplay = grandTotal.toFixed(2);
 
             const queue = formatQueueNumber(order.queueNumber);
             const etaText = order.estimatedTime ? `<div>ETA: ${order.estimatedTime}</div>` : "";
@@ -311,21 +311,11 @@ function renderOrders() {
                         badgeClass = 'refund-pending';
                         mainStatusDisplay = "Refunded";
                         break;
-                    case "Failed": case "API Failed":
+                    case "Failed": case "API Failed": case "Denied": case "Canceled":
                         badgeClass = 'refund-failed';
-                        mainStatusDisplay = "Refund Failed";
-                        break;
-                    case "Denied":
-                        badgeClass = 'refund-denied';
-                        // For denied we prefer to show the denial while preserving main status display
-                        mainStatusDisplay = mainStatus === "Pending" ? "Pending" : "Refund Denied";
-                        break;
-                    case "Canceled":
-                        badgeClass = 'refund-failed';
-                        mainStatusDisplay = "Canceled";
-                        break;
-                    default:
-                        badgeClass = 'refund-error';
+                        if (badgeText === "Denied") mainStatusDisplay = "Refund Denied";
+                        else if (badgeText === "Canceled") mainStatusDisplay = "Canceled";
+                        else mainStatusDisplay = "Refund Failed";
                         break;
                 }
 
@@ -363,12 +353,6 @@ function renderOrders() {
                     case "Canceled": // Keep the action cell blank for final states
                     case "Refund Denied":
                     case "Refund Failed":
-                        actionBtnHtml = "";
-                        break;
-                    case "Refunded":
-                        actionBtnHtml = "";
-                        break;
-                    default:
                         actionBtnHtml = "";
                         break;
                 }
@@ -455,7 +439,7 @@ function attachActionHandlers() {
                 productsHtml += `<div>1 x Delivery Fee - ₱${deliveryFee.toFixed(2)}</div>`;
             }
 
-            const maxRefundable = orderData.total || 0;
+            const maxRefundable = orderData.total;
 
             // --- Show First Refund Popup (Accept/Deny) ---
             if (!popup) createPopup();
@@ -538,15 +522,15 @@ async function handleRefundAction(orderId, collectionName, action, refundAmount 
         if (action === "Accepted") {
             // ---------- CASE: Original status = Pending ----------
             if (originalStatus === "Pending") {
-                // Accepting a refund for a Pending order => Cancel and RETURN stock
+                // Per your requirement: Accepting a refund for a Pending order => Cancel and RETURN stock
+                // (This applies to both manual and e-payment cases per instruction)
+                // Return stock first
                 await returnStock(orderData.products || orderData.items);
 
                 // Update order to canceled and clear refundRequest
-                // For Pending orders we set status => Canceled (customer refund accepted before fulfillment)
-                // finalRefundStatus: Manual for cash/manual, Pending for e-payment (if you still want to track)
                 await updateDoc(orderRef, {
                     refundRequest: deleteField(),
-                    finalRefundStatus: isEPayment ? "Pending" : "Manual",
+                    finalRefundStatus: isEPayment ? "Pending" : "Manual", // e-payment: pending until webhook; manual: marked Manual
                     status: "Canceled"
                 });
 
@@ -554,65 +538,96 @@ async function handleRefundAction(orderId, collectionName, action, refundAmount 
             }
             // ---------- CASE: Original status = Completed ----------
             else if (originalStatus === "Completed") {
-                // Accepting a refund for a Completed order => Refunded (NO stock return)
-                // Per requested behavior: Immediately mark as Refunded when owner accepts.
-                // If e-payment, mark finalRefundStatus as "Succeeded" to indicate successful refund state.
-                // NOTE: If you want to still call the external refund API you can integrate that separately,
-                // but this flow will mark it Refunded immediately (as requested).
-                await updateDoc(orderRef, {
-                    refundRequest: deleteField(),
-                    finalRefundStatus: isEPayment ? "Succeeded" : "Manual",
-                    status: "Refunded"
-                });
+                // Per your requirement: Accepting a refund for a Completed order => Refunded (NO stock return)
+                if (isEPayment) {
+                    // For E-Payment on completed orders, call the refund API and set pending states.
+                    const endpoint = "/.netlify/functions/refund-payment";
 
-                customAlert(`Refund accepted: Order #${orderData.queueNumber || 'N/A'} marked as Refunded.`);
+                    // 1. Temporarily update status while API call is in progress
+                    await updateDoc(orderRef, {
+                        status: "Refund Pending",
+                        // keep refundRequest deleted so UI doesn't keep showing it
+                        refundRequest: deleteField(),
+                        finalRefundStatus: "Pending" // Webhook will update to Succeeded/Failed
+                    });
+                    customAlert("PayMongo refund initiated. Status is 'Refund Pending'.");
+
+                    const response = await fetch(endpoint, {
+                        method: "POST",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify({ paymongoPaymentId: orderData.paymongoPaymentId, amount: refundAmount * 100 }) // PayMongo uses centavos
+                    });
+
+                    const data = await response.json();
+                    console.log("Refund response:", data);
+
+                    if (data.error) {
+                        // API Call Failed - Update status to final error state
+                        customAlert(`PayMongo Refund failed: ${data.details || data.error}. Please check the PayMongo dashboard.`);
+                        await updateDoc(orderRef, {
+                            finalRefundStatus: "API Failed",
+                            status: "Refund Failed"
+                        });
+                        return;
+                    }
+
+                    // If call succeeds, keep pending status; webhook will set Succeeded or Failed
+                } else {
+                    // Manual cash refund for a completed order: mark as final Refunded, no stock return
+                    await updateDoc(orderRef, {
+                        refundRequest: deleteField(),
+                        finalRefundStatus: "Manual",
+                        status: "Refunded"
+                    });
+                    customAlert(`Manual refund completed: Order #${orderData.queueNumber || 'N/A'} marked as Refunded.`);
+                }
             }
             // ---------- Other statuses (fallback) ----------
             else {
-                // If the order is in some other state, default to the Completed refund flow
+                // Default fallback: treat as Completed refund flow (do NOT return stock)
                 if (isEPayment) {
-                    // Mark as Refunded for consistency
+                    const endpoint = "/.netlify/functions/refund-payment";
                     await updateDoc(orderRef, {
+                        status: "Refunded",
                         refundRequest: deleteField(),
-                        finalRefundStatus: "Succeeded",
-                        status: "Refunded"
+                        finalRefundStatus: "Pending"
                     });
-                    customAlert(`Refund accepted: Order #${orderData.queueNumber || 'N/A'} marked as Refunded (fallback).`);
+                    customAlert("PayMongo refund initiated. Status is 'Refund Pending'.");
+
+                    const response = await fetch(endpoint, {
+                        method: "POST",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify({ paymongoPaymentId: orderData.paymongoPaymentId, amount: refundAmount * 100 })
+                    });
+
+                    const data = await response.json();
+                    console.log("Refund response:", data);
+
+                    if (data.error) {
+                        customAlert(`PayMongo Refund failed: ${data.details || data.error}. Please check the PayMongo dashboard.`);
+                        await updateDoc(orderRef, {
+                            finalRefundStatus: "API Failed",
+                            status: "Refund Failed"
+                        });
+                        return;
+                    }
                 } else {
                     await updateDoc(orderRef, {
                         refundRequest: deleteField(),
                         finalRefundStatus: "Manual",
                         status: "Refunded"
                     });
-                    customAlert(`Manual refund completed: Order #${orderData.queueNumber || 'N/A'} marked as Refunded (fallback).`);
+                    customAlert(`Manual refund completed: Order #${orderData.queueNumber || 'N/A'} marked as Refunded.`);
                 }
             }
         } else if (action === "Denied") {
-            // ---------- DENIED: Behavior depends on original status ----------
-            if (originalStatus === "Pending") {
-                // Denied while Pending: keep the main status as Pending, clear refundRequest, mark finalRefundStatus as Denied
-                await updateDoc(orderRef, {
-                    refundRequest: deleteField(),
-                    finalRefundStatus: "Denied"
-                });
-                customAlert(`Refund request for Order #${orderData.queueNumber || 'N/A'} denied. Order remains Pending.`);
-            } else if (originalStatus === "Completed") {
-                // Denied after Completed: mark finalRefundStatus Denied and set a visible 'Refund Denied' status
-                await updateDoc(orderRef, {
-                    refundRequest: deleteField(),
-                    finalRefundStatus: "Denied",
-                    status: "Refund Denied"
-                });
-                customAlert(`Refund request for Order #${orderData.queueNumber || 'N/A'} denied. Status set to 'Refund Denied'.`);
-            } else {
-                // Fallback: mark as Refund Denied
-                await updateDoc(orderRef, {
-                    refundRequest: deleteField(),
-                    finalRefundStatus: "Denied",
-                    status: "Refund Denied"
-                });
-                customAlert(`Refund request denied. Status set to 'Refund Denied'.`);
-            }
+            // Denied refund request - Final Status
+            await updateDoc(orderRef, {
+                refundRequest: deleteField(),
+                finalRefundStatus: "Denied",
+                status: "Refund Denied"
+            });
+            customAlert(`Refund request for Order #${orderData.queueNumber || 'N/A'} has been denied. Status updated.`);
         }
 
         renderOrders(); // Re-render to show the updated status
