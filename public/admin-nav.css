@@ -76,6 +76,22 @@
   align-items: center;
   gap: 10px;
   border-top: 1px solid #ddd;
+  transition: background 0.3s, color 0.3s;
+}
+
+/* ===== Hover effect for profile card ===== */
+.profile-card:hover {
+  background: #6f4e37;
+  color: #fff;
+  cursor: pointer;
+}
+
+.profile-card:hover .profile-avatar i {
+  color: #fff;
+}
+
+.profile-card:hover .profile-info .edit-text {
+  color: #ddd;
 }
 
 .profile-avatar i {
@@ -101,6 +117,7 @@
   border-top: 1px solid #ddd;
   cursor: pointer;
   color: #552915;
+  transition: background 0.3s, color 0.3s;
 }
 
 .logout:hover {
@@ -120,7 +137,15 @@
 }
 
 @media (max-width: 1024px) {
-  .hamburger { display: block; }
-  .sidebar { transform: translateX(-240px); }
-  .sidebar.active { transform: translateX(0); }
+  .hamburger {
+    display: block;
+  }
+
+  .sidebar {
+    transform: translateX(-240px);
+  }
+
+  .sidebar.active {
+    transform: translateX(0);
+  }
 }
