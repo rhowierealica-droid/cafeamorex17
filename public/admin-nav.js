@@ -50,19 +50,19 @@ if (navLinks.length >= 6) {
   navLinks[1].addEventListener('click', () => window.location.href = "menumanagement.html"); // Menu Management
   navLinks[2].addEventListener('click', () => window.location.href = "orders.html"); // Orders
   navLinks[3].addEventListener('click', () => window.location.href = "incomingorder.html"); // Incoming Orders
-  navLinks[4].addEventListener('click', () => window.location.href = "admin-feedback.html"); // Inventory
-  navLinks[5].addEventListener('click', () => window.location.href = "inventory.html");
-  navLinks[6].addEventListener('click', () => window.location.href = "employeeManagement.html");
+  navLinks[4].addEventListener('click', () => window.location.href = "admin-feedback.html"); // Feedback
+  navLinks[5].addEventListener('click', () => window.location.href = "inventory.html"); // Inventory
+  navLinks[6].addEventListener('click', () => window.location.href = "employeeManagement.html"); // Employee Management
   navLinks[7].addEventListener('click', () => window.location.href = "sales.html"); // Sales
 }
 
 // ==========================
-// Profile Edit
+// Profile Card Click → Edit Profile
 // ==========================
-const profileEdit = document.querySelector('.profile-card .edit-text');
-if (profileEdit) {
-  profileEdit.addEventListener('click', () => {
-    window.location.href = "edit-profile.html";
+const profileCard = document.querySelector('.profile-card');
+if (profileCard) {
+  profileCard.addEventListener('click', () => {
+    window.location.href = "Admin-EditProfile.html";
   });
 }
 
@@ -102,6 +102,7 @@ navLinks.forEach(link => {
     (currentPage === "incomingorder.html" && text === "incoming orders") ||
     (currentPage === "admin-feedback.html" && text === "feedback") ||
     (currentPage === "inventory.html" && text === "inventory") ||
+    (currentPage === "employeeManagement.html" && text === "employee management") ||
     (currentPage === "sales.html" && text === "sales")
   ) {
     link.classList.add('active');
