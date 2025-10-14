@@ -26,7 +26,7 @@ onAuthStateChanged(auth, user => {
     currentUserEmail = user.email?.toLowerCase();
     listenOrders();
   } else {
-    window.location.href = "login.html"; 
+    window.location.href = "login.html"; 
   }
 });
 
@@ -66,13 +66,16 @@ function listenOrders() {
 
     const filteredOrders = userOrders.filter(order => {
       const status = (order.status || "").toLowerCase();
-      const refundStatus = (order.refundStatus || "").toLowerCase();
+      // const refundStatus = (order.refundStatus || "").toLowerCase(); // OLD: Removed, relies on finalRefundStatus
+      const finalRefundStatus = (order.finalRefundStatus || "").toLowerCase(); // <-- NEW: Use final status
       const tab = (currentTab || "").toLowerCase();
 
       if (tab === "to rate") return status === "completed by customer" && !order.feedback;
       if (tab === "to receive") return status === "completed" && !order.feedback;
       if (tab === "completed") return ["completed", "completed by customer"].includes(status);
-      if (tab === "refund") return ["requested", "accepted", "denied"].includes(refundStatus);
+      
+      // <-- UPDATED: Check finalRefundStatus for the "Refund" tab
+      if (tab === "refund") return ["requested", "pending", "succeeded", "manual", "failed", "api failed", "denied"].includes(finalRefundStatus);
 
       return status === tab;
     });
@@ -95,17 +98,8 @@ function listenOrders() {
       const orderTitle = document.createElement("h3");
       let titleText = `Order #${order.queueNumber || "N/A"} - Status: ${order.status || "Unknown"}`;
       if (order.estimatedTime) titleText += ` | ETA: ${order.estimatedTime}`;
-      
-        // ⭐ MODIFIED SECTION START ⭐
-        if (currentTab === "Refund") {
-            titleText += ` | Refund: ${order.refundStatus || "Requested"}`;
-            // Display the final status reported by PayMongo for clarity
-            if (order.finalRefundStatus) {
-                titleText += ` (${order.finalRefundStatus})`;
-            }
-        }
-        // ⭐ MODIFIED SECTION END ⭐
-
+      // <-- UPDATED: Display finalRefundStatus instead of refundStatus on Refund tab
+      if (currentTab === "Refund") titleText += ` | Refund: ${order.finalRefundStatus || "Requested"}`;
       orderTitle.textContent = titleText;
 
       orderHeader.appendChild(orderTitle);
@@ -155,13 +149,16 @@ function listenOrders() {
 
       // Pending Tab Refund / Cancel
       if (currentTab === "Pending") {
+        // Check if refund is already requested using the finalRefundStatus
+        const refundRequested = !!order.finalRefundStatus;
+
         if (paymentMethod.includes("e-payment") || paymentMethod === "g" || paymentMethod === "gcash") {
           const btn = document.createElement("button");
-          btn.textContent = order.refundRequest ? `Refund: ${order.refundStatus}` : "Request Refund";
-          btn.disabled = !!order.refundRequest;
+          btn.textContent = refundRequested ? `Refund: ${order.finalRefundStatus}` : "Request Refund";
+          btn.disabled = refundRequested;
           btn.className = "action-btn";
-          btn.style.backgroundColor = order.refundRequest ? "#ccc" : "";
-          btn.style.cursor = order.refundRequest ? "not-allowed" : "pointer";
+          btn.style.backgroundColor = refundRequested ? "#ccc" : "";
+          btn.style.cursor = refundRequested ? "not-allowed" : "pointer";
           btn.addEventListener("click", () => openRefundModal(order.id, order.items));
           itemsContainer.appendChild(btn);
         } else if (paymentMethod === "cash" || paymentMethod === "c") {
@@ -175,13 +172,17 @@ function listenOrders() {
 
       // To Receive Tab
       if (currentTab === "To Receive") {
+        // Check if refund is already requested using the finalRefundStatus
+        const refundRequested = !!order.finalRefundStatus;
+        
         if (paymentMethod.includes("e-payment") || paymentMethod === "g" || paymentMethod === "gcash") {
           const refundBtn = document.createElement("button");
-          refundBtn.textContent = order.refundRequest ? `Refund: ${order.refundStatus}` : "Request Refund";
-          refundBtn.disabled = !!order.refundRequest;
-          refundBtn.className = "action-btn cancel-refund-btn"; 
-          refundBtn.style.backgroundColor = order.refundRequest ? "#ccc" : "";
-          refundBtn.style.cursor = order.refundRequest ? "not-allowed" : "pointer";
+          // <-- UPDATED: Display finalRefundStatus
+          refundBtn.textContent = refundRequested ? `Refund: ${order.finalRefundStatus}` : "Request Refund";
+          refundBtn.disabled = refundRequested;
+          refundBtn.className = "action-btn cancel-refund-btn"; 
+          refundBtn.style.backgroundColor = refundRequested ? "#ccc" : "";
+          refundBtn.style.cursor = refundRequested ? "not-allowed" : "pointer";
           refundBtn.addEventListener("click", () => openRefundModal(order.id, order.items));
           itemsContainer.appendChild(refundBtn);
         }
@@ -197,16 +198,21 @@ function listenOrders() {
 
       // Refund Tab
       if (currentTab === "Refund") {
+        // <-- CRITICAL UPDATE: Use finalRefundStatus for display
+        const finalStatus = order.finalRefundStatus || "Requested";
         const refundBtn = document.createElement("button");
-        refundBtn.textContent = order.refundStatus;
+        
+        refundBtn.textContent = finalStatus;
         refundBtn.disabled = true;
         refundBtn.className = "action-btn";
         refundBtn.style.cursor = "not-allowed";
 
-        if (order.refundStatus === "Requested") refundBtn.style.backgroundColor = "green";
-        else if (order.refundStatus === "Accepted") refundBtn.style.backgroundColor = "green";
-        else if (order.refundStatus === "Denied") refundBtn.style.backgroundColor = "red";
-        else refundBtn.style.backgroundColor = "#ccc"; 
+        // Color Logic based on finalStatus
+        const statusLower = finalStatus.toLowerCase();
+        if (statusLower.includes("pending") || statusLower === "requested") refundBtn.style.backgroundColor = "orange";
+        else if (statusLower === "succeeded" || statusLower === "manual") refundBtn.style.backgroundColor = "green";
+        else if (statusLower.includes("denied") || statusLower.includes("failed") || statusLower.includes("api")) refundBtn.style.backgroundColor = "red";
+        else refundBtn.style.backgroundColor = "#ccc"; 
 
         itemsContainer.appendChild(refundBtn);
       }
@@ -230,6 +236,9 @@ function listenOrders() {
 // Return Items to Inventory
 // ==========================
 async function returnItemsToInventory(orderItems) {
+  // NOTE: This function's logic is generally correct for its purpose, 
+  // assuming it covers all product, size, and add-on ingredients/others
+  // as defined in the cart item structure.
   if (!orderItems || orderItems.length === 0) return;
   const inventoryUpdates = {};
 
@@ -248,6 +257,12 @@ async function returnItemsToInventory(orderItems) {
     item.ingredients?.forEach(ing => aggregateItem(ing.id, ing.qty || 1));
     item.addons?.forEach(addon => aggregateItem(addon.id, addon.qty || 1));
     item.others?.forEach(other => aggregateItem(other.id, other.qty || 1));
+
+    // NOTE: The complete inventory return logic (as shown in the staff code)
+    // for deeply nested add-on ingredients is more complex and usually 
+    // handled by the staff/server-side function for reliability. 
+    // For the client-side cancel, this simplified return is often used 
+    // for immediate components, but the full staff logic is safer.
   }
 
   const batch = writeBatch(db);
@@ -258,6 +273,9 @@ async function returnItemsToInventory(orderItems) {
     try {
       const inventorySnap = await getDoc(inventoryRef);
       if (inventorySnap.exists()) {
+        // Using currentQuantity + qtyToReturn simulates the increment,
+        // but using FieldValue.increment() from a proper server-side 
+        // function is safer against race conditions.
         const currentQuantity = inventorySnap.data().quantity || 0;
         batch.update(inventoryRef, { quantity: currentQuantity + qtyToReturn });
         console.log(`Returned ${qtyToReturn} units to Inventory ID: ${inventoryId}`);
@@ -279,7 +297,10 @@ async function handleCancelOrder(orderId, orderItems) {
 
   try {
     await returnItemsToInventory(orderItems);
-    await updateDoc(doc(db, "DeliveryOrders", orderId), { status: "Canceled" });
+    await updateDoc(doc(db, "DeliveryOrders", orderId), { 
+      status: "Canceled",
+      // Set a cancellation status here if needed, or rely on 'status'
+    });
     alert("✅ Order canceled successfully and stock returned.");
     listenOrders();
   } catch (err) {
@@ -368,7 +389,9 @@ function openRefundModal(orderId, orderItems) {
     try {
       await updateDoc(doc(db, "DeliveryOrders", orderId), {
         refundRequest: true,
-        refundStatus: "Requested",
+        // <-- CRITICAL UPDATE: Set the initial status on the finalRefundStatus field
+        finalRefundStatus: "Requested", 
+        // OLD: refundStatus: "Requested", <-- REMOVED THIS REDUNDANT/CONFUSING FIELD
         refundItems: selectedItems
       });
       alert("Refund request submitted. Waiting for admin approval.");
@@ -463,7 +486,7 @@ function openFeedbackModal(orderId, items) {
     });
 
     try {
-      await updateDoc(doc(db, "DeliveryOrders", orderId), { 
+      await updateDoc(doc(db, "DeliveryOrders", orderId), { 
         feedback: arrayUnion(...feedbacks),
         feedbackRating: arrayUnion(...ratings)
       });
