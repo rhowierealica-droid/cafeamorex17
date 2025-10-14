@@ -1,0 +1,193 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Café Amore | Admin Profile</title>
+
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css" />
+    <link rel="stylesheet" href="Admin-EditProfile.css" />
+    <link rel="stylesheet" href="admin-side.css" />
+        <link rel="stylesheet" href="admin-nav.css" />
+
+</head>
+<body>
+
+    <div class="top-bar">
+        <div class="hamburger" id="hamburger"><i class="fas fa-bars"></i></div>
+        <div class="mobile-logo">
+            <img src="logo.png" alt="Café Amore Logo" />
+            <span class="brand">Café Amore</span>
+        </div>
+    </div>
+
+    <aside class="sidebar" id="sidebar">
+        <div class="logo">
+            <img src="logo.png" alt="Café Amore Logo" />
+            <span class="brand">Café Amore</span>
+        </div>
+
+        <nav>
+            <ul>
+                <li><i class="fas fa-home"></i> Home</li>
+                <li><i class="fas fa-coffee"></i> Menu Management</li>
+                <li><i class="fas fa-list"></i> Orders</li>
+                <li><i class="fas fa-truck"></i> Incoming Orders</li>
+                <li><i class="fas fa-comment-dots"></i> Feedback</li>
+                <li><i class="fas fa-box"></i> Inventory</li>
+                <li><i class="fas fa-users"></i> Employee Management</li>
+                <li><i class="fas fa-chart-line"></i> Sales</li>
+            </ul>
+        </nav>
+
+        <div class="profile-card">
+            <div class="profile-avatar"><i class="fas fa-user-circle"></i></div>
+            <div class="profile-info">
+                <p class="profile-name">Admin</p>
+                <p class="edit-text">Edit Profile</p>
+            </div>
+        </div>
+
+        <div class="logout"><i class="fas fa-sign-out-alt"></i> Log Out</div>
+        <div class="close-btn hidden" id="closeBtn">&times;</div>
+    </aside>
+
+    <div class="profile-wrapper">
+        <div class="profile-container">
+            <h2>Edit Profile</h2>
+
+            <div class="tabs">
+                <button class="tab-btn active" data-tab="infoTab">Information</button>
+            </div>
+
+            <div class="tab-content" id="infoTab" style="display: block;">
+                <h3>Personal Information</h3>
+                <form id="nameForm">
+                    <div class="row">
+                        <div class="input-group">
+                            <label for="firstName">First Name</label>
+                            <input type="text" id="firstName" disabled />
+                        </div>
+                        <div class="input-group">
+                            <label for="lastName">Last Name</label>
+                            <input type="text" id="lastName" disabled />
+                        </div>
+                    </div>
+                    <div class="button-group">
+                        <button type="button" class="edit-btn" id="editNameBtn">Edit</button>
+                        <button type="submit" class="save-btn" id="saveNameBtn" style="display:none;">Save</button>
+                        <button type="button" class="cancel-btn" id="cancelNameBtn" style="display:none;">Cancel</button>
+                    </div>
+                </form>
+
+                <hr />
+
+                <h3>Email Settings</h3>
+                <form id="emailForm">
+                    <div class="input-group">
+                        <label for="email">Current Email</label>
+                        <input type="email" id="email" disabled />
+                    </div>
+
+                    <div class="email-edit-fields" id="emailEditFields" style="display:none;">
+                        <div class="input-group">
+                            <label for="currentEmailInput">Confirm Current Email</label>
+                            <input type="email" id="currentEmailInput" placeholder="Enter current email" required />
+                        </div>
+                        <div class="input-group">
+                            <label for="newEmail">Enter New Email</label>
+                            <input type="email" id="newEmail" placeholder="Enter new email" required />
+                        </div>
+                        <div class="input-group">
+                            <label for="currentPassword">Enter Current Password</label>
+                            <input type="password" id="currentPassword" placeholder="Enter current password" required />
+                        </div>
+                    </div>
+
+                    <div class="button-group">
+                        <button type="button" class="edit-btn" id="editEmailBtn">Edit</button>
+                        <button type="submit" class="save-btn" id="saveEmailBtn" style="display:none;">Save</button>
+                        <button type="button" class="cancel-btn" id="cancelEmailBtn" style="display:none;">Cancel</button>
+                    </div>
+                </form>
+
+                <hr />
+
+                <h3>Change Password</h3>
+                <form id="passwordForm">
+                    <div class="input-group">
+                        <label>Password Status</label>
+                        <input type="text" value="********" disabled />
+                    </div>
+
+                    <div class="password-edit-fields" id="passwordEditFields" style="display:none;">
+                        <div class="input-group">
+                            <label for="currentPasswordForChange">Enter Current Password</label>
+                            <input type="password" id="currentPasswordForChange" placeholder="Enter current password" required />
+                        </div>
+                        <div class="input-group">
+                            <label for="password">New Password</label>
+                            <input type="password" id="password" placeholder="Enter new password" required />
+                        </div>
+                        <div class="input-group">
+                            <label for="confirmPassword">Confirm Password</label>
+                            <input type="password" id="confirmPassword" placeholder="Confirm new password" required />
+                        </div>
+                    </div>
+
+                    <div class="button-group">
+                        <button type="button" class="edit-btn" id="editPasswordBtn">Edit</button>
+                        <button type="submit" class="save-btn" id="savePasswordBtn" style="display:none;">Save</button>
+                        <button type="button" class="cancel-btn" id="cancelPasswordBtn" style="display:none;">Cancel</button>
+                    </div>
+                </form>
+
+                <hr />
+
+                <h3>Phone Number</h3>
+                <form id="phoneForm">
+                    <div class="input-group">
+                        <label for="phone">Current Phone</label>
+                        <input type="text" id="phone" disabled />
+                    </div>
+
+                    <div class="phone-edit-fields" id="phoneEditFields" style="display:none;">
+                        <div class="input-group">
+                            <label for="currentPhoneInput">Confirm Current Phone</label>
+                            <input type="text" id="currentPhoneInput" placeholder="09xxxxxxxxx" required />
+                        </div>
+                        <div class="input-group">
+                            <label for="newPhone">Enter New Phone</label>
+                            <input type="text" id="newPhone" placeholder="09xxxxxxxxx" required />
+                        </div>
+                        <div class="input-group">
+                            <label for="currentPhonePassword">Enter Current Password</label>
+                            <input type="password" id="currentPhonePassword" placeholder="Enter current password" required />
+                        </div>
+                    </div>
+
+                    <div class="button-group">
+                        <button type="button" class="edit-btn" id="editPhoneBtn">Edit</button>
+                        <button type="submit" class="save-btn" id="savePhoneBtn" style="display:none;">Save</button>
+                        <button type="button" class="cancel-btn" id="cancelPhoneBtn" style="display:none;">Cancel</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <div id="recaptcha-container"></div>
+
+    <div id="otpPopup">
+        <div class="otp-container">
+            <h3>Enter OTP</h3>
+            <input type="text" id="otpCode" placeholder="Enter OTP" />
+            <div id="otpError"></div>
+            <button type="button" id="verifyOtpBtn">Verify OTP</button>
+        </div>
+    </div>
+
+    <script type="module" src="Admin-EditProfile.js"></script>
+    <script type="module" src="admin-nav.js"></script>
+</body>
+</html>

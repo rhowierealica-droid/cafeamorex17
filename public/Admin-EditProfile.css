@@ -1,0 +1,460 @@
+/* =========================
+   Reset & Base
+========================= */
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+  font-family: "Poppins", Arial, sans-serif;
+}
+
+body {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  background: linear-gradient(135deg, #fdf6f0, #fff8f0);
+  color: #4b3621;
+}
+
+/* =========================
+   Profile Wrapper
+========================= */
+.profile-wrapper {
+  flex: 1;
+  display: flex;
+  justify-content: center;
+  align-items: flex-start;
+  padding: 40px 20px;
+  margin-left: 260px;
+  max-width: calc(100% - 280px);
+  transition: margin-left 0.25s ease-in-out, max-width 0.25s ease-in-out;
+}
+
+/* =========================
+   Profile Container
+========================= */
+.profile-container {
+  background: #fff8f0;
+  padding: 30px 40px;
+  border-radius: 20px;
+  box-shadow: 0 15px 40px rgba(0, 0, 0, 0.25);
+  width: 100%;
+  max-width: 650px;
+}
+
+.profile-container h2 {
+  color: #552915;
+  margin-bottom: 20px;
+  text-align: center;
+}
+
+.profile-container h3 {
+  color: #552915;
+  margin-bottom: 15px;
+  font-size: 1.2em;
+}
+
+/* =========================
+   Tabs
+========================= */
+.tabs {
+  display: flex;
+  justify-content: space-between;
+  margin-bottom: 20px;
+}
+
+.tab-btn {
+  flex: 1;
+  padding: 10px;
+  background: #e0e0e0;
+  border: none;
+  cursor: pointer;
+  font-weight: bold;
+  transition: 0.3s;
+  margin-right: 5px;
+  border-radius: 10px;
+}
+
+.tab-btn:last-child {
+  margin-right: 0;
+}
+
+.tab-btn.active {
+  background: #552915;
+  color: #fff;
+}
+
+/* =========================
+   Inputs & Form Structure
+========================= */
+.input-group {
+  display: flex;
+  flex-direction: column;
+  margin-bottom: 15px;
+}
+
+.input-group label {
+  font-weight: 600;
+  color: #552915;
+  font-size: 0.95em;
+  margin-bottom: 5px;
+}
+
+input,
+select {
+  width: 100%;
+  padding: 12px;
+  border-radius: 10px;
+  border: 1px solid #c9c9c9;
+  outline: none;
+  font-size: 0.95em;
+  transition: border-color 0.3s, box-shadow 0.3s;
+}
+
+input:focus,
+select:focus {
+  border-color: #552915;
+  box-shadow: 0 0 5px rgba(85, 41, 21, 0.4);
+}
+
+input[disabled],
+select[disabled] {
+  background: #e0e0e0;
+  color: #7a7a7a;
+  cursor: not-allowed;
+  font-style: italic;
+  border: 1px solid #e0e0e0;
+}
+
+.row {
+  display: flex;
+  gap: 15px;
+  flex-wrap: wrap;
+}
+
+.row .input-group {
+  flex: 1;
+  min-width: 200px;
+}
+
+/* =========================
+   Buttons
+========================= */
+.button-group {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  margin-top: 10px;
+  margin-bottom: 15px;
+}
+
+.edit-btn,
+.save-btn,
+.cancel-btn {
+  padding: 10px 20px;
+  border: none;
+  border-radius: 10px;
+  cursor: pointer;
+  font-weight: bold;
+  transition: 0.3s;
+}
+
+.edit-btn {
+  background: #552915;
+  color: #fff;
+}
+
+.edit-btn:hover {
+  background: #6f4e37;
+}
+
+.save-btn {
+  background: #4caf50;
+  color: #fff;
+}
+
+.save-btn:hover {
+  background: #388e3c;
+}
+
+.cancel-btn {
+  background: #ff4d4d;
+  color: #fff;
+}
+
+.cancel-btn:hover {
+  background: #cc0000;
+}
+
+/* =========================
+   Info Tab Styling
+========================= */
+.tab-content hr {
+  border: 0;
+  height: 1px;
+  background-image: linear-gradient(
+    to right,
+    rgba(85, 41, 21, 0),
+    rgba(85, 41, 21, 0.45),
+    rgba(85, 41, 21, 0)
+  );
+  margin: 25px 0;
+}
+
+.email-edit-fields,
+.password-edit-fields,
+.phone-edit-fields {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  margin-top: 10px;
+}
+
+/* =========================
+   Sidebar
+========================= */
+.sidebar {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 240px;
+  height: 100%;
+  background: #f3e9dc;
+  padding-bottom: 20px;
+  z-index: 2000;
+  display: flex;
+  flex-direction: column;
+  box-sizing: border-box;
+  overflow-y: auto;
+  transform: translateX(0);
+  transition: transform 0.25s ease-in-out, box-shadow 0.25s ease-in-out;
+  box-shadow: 2px 0 8px rgba(0, 0, 0, 0.1);
+}
+
+.sidebar .logo {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 20px 18px;
+}
+
+.sidebar .logo img {
+  width: 40px;
+  height: 40px;
+}
+
+.sidebar .brand {
+  font-weight: bold;
+  font-size: 1.3em;
+  color: #4b3621;
+}
+
+.sidebar nav ul {
+  list-style: none;
+  padding: 0;
+  margin-top: 10px;
+}
+
+.sidebar nav ul li {
+  padding: 12px 18px;
+  margin: 4px 10px;
+  border-radius: 8px;
+  cursor: pointer;
+  font-weight: 600;
+  color: #4b3621;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  transition: background 0.3s, color 0.3s, transform 0.2s;
+}
+
+.sidebar nav ul li:hover,
+.sidebar nav ul li.active {
+  background: #6f4e37;
+  color: #fff;
+  transform: scale(1.02);
+}
+
+/* =========================
+   Profile Card
+========================= */
+.profile-card {
+  margin-top: auto;
+  padding: 15px 18px;
+  display: none;
+  align-items: center;
+  gap: 12px;
+  border-top: 1px solid #ddd;
+  cursor: pointer;
+  background: #fff8f0;
+  color: #4b3621;
+  transition: background 0.25s, color 0.25s;
+}
+
+.profile-card.active {
+  background: #6f4e37 !important;
+  color: #fff !important;
+}
+
+.profile-avatar i {
+  font-size: 2em;
+  color: #552915;
+}
+
+.profile-info .profile-name {
+  font-weight: bold;
+  color: #4b3621;
+}
+
+.profile-info .edit-text {
+  font-size: 0.85em;
+  color: #777;
+}
+
+/* =========================
+   Logout
+========================= */
+.logout {
+  padding: 14px 18px;
+  display: none;
+  align-items: center;
+  gap: 10px;
+  font-weight: 700;
+  border-top: 1px solid #ddd;
+  cursor: pointer;
+  color: #552915;
+  transition: background 0.25s, color 0.25s;
+}
+
+.logout:hover {
+  background: #6f4e37;
+  color: #fff;
+}
+
+/* =========================
+   Hamburger & Close
+========================= */
+.hamburger {
+  position: fixed;
+  top: 20px;
+  left: 15px;
+  font-size: 2em;
+  color: #552915;
+  cursor: pointer;
+  z-index: 2003;
+  display: none;
+}
+
+.sidebar .close-btn {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  font-size: 1.5em;
+  cursor: pointer;
+  color: #552915;
+  transition: color 0.25s, opacity 0.25s;
+  opacity: 0;
+  z-index: 2010;
+}
+
+/* =========================
+   OTP Popup
+========================= */
+#otpPopup {
+  display: none;
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: rgba(0, 0, 0, 0.6);
+  justify-content: center;
+  align-items: center;
+  z-index: 10000;
+  animation: fadeIn 0.3s ease-in-out;
+}
+
+#otpPopup .otp-container {
+  background: #fff8f0;
+  padding: 25px 30px;
+  border-radius: 15px;
+  width: 90%;
+  max-width: 350px;
+  text-align: center;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.25);
+  animation: slideDown 0.3s ease-in-out;
+}
+
+#otpPopup h3 {
+  font-size: 1.3em;
+  color: #552915;
+  margin-bottom: 15px;
+}
+
+#otpPopup input {
+  width: 80%;
+  padding: 12px;
+  border-radius: 10px;
+  border: 1px solid #c9c9c9;
+  font-size: 1em;
+  margin-bottom: 10px;
+  outline: none;
+}
+
+#otpPopup input:focus {
+  border-color: #552915;
+  box-shadow: 0 0 5px rgba(85, 41, 21, 0.4);
+}
+
+#otpPopup button {
+  background: #552915;
+  color: #fff;
+  border: none;
+  padding: 10px 25px;
+  border-radius: 10px;
+  font-weight: bold;
+  cursor: pointer;
+  transition: 0.3s;
+}
+
+#otpPopup button:hover {
+  background: #6f4e37;
+}
+
+#otpError {
+  color: #ff4d4d;
+  font-size: 0.9em;
+  margin-top: 5px;
+  display: none;
+}
+
+/* =========================
+   Animations
+========================= */
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes slideDown {
+  from { transform: translateY(-20px); opacity: 0; }
+  to { transform: translateY(0); opacity: 1; }
+}
+
+/* =========================
+   Responsive
+========================= */
+@media (max-width: 1024px) {
+  .hamburger { display: block; }
+  .sidebar { transform: translateX(-240px); }
+  .sidebar.active { transform: translateX(0); }
+  .sidebar .close-btn { opacity: 1; }
+  .profile-wrapper { margin-left: 0; max-width: 100%; padding-top: 80px; }
+}
+
+@media (max-width: 768px) {
+  .row { flex-direction: column; }
+  .tab-btn { margin-right: 0; margin-bottom: 5px; }
+  #otpPopup .otp-container { padding: 20px; width: 95%; }
+  #otpPopup input, #otpPopup button { width: 90%; padding: 10px; }
+}
