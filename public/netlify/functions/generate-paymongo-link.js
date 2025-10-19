@@ -1,132 +1,148 @@
-const axios = require('axios');
-const { v4: uuidv4 } = require('uuid'); 
+// ===========================================
+// generate-paymongo-link.js
+// Standalone Netlify Function for Admin Approval Flow
+// ===========================================
 
-// Environment variables are accessed directly inside the handler via process.env
+const axios = require('axios');
+const { v4: uuidv4 } = require('uuid');
+
+// === PayMongo API Configuration ===
 const PAYMONGO_SECRET_KEY = process.env.PAYMONGO_SECRET_KEY;
 const PAYMONGO_API = "https://api.paymongo.com/v1";
 
+// === Basic Auth Header ===
+const AUTH_HEADER = PAYMONGO_SECRET_KEY
+  ? Buffer.from(`${PAYMONGO_SECRET_KEY}:`).toString("base64")
+  : null;
+
 /**
- * Handles the logic for generating a PayMongo Checkout Session link.
- * @param {object} event - The event object (contains request body in event.body).
- * @param {object} context - The context object.
+ * Netlify Function Entry Point
+ * Generates a PayMongo Checkout Session link for admin-approved orders
  */
-exports.handler = async (event, context) => { 
-    
-    // 1. Check for Secret Key
-    if (!PAYMONGO_SECRET_KEY) {
-        return {
-            statusCode: 500,
-            body: JSON.stringify({ error: "Server configuration error: PAYMONGO_SECRET_KEY is missing." }),
-        };
-    }
+exports.handler = async (event, context) => {
+  // 1️⃣ Ensure Environment Variable Exists
+  if (!PAYMONGO_SECRET_KEY) {
+    console.error("🚨 PAYMONGO_SECRET_KEY is missing from environment.");
+    return {
+      statusCode: 500,
+      body: JSON.stringify({
+        error: "Server configuration error: PAYMONGO_SECRET_KEY is missing.",
+      }),
+    };
+  }
 
-    // Calculate the AUTH_HEADER here to ensure environment variables are loaded
-    const AUTH_HEADER = Buffer.from(PAYMONGO_SECRET_KEY + ":").toString("base64");
+  // 2️⃣ Parse Request Body
+  let parsedBody;
+  try {
+    parsedBody = JSON.parse(event.body);
+  } catch (e) {
+    console.error("🚨 Invalid JSON in request:", e.message);
+    return {
+      statusCode: 400,
+      body: JSON.stringify({ error: "Invalid JSON format in request body." }),
+    };
+  }
 
+  // 3️⃣ Extract Data from Body
+  const {
+    orderId,
+    collectionName,
+    amount,
+    lineItems,
+    customerDetails = {},
+    description,
+  } = parsedBody;
 
-    // 2. Parse the Request Body
-    let parsedBody;
-    try {
-        // Netlify event.body is a string
-        parsedBody = JSON.parse(event.body); 
-    } catch (e) {
-        return {
-            statusCode: 400,
-            body: JSON.stringify({ error: "Invalid JSON format in request body." }),
-        };
-    }
+  // 4️⃣ Validate Essential Fields
+  const amountInCentavos = Math.round(Number(amount) * 100);
 
-    // Deconstruct the parsed body
-    const { 
-        orderId, 
-        collectionName, 
-        amount, 
-        lineItems, 
-        customerDetails = {},
-        description 
-    } = parsedBody;
+  if (!orderId || !collectionName || !lineItems?.length || amountInCentavos < 100) {
+    console.error("🚨 Missing or invalid required data:", parsedBody);
+    return {
+      statusCode: 400,
+      body: JSON.stringify({
+        error: "Invalid order, amount, or line item details.",
+      }),
+    };
+  }
 
-    // amount is in Philippine Pesos (e.g., 100.50), convert to centavos
-    const amountInCentavos = Math.round(Number(amount) * 100);
+  // 5️⃣ Create Unique Idempotency Key
+  const idempotencyKey = uuidv4();
 
-    // 3. Basic Validation
-    if (!orderId || !collectionName || amountInCentavos < 100 || !lineItems?.length) {
-        return {
-            statusCode: 400,
-            body: JSON.stringify({ error: "Invalid order, amount (min 1.00 PHP), or line items details" }),
-        };
-    }
+  try {
+    // 6️⃣ Call PayMongo API to Create Checkout Session
+    const response = await axios.post(
+      `${PAYMONGO_API}/checkout_sessions`,
+      {
+        data: {
+          attributes: {
+            billing: {
+              name: customerDetails.name || "Unknown Customer",
+              phone: customerDetails.phone || "",
+              email: customerDetails.email || "",
+              address: {
+                line1: customerDetails.addressLine1 || "",
+                line2: customerDetails.addressLine2 || "",
+                city: customerDetails.city || "",
+                state: customerDetails.state || "",
+                postal_code: customerDetails.postalCode || "",
+                country: "PH",
+              },
+            },
+            // ✅ Use your real deployed Netlify domain
+            success_url: "https://amorex17.netlify.app/index.html",
+            cancel_url: "https://amorex17.netlify.app/cart.html",
+            send_email_receipt: true,
+            description: description || "Order Payment (Admin Approved)",
+            line_items: lineItems,
+            payment_method_types: ["gcash", "card", "paymaya", "grab_pay"],
+            metadata: {
+              orderId,
+              collectionName,
+              source: "admin_approval_link",
+            },
+          },
+        },
+      },
+      {
+        headers: {
+          Authorization: `Basic ${AUTH_HEADER}`,
+          "Content-Type": "application/json",
+          Accept: "application/json",
+          "Idempotency-Key": idempotencyKey,
+        },
+      }
+    );
 
-    // Use a unique idempotency key for this request
-    const idempotencyKey = uuidv4(); 
-    
-    try {
-        const response = await axios.post(
-            `${PAYMONGO_API}/checkout_sessions`,
-            {
-                data: {
-                    attributes: {
-                        amount: amountInCentavos, 
-                        billing: {
-                            name: customerDetails.name,
-                            phone: customerDetails.phone,
-                            email: customerDetails.email,
-                            address: {
-                                line1: customerDetails.addressLine1,
-                                line2: customerDetails.addressLine2,
-                                city: customerDetails.city,
-                                state: customerDetails.state,
-                                postal_code: customerDetails.postalCode,
-                                country: "PH"
-                            }
-                        },
-                        // NOTE: REPLACE THESE WITH YOUR ACTUAL SUCCESS/CANCEL URLS
-                        success_url: "YOUR_NETLIFY_DOMAIN/public/index.html", 
-                        cancel_url: "YOUR_NETLIFY_DOMAIN/public/index.html", 
-                        send_email_receipt: true,
-                        description: description || "Order Payment (Admin Approved)",
-                        line_items: lineItems,
-                        payment_method_types: ["gcash", "card", "paymaya", "grab_pay"], 
-                        metadata: {
-                            orderId: orderId,
-                            collectionName: collectionName,
-                            source: 'admin_approval_link'
-                        },
-                    },
-                },
-                {
-                    headers: {
-                        Authorization: `Basic ${AUTH_HEADER}`, // Use the corrected header
-                        "Content-Type": "application/json",
-                        Accept: "application/json",
-                        "Idempotency-Key": idempotencyKey,
-                    },
-                }
-        );
+    // ✅ Success Response
+    const checkoutUrl = response.data?.data?.attributes?.checkout_url;
+    if (!checkoutUrl) throw new Error("PayMongo did not return a checkout_url.");
 
-        // Success response (Netlify format)
-        return {
-            statusCode: 200,
-            body: JSON.stringify({ checkoutUrl: response.data.data.attributes.checkout_url }),
-        };
+    console.log("✅ PayMongo checkout link created successfully for:", orderId);
 
-    } catch (error) {
-        console.error(
-            "❌ Admin Approval PayMongo Link Error:",
-            error.response?.data || error.message
-        );
-       
-        // Extract the most helpful error detail from PayMongo's response structure
-        const paymongoErrorDetail = error.response?.data?.errors?.[0]?.detail || error.message;
+    return {
+      statusCode: 200,
+      body: JSON.stringify({ checkoutUrl }),
+    };
+  } catch (error) {
+    // 7️⃣ Error Handling & Logging
+    const errorDetails =
+      error.response?.data?.errors?.[0]?.detail || error.message;
 
-        // Error response (Netlify format)
-        return {
-            // Return a 400 for client errors (like missing line items) or 500 otherwise
-            statusCode: error.response?.status || 500, 
-            body: JSON.stringify({
-                error: "Failed to create checkout session for admin approval",
-                details: paymongoErrorDetail,
-            }),
-        };
-    }
+    console.error("❌ PayMongo Link Creation Failed:", {
+      status: error.response?.status,
+      details: errorDetails,
+      data: error.response?.data,
+    });
+
+    return {
+      statusCode: 500,
+      body: JSON.stringify({
+        error: "Failed to create checkout session for admin approval.",
+        details: errorDetails,
+      }),
+    };
+  }
 };
+
+// Netlify automatically uses exports.handler as the function entry point
