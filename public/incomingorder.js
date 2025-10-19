@@ -622,7 +622,7 @@ async function handleRefundAction(orderId, collectionName, action, refundAmount 
             else {
                  // Default fallback: treat as Completed refund flow (do NOT return stock)
                 if (isEPayment) {
-                    const endpoint = "/.netlify/functions/refund-payment";
+                    const endpoint = "/netlify/functions/refund-payment";
                     await updateDoc(orderRef, {
                         status: "Refund Pending", // Should transition to 'Refunded' after webhook
                         refundRequest: deleteField(),
@@ -800,7 +800,7 @@ async function updateOrderStatus(orderId, collectionName, newStatus, eta = "") {
 
             // A. Generate PayMongo Checkout Link via Netlify Function
             // NOTE: Change this endpoint for production if not using localhost
-            const endpoint = "/.netlify/functions/generate-paymongo-link";
+            const endpoint = "/netlify/functions/generate-paymongo-link";
             customAlert("Generating secure payment link... Please wait. Do not navigate away.");
 
             // Temporarily set status to "Processing" to prevent double-clicking 
@@ -903,4 +903,5 @@ checkAdminAuth();
 
 // Initial render to show any orders loaded before the snapshot completes
 renderOrders();
+
 
