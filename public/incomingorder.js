@@ -577,7 +577,7 @@ async function handleRefundAction(orderId, collectionName, action, refundAmount 
                 
                 if (isEPayment) {
                     // For E-Payment on completed orders, call the refund API and set pending states.
-                    const endpoint = "/.netlify/functions/refund-payment";
+                    const endpoint = "/netlify/functions/refund-payment";
 
                     // 1. Temporarily update status while API call is in progress
                     await updateDoc(orderRef, {
@@ -903,3 +903,4 @@ checkAdminAuth();
 
 // Initial render to show any orders loaded before the snapshot completes
 renderOrders();
+
