@@ -102,11 +102,11 @@ overlay.addEventListener('click', closeSidebar);
 =============================== */
 const navLinks = sidebar?.querySelectorAll('nav ul li') || [];
 const linkMap = {
-  "menu-link": "index.html",
+  "menu-link": "menu.html",
   "cart-link": "cart.html",
   "order-status-link": "customer-status.html",
   "favorites-link": "favorites.html",
-  // "history-link": "history.html"
+  "history-link": "history.html"
 };
 
 navLinks.forEach(link => {
@@ -121,7 +121,7 @@ navLinks.forEach(link => {
    LOGIN / PROFILE / LOGOUT
 =============================== */
 loginLink?.addEventListener('click', () => {
-  window.location.href = '/login';
+  window.location.href = "login.html";
 });
 
 profileCard?.addEventListener('click', () => {
@@ -140,7 +140,7 @@ logout?.addEventListener('click', async (e) => {
 });
 
 logo?.addEventListener('click', () => {
-  window.location.href = "index.html";
+  window.location.href = "menu.html";
 });
 
 /* ===============================
@@ -155,7 +155,7 @@ onAuthStateChanged(auth, async (user) => {
     if (navLinks[0]) navLinks[0].style.display = "flex";
 
     // Show/Hide other links based on login
-    if (navLinks[1]) navLinks[1].style.display = isLoggedIn ? "flex" : "none"; // Cart
+    if (navLinks[1]) navLinks[1].style.display = isLoggedIn ? "flex" : "display"; // Cart
     if (navLinks[2]) navLinks[2].style.display = isLoggedIn ? "flex" : "none"; // Order Status
     if (navLinks[3]) navLinks[3].style.display = isLoggedIn ? "flex" : "none"; // Favorites
     // if (navLinks[4]) navLinks[4].style.display = isLoggedIn ? "flex" : "none"; // History
@@ -189,4 +189,3 @@ onAuthStateChanged(auth, async (user) => {
   if (profileNameEl) profileNameEl.textContent = fullName;
   if (welcomeHeader) welcomeHeader.textContent = `Welcome, ${fullName}`;
 });
-
