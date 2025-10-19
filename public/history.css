@@ -1,257 +1,308 @@
 /* =========================
-   Body & Main
+   General Body & Main
 ========================= */
 body {
   font-family: 'Poppins', sans-serif;
   margin: 0;
   background-color: #fff8f0;
-  color: #552915;
+  color: #3b2a1a;
+  overflow-x: hidden;
 }
 
 main.history-main {
   margin-left: 260px;
-  padding: 15px;
+  padding: 20px;
   min-height: 100vh;
+  transition: margin-left 0.3s ease;
 }
 
-/* Header */
+/* When sidebar hidden */
+.sidebar-hidden main.history-main {
+  margin-left: 0;
+}
+
+/* =========================
+   Header
+========================= */
 header {
   text-align: center;
-  font-size: 1.6em;
-  margin-bottom: 15px;
+  font-size: 1.8em;
+  margin-bottom: 20px;
   color: #4b3621;
+  font-weight: 600;
+  letter-spacing: 1px;
+}
+
+/* =========================
+   Filter Dropdown Section
+========================= */
+.filter-container {
+  max-width: 750px;
+  margin: 0 auto 20px auto;
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+}
+
+.filter-container label {
+  font-weight: 600;
+  color: #4b3621;
+  margin-right: 8px;
+  font-size: 0.95em;
+}
+
+#statusFilter {
+  border: 1px solid #a07855;
+  border-radius: 8px;
+  padding: 6px 10px;
+  font-size: 0.95em;
+  font-weight: 600;
+  background-color: #fff;
+  color: #3b2a1a;
+  cursor: pointer;
+  transition: background 0.25s ease, border 0.25s ease;
+}
+
+#statusFilter:hover {
+  background-color: #fdf4e7;
+  border-color: #8b5e3c;
 }
 
 /* =========================
    History Container
 ========================= */
 .history-container {
-  max-width: 1200px;
+  max-width: 750px;
   margin: 0 auto;
   display: flex;
-  flex-wrap: wrap;
-  gap: 10px;
-  justify-content: center;
+  flex-direction: column;
+  gap: 20px;
 }
 
-/* No orders message */
 .no-orders {
-  font-size: 1em;
+  font-size: 1.1em;
   color: #c94c4c;
   text-align: center;
+  margin-top: 40px;
+  font-weight: 500;
+}
+
+/* =========================
+   Order Receipt Style
+========================= */
+.order-card {
+  background-color: #fff;
+  border: 1px dashed #a07855;
+  padding: 16px 18px;
+  font-size: 0.95em;
+  line-height: 1.6;
+  position: relative;
+  color: #3b2a1a;
+  border-radius: 8px;
+  box-shadow: 0 2px 6px rgba(0,0,0,0.05);
+}
+
+/* Header line (Queue # + Date) */
+.order-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-weight: 600;
+  margin-bottom: 6px;
+}
+
+.order-header span {
+  font-size: 0.95em;
+}
+
+/* Status Line */
+.order-status {
+  font-weight: 600;
+  margin-bottom: 10px;
+}
+
+.order-status.Completed { color: #4caf50; }
+.order-status.Canceled { color: #d9534f; }
+.order-status.Pending { color: #f0a500; }
+.order-status.Refunded { color: #795548; }
+
+/* Dropdown (view-only) */
+.status-dropdown {
+  border: 1px solid #a07855;
+  border-radius: 6px;
+  background-color: #fff;
+  font-size: 0.9em;
+  color: #3b2a1a;
+  padding: 4px 8px;
+  font-weight: 600;
+  margin-left: 6px;
+  cursor: default;
+}
+
+.status-dropdown:disabled {
+  background-color: #f9f5f0;
+  opacity: 0.9;
+  cursor: not-allowed;
+}
+
+/* Divider line (top & bottom) */
+.order-divider {
+  border-top: 1px dashed #a07855;
+  margin: 8px 0;
+}
+
+/* Items Section */
+.order-items {
   width: 100%;
 }
 
-/* =========================
-   Order Card
-========================= */
-.order-card {
-  background-color: #fff4e6;
-  padding: 12px;
-  border-radius: 12px;
-  box-shadow: 0 3px 10px rgba(0,0,0,0.08);
-  flex: 1 1 280px;
-  max-width: 320px;
+.order-item-row {
   display: flex;
-  flex-direction: column;
-  gap: 6px; /* reduced gap */
-  transition: transform 0.2s ease, box-shadow 0.2s ease;
+  justify-content: space-between;
+  font-size: 0.95em;
+}
+
+.order-item-name {
+  flex: 1;
+  text-align: left;
+}
+
+.order-item-qty {
+  width: 60px;
+  text-align: center;
+}
+
+.order-item-price {
+  width: 90px;
+  text-align: right;
+}
+
+/* Delivery Fee, Address, Total */
+.order-summary {
+  margin-top: 10px;
+  font-size: 0.95em;
+}
+
+.order-summary-row {
+  display: flex;
+  justify-content: space-between;
+}
+
+.order-summary strong {
+  font-weight: 600;
+}
+
+.order-address {
+  margin-top: 6px;
+  font-style: italic;
   font-size: 0.9em;
 }
 
-.order-card:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 5px 12px rgba(0,0,0,0.12);
+.order-total {
+  font-weight: 700;
+  font-size: 1em;
+  display: flex;
+  justify-content: space-between;
+  margin-top: 8px;
 }
-
-.order-card h3 {
-  margin: 0 0 4px 0; /* smaller bottom margin */
-  font-size: 1.1em;
-  color: #4b3621;
-}
-
-.order-card .order-date,
-.order-card .status {
-  margin: 0;
-  font-size: 0.85em;
-  line-height: 1.2em; /* tighter line height */
-}
-
-.status.Completed { color: #4caf50; }
-.status.Canceled { color: #c94c4c; }
-.status.Pending { color: #f0a500; }
 
 /* =========================
-   Order Items - Image Container Only
+   Pagination Controls
 ========================= */
-.order-items {
-  display: flex;
-  flex-direction: column;
-  gap: 4px; /* smaller gap */
-  margin-top: 4px;
-}
-
-.order-item {
+.pagination-controls {
   display: flex;
   justify-content: center;
-  background-color: #ffffff;
-  padding: 8px; /* reduced padding */
-  border-radius: 12px;
-  box-shadow: 0 2px 8px rgba(0,0,0,0.05);
-  transition: transform 0.2s ease, box-shadow 0.2s ease;
+  align-items: center;
+  gap: 12px;
+  margin-top: 15px;
 }
 
-.order-item:hover {
-  transform: translateY(-1px);
-  box-shadow: 0 4px 10px rgba(0,0,0,0.1);
-}
-
-.order-item img {
-  width: 180px;
-  height: 180px;
-  object-fit: cover;
-  border-radius: 10px;
-}
-
-/* =========================
-   Product Info in Order Card
-========================= */
-.item-name {
-  font-weight: 600;
-  font-size: 0.95em;
-  color: #4b3621;
-  margin: 2px 0; /* reduced spacing */
-}
-
-.item-size,
-.item-addons,
-.item-qty,
-.item-total,
-.item-delivery,
-.item-grandtotal {
-  font-size: 0.85em;
-  color: #6b4b3a;
-  margin: 1px 0; /* minimal spacing between lines */
-  line-height: 1.2em;
-}
-
-/* =========================
-   Show All Button
-========================= */
-.show-all-btn {
-  padding: 6px 10px;
+.pagination-controls button {
   background-color: #552915;
   color: #fff;
   border: none;
+  padding: 6px 14px;
   border-radius: 6px;
   cursor: pointer;
   font-weight: 600;
-  margin-top: 2px; /* reduced margin */
-  transition: background 0.2s ease, transform 0.2s ease;
+  transition: background 0.25s ease;
 }
 
-.show-all-btn:hover {
-  background-color: #4b2c0f;
-  transform: translateY(-1px);
+.pagination-controls button:hover:not(:disabled) {
+  background-color: #3b1d0f;
+}
+
+.pagination-controls button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.pagination-controls span {
+  font-weight: 600;
+  color: #4b3621;
+  font-size: 0.95em;
 }
 
 /* =========================
-   Popup / Modal
+   Login Popup
 ========================= */
-.popup, .order-modal {
-  display: none;
-  position: fixed;
-  top:0; left:0;
-  width: 100%; height: 100%;
-  background: rgba(0,0,0,0.5);
-  justify-content: center;
-  align-items: center;
-  z-index: 2000;
-}
-
-.popup-content, .order-modal-content {
-  background-color: #fff8f0;
-  padding: 18px 20px;
+#loginPopup .popup-content {
+  max-width: 400px;
+  background: #fff;
+  padding: 20px;
   border-radius: 12px;
   text-align: center;
-  max-width: 600px;
-  width: 90%;
-  max-height: 80%;
-  overflow-y: auto;
-  box-shadow: 0 5px 15px rgba(0,0,0,0.15);
 }
 
-.order-modal-content h2 {
-  text-align: center;
-  margin-bottom: 12px;
+#loginPopup p {
+  margin-bottom: 15px;
+  font-size: 1em;
   color: #4b3621;
-  font-size: 1.25em;
 }
 
-.order-modal-content .order-item {
-  flex-direction: column;
-  align-items: center;
-  gap: 4px;
-  padding: 6px;
-  margin-bottom: 4px;
-  background-color: #ffffff;
-  border-radius: 10px;
-  box-shadow: 0 2px 8px rgba(0,0,0,0.05);
-}
-
-.order-modal-content .order-item img {
-  width: 100px;
-  height: 100px;
-  border-radius: 10px;
-  object-fit: cover;
-}
-
-.order-modal-content .item-name {
-  font-size: 0.95em;
-  font-weight: 600;
-  margin: 2px 0;
-}
-
-.order-modal-content .item-addons,
-.order-modal-content .item-size,
-.order-modal-content .item-qty,
-.order-modal-content .item-total,
-.order-modal-content .item-delivery,
-.order-modal-content .item-grandtotal {
-  font-size: 0.85em;
-  color: #6b4b3a;
-  margin: 1px 0;
-  line-height: 1.2em;
-}
-
-.modal-close-btn {
-  display: block;
-  margin: 10px auto 0 auto;
-  padding: 8px 12px;
+#loginRedirect {
   background-color: #552915;
   color: #fff;
   border: none;
+  padding: 8px 16px;
   border-radius: 8px;
   cursor: pointer;
   font-weight: 600;
+  transition: background 0.25s ease;
 }
 
-.modal-close-btn:hover {
+#loginRedirect:hover {
   background-color: #4b2c0f;
 }
 
 /* =========================
-   Responsive
+   Responsive Design
 ========================= */
-@media (max-width: 1024px) {
-  main.history-main { margin-left: 0; padding: 15px; }
-  .history-container { gap: 6px; }
-  .order-card { max-width: 280px; }
-  .order-item img { width: 90px; height: 90px; }
-}
-
 @media (max-width: 768px) {
-  .order-card { flex: 1 1 100%; }
-  .order-item img { width: 80px; height: 80px; }
-  .order-modal-content { max-width: 90%; padding: 12px; }
+  main.history-main {
+    margin-left: 0;
+    padding: 15px;
+  }
+
+  .filter-container {
+    justify-content: center;
+  }
+
+  .order-card {
+    font-size: 0.9em;
+    padding: 12px 14px;
+  }
+
+  .order-item-price {
+    width: 70px;
+  }
+
+  .order-item-qty {
+    width: 45px;
+  }
+
+  .pagination-controls {
+    flex-direction: column;
+    gap: 8px;
+  }
 }
