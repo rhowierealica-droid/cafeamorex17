@@ -1,23 +1,48 @@
+// ==========================
+// feedback.js (Admin Access Check Fixed)
+// ==========================
 import { db } from './firebase-config.js';
-import { collection, getDocs, query, orderBy } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
-import { getAuth, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
+import { 
+  collection, getDocs, query, orderBy, doc, getDoc 
+} from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+import { 
+  getAuth, onAuthStateChanged 
+} from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
 
 // DOM
-const auth = getAuth();  // ← this was missing
+const auth = getAuth();
 const feedbackContainer = document.getElementById('feedback-container');
 
-// Redirect if not logged in
+// ✅ Check if user is logged in and has Admin role
 onAuthStateChanged(auth, async (user) => {
   if (!user) {
-    window.location.replace("login.html"); // redirect
+    window.location.href = "login.html";
     return;
   }
 
-  // User is logged in -> initialize the app
-  await init();
+  try {
+    const userDoc = await getDoc(doc(db, "users", user.uid));
+
+    if (!userDoc.exists() || userDoc.data().role !== "Admin") {
+      alert("Access denied. Admins only.");
+      window.location.href = "login.html";
+      return;
+    }
+
+    // ✅ Admin verified, continue loading
+    console.log("Admin verified, access granted.");
+    loadFeedback();
+
+  } catch (err) {
+    console.error("Error verifying admin:", err);
+    alert("Error verifying access.");
+    window.location.href = "login.html";
+  }
 });
 
-// Fetch all DeliveryOrders and display feedback with product name
+// ==========================
+// FETCH FEEDBACK
+// ==========================
 async function loadFeedback() {
   feedbackContainer.innerHTML = '';
   const ordersRef = collection(db, "DeliveryOrders");
@@ -54,6 +79,3 @@ async function loadFeedback() {
     feedbackContainer.innerHTML = '<p class="no-feedback">No feedback available yet.</p>';
   }
 }
-
-// Init
-loadFeedback();
