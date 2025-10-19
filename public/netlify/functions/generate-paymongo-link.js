@@ -1,4 +1,4 @@
-// generate-paymongo-link.js (Standalone Module for Admin Approval Flow)
+// generate-paymongo-link.js (Standalone Module for Admin Approval Flow - Netlify Format)
 
 const axios = require('axios');
 const { v4: uuidv4 } = require('uuid'); 
@@ -11,31 +11,53 @@ const AUTH_HEADER = PAYMONGO_SECRET_KEY
     : null;
 
 /**
- * Handles the logic for generating a PayMongo Checkout Session link, 
- * typically used for admin-approved or manually created payments.
- * * @param {object} req - The request object (containing body parameters).
- * @param {object} res - The response object.
+ * Handles the logic for generating a PayMongo Checkout Session link.
+ * * NOTE: The signature is changed from (req, res) to the standard Netlify (event, context)
+ * to resolve the 'Runtime.HandlerNotFound' error and handle body parsing reliably.
+ * * @param {object} event - The event object (contains request body in event.body).
+ * @param {object} context - The context object.
  */
-exports.handler = async (req, res) => { 
+exports.handler = async (event, context) => { // Using exports.handler to fix the error
+    
+    // 1. Check for Secret Key
     if (!PAYMONGO_SECRET_KEY) {
-        return res.status(500).json({ error: "Server configuration error: PAYMONGO_SECRET_KEY is missing." });
+        return {
+            statusCode: 500,
+            body: JSON.stringify({ error: "Server configuration error: PAYMONGO_SECRET_KEY is missing." }),
+        };
     }
 
-    // Deconstruct the request body
+    // 2. Parse the Request Body (CRITICAL FIX for Netlify functions)
+    let parsedBody;
+    try {
+        // Netlify event.body is a string
+        parsedBody = JSON.parse(event.body); 
+    } catch (e) {
+        return {
+            statusCode: 400,
+            body: JSON.stringify({ error: "Invalid JSON format in request body." }),
+        };
+    }
+
+    // Deconstruct the parsed body
     const { 
         orderId, 
         collectionName, 
         amount, 
         lineItems, 
-        customerDetails = {}, // Use default empty object for safety
+        customerDetails = {},
         description 
-    } = req.body;
+    } = parsedBody;
 
     // amount is in Philippine Pesos (e.g., 100.50), convert to centavos
     const amountInCentavos = Math.round(Number(amount) * 100);
 
+    // 3. Basic Validation
     if (!orderId || !collectionName || amountInCentavos < 100 || !lineItems?.length) {
-        return res.status(400).json({ error: "Invalid order, amount, or line items details" });
+        return {
+            statusCode: 400,
+            body: JSON.stringify({ error: "Invalid order, amount, or line items details" }),
+        };
     }
 
     // Use a unique idempotency key for this request
@@ -60,17 +82,17 @@ exports.handler = async (req, res) => {
                                 country: "PH"
                             }
                         },
-                        // NOTE: Update these URLs to your live domain when deploying
-                        success_url: "http://192.168.1.5:5500/CafeAmoreSite/public/index.html", 
-                        cancel_url: "http://192.168.1.5:5500/CafeAmoreSite/public/index.html", 
+                        // >>> MUST CHANGE THIS IN PRODUCTION <<<
+                        success_url: "https://[YOUR_NETLIFY_DOMAIN]/public/index.html", 
+                        cancel_url: "https://[YOUR_NETLIFY_DOMAIN]/public/index.html", 
                         send_email_receipt: true,
                         description: description || "Order Payment (Admin Approved)",
-                        line_items: lineItems, // Assumed to be correctly formatted (amount in centavos)
+                        line_items: lineItems,
                         payment_method_types: ["gcash", "card", "paymaya", "grab_pay"], 
                         metadata: {
                             orderId: orderId,
                             collectionName: collectionName,
-                            source: 'admin_approval_link' // CRITICAL for webhook logic
+                            source: 'admin_approval_link'
                         },
                     },
                 },
@@ -80,13 +102,16 @@ exports.handler = async (req, res) => {
                     Authorization: `Basic ${AUTH_HEADER}`,
                     "Content-Type": "application/json",
                     Accept: "application/json",
-                    "Idempotency-Key": idempotencyKey, // Prevents duplicate charges
+                    "Idempotency-Key": idempotencyKey,
                 },
             }
         );
 
-        // Success response
-        return res.json({ checkoutUrl: response.data.data.attributes.checkout_url });
+        // Success response (Netlify format)
+        return {
+            statusCode: 200,
+            body: JSON.stringify({ checkoutUrl: response.data.data.attributes.checkout_url }),
+        };
 
     } catch (error) {
         console.error(
@@ -94,14 +119,17 @@ exports.handler = async (req, res) => {
             error.response?.data || error.message
         );
         
-        // Error response
-        return res.status(500).json({
-            error: "Failed to create checkout session for admin approval",
-            details: error.response?.data?.errors?.[0]?.detail || error.message,
-        });
+        // Error response (Netlify format)
+        return {
+            statusCode: 500,
+            body: JSON.stringify({
+                error: "Failed to create checkout session for admin approval",
+                // Provide clearer error details from PayMongo
+                details: error.response?.data?.errors?.[0]?.detail || error.message,
+            }),
+        };
     }
 };
 
-// If this file is required by server.cjs, ensure you export the handler function.
-// If this is used as a Netlify/AWS Lambda function, you'd export 'handler' as module.exports.
-module.exports = exports.handler;
+// No need for a separate module.exports = exports.handler; when using exports.handler
+// for the main Netlify function entry point.
