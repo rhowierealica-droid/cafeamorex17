@@ -798,90 +798,60 @@ async function updateOrderStatus(orderId, collectionName, newStatus, eta = "") {
                 return;
             }
 
-            // A. Generate PayMongo Checkout Link via Netlify Function
-            // NOTE: Change this endpoint for production if not using localhost
-            const endpoint = "/netlify/functions/generate-paymongo-link";
-            customAlert("Generating secure payment link... Please wait. Do not navigate away.");
+           // --- A. Generate PayMongo Checkout Link via Netlify Function ---
+const endpoint = "/netlify/functions/generate-paymongo-link";
+customAlert("Generating secure payment link... Please wait. Do not navigate away.");
 
-            // Temporarily set status to "Processing" to prevent double-clicking 
-            await updateDoc(orderRef, { status: "Processing" });
+// Temporarily set status to "Processing"
+await updateDoc(orderRef, { status: "Processing" });
 
-            const response = await fetch(endpoint, {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({
-                    orderId: orderId,
-                    collectionName: collectionName,
-                    amount: orderData.total, // Send amount in PHP, server will handle centavos
-                    lineItems: orderData.paymentMetadata.lineItems,
-                    customerDetails: orderData.paymentMetadata.customerDetails,
-                    description: `Order ${formatQueueNumber(orderData.queueNumber)}`
-                })
-            });
+let data;
+try {
+  const response = await fetch(endpoint, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      orderId: orderId,
+      collectionName: collectionName,
+      amount: orderData.total,
+      lineItems: orderData.paymentMetadata.lineItems,
+      customerDetails: orderData.paymentMetadata.customerDetails,
+      description: `Order ${formatQueueNumber(orderData.queueNumber)}`
+    })
+  });
 
-            const data = await response.json();
-            
-            if (data.error || !data.checkoutUrl) {
-                console.error("PayMongo Link Generation Failed:", data.details || data.error);
-                customAlert(`Payment link failed to generate: ${data.details || data.error}. Status reverted.`);
-                // Revert status to allow re-try
-                await updateDoc(orderRef, { status: originalStatus }); 
-                return;
-            }
+  data = await response.json();
 
-            // B. Success: Update Order with new Status and the generated URL
-            updatePayload.checkoutUrl = data.checkoutUrl;
-            updatePayload.status = "Waiting for Payment"; // Final status after successful link generation
-            updatePayload.paymentMetadata = deleteField(); // Clean up metadata
+  if (!response.ok || data.error || !data.checkoutUrl) {
+    console.error("PayMongo Link Generation Failed:", data.details || data.error);
+    customAlert(`Payment link failed to generate: ${data.details || data.error}. Status reverted.`);
+    await updateDoc(orderRef, { status: originalStatus });
+    return;
+  }
 
-            customAlert("Payment link generated successfully. Status updated to 'Waiting for Payment'.");
-        }
-        
-        // --- 2. CANCELLATION / DECLINE: New status is "Canceled" ---
-        else if (newStatus === "Canceled") {
-            // Logic moved from the old place, simplified:
-            // If the order has no payment ID (cash/timed out) OR is being declined during approval, return stock.
-            if (!orderData.paymongoPaymentId || originalStatus === "Wait for Admin to Accept") {
-                await returnStock(orderData.products || orderData.items);
-                customAlert(`Order #${orderData.queueNumber} canceled and stock returned.`);
-            } else {
-                // E-Payment order canceled after being paid (or Waiting for Payment - rare but handled)
-                customAlert(`Order #${orderData.queueNumber} is E-Payment. It was manually canceled. Refund must be processed separately.`);
-            }
-            
-            // Finalize cancellation flags
-            updatePayload.finalRefundStatus = "Canceled"; 
-            updatePayload.refundRequest = deleteField();
-        }
+  // --- B. Success ---
+  updatePayload.checkoutUrl = data.checkoutUrl;
+  updatePayload.status = "Waiting for Payment";
+  updatePayload.paymentMetadata = deleteField();
 
-        // --- 3. Clear refund flags when moving to a new non-refund status ---
-        if (newStatus === "Preparing" || newStatus === "Delivery" || newStatus === "Completed" || newStatus === "Waiting for Payment") {
-            updatePayload.refundRequest = deleteField();
-            if (newStatus === "Completed") {
-                // Clear final status only if it's a clean completion
-                updatePayload.finalRefundStatus = deleteField();
-            }
-        }
-        
-        // --- Final Firestore Update ---
-        await updateDoc(orderRef, updatePayload);
-        renderOrders(); // Re-render the list immediately
+  await updateDoc(orderRef, updatePayload);
+  customAlert("Payment link generated successfully. Status updated to 'Waiting for Payment'.");
 
-    } catch (err) {
-        console.error("Critical Error in updateOrderStatus:", err);
-        customAlert(`A critical error occurred while updating the order status for Order ${orderId}.`);
-        
-        // Attempt to reset status if it was stuck in "Processing" from the approval block
-        if (originalStatus === "Wait for Admin to Accept" && newStatus === "Waiting for Payment") {
-            try {
-                await updateDoc(orderRef, { status: originalStatus });
-                console.warn("Status reverted to 'Wait for Admin to Accept' after API failure.");
-            } catch(resetErr) {
-                console.error("Failed to revert status:", resetErr);
-            }
-        }
+} catch (err) {
+  console.error("❌ Critical Error while generating PayMongo link or updating order:", err);
+  customAlert(`A critical error occurred while updating the order status for Order ${orderId}.`);
+
+  // Revert status if something failed during Processing
+  if (originalStatus === "Wait for Admin to Accept") {
+    try {
+      await updateDoc(orderRef, { status: originalStatus });
+      console.warn("Status reverted to 'Wait for Admin to Accept' after API failure.");
+    } catch (resetErr) {
+      console.error("Failed to revert status:", resetErr);
     }
+  }
 }
+
 
 
 // =========================================================
@@ -903,5 +873,6 @@ checkAdminAuth();
 
 // Initial render to show any orders loaded before the snapshot completes
 renderOrders();
+
 
 
