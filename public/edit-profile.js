@@ -65,7 +65,7 @@ const currentPasswordForChange = document.getElementById("currentPasswordForChan
 
 // Phone Fields
 const phoneInput = document.getElementById("phone"); // Display only
-const currentPhoneInput = document.getElementById("currentPhoneInput");
+const currentPhoneInput = document.getElementById("currentPhoneInput"); // <<< CONFIRM CURRENT PHONE INPUT
 const newPhoneInput = document.getElementById("newPhone");
 const currentPhonePasswordInput = document.getElementById("currentPhonePassword"); // Used for reauth
 
@@ -188,8 +188,8 @@ async function loadUserData() {
         emailInput.value = maskEmail(user.email || data.email || "");
         phoneInput.value = maskPhone(data.phoneNumber || "");
 
-        if (currentEmailInput) currentEmailInput.value = user.email || data.email || "";
-        if (currentPhoneInput) currentPhoneInput.value = maskPhone(data.phoneNumber || ""); // Keep this masked on load for security
+        // if (currentEmailInput) currentEmailInput.value = user.email || data.email || ""; // <<< REMOVED
+        // if (currentPhoneInput) currentPhoneInput.value = maskPhone(data.phoneNumber || ""); // <<< REMOVED: DON'T PRE-FILL CURRENT PHONE
 
         // Address form fields
         barangayInput.value = data.barangay || "";
@@ -280,13 +280,17 @@ function setupEditSaveCancel(editBtnId, saveBtnId, cancelBtnId, inputs, formId, 
             // Standard forms (Name, Email, Password, Phone)
             inputs.forEach(i => i.value = originalValues[i.id]);
             inputs.forEach(i => i.disabled = true);
+            
             // Special case for email/phone: reset current inputs to display only
             if (formId === "emailForm") {
                  emailInput.value = maskEmail(auth.currentUser.email);
+                 if (currentEmailInput) currentEmailInput.value = ""; // Clear current email input
             }
             if (formId === "phoneForm") {
                  loadUserData(); // Reload to get masked number
+                 if (currentPhoneInput) currentPhoneInput.value = ""; // Clear current phone input
             }
+
         } else {
             // Address Form (Used for Default and Saved Addresses)
             // Determine the source of original values
@@ -336,6 +340,15 @@ function setupEditSaveCancel(editBtnId, saveBtnId, cancelBtnId, inputs, formId, 
             // Reset field states after successful save
             if (formId !== "addressForm") {
                 inputs.forEach(i => i.disabled = true);
+                
+                // Clear the current email/phone inputs after successful save
+                if (formId === "emailForm" && currentEmailInput) {
+                    currentEmailInput.value = "";
+                }
+                if (formId === "phoneForm" && currentPhoneInput) {
+                    currentPhoneInput.value = "";
+                }
+
             } else {
                 // Address: Disable all fields and hide inline container if it was active
                 barangayInput.disabled = true;
@@ -457,39 +470,49 @@ setupEditSaveCancel(
     "editEmailBtn",
     "saveEmailBtn",
     "cancelEmailBtn",
-    [emailInput, currentEmailInput, newEmailInput, currentPasswordInput],
+    [emailInput, newEmailInput, currentPasswordInput], 
     "emailForm",
     async () => {
         const user = auth.currentUser;
         if (!user) throw new Error("No account detected.");
-        if (!currentEmailInput.value || !newEmailInput.value || !currentPasswordInput.value)
+        
+        // Use the user-entered values
+        const confirmEmail = currentEmailInput.value.trim(); 
+        const newEmail = newEmailInput.value.trim();
+        const currentPassword = currentPasswordInput.value;
+
+        if (!confirmEmail || !newEmail || !currentPassword)
             throw new Error("All fields are required");
-        // User.email is the source of truth for current email
-        if (currentEmailInput.value !== user.email) 
-            throw new Error("Current email does not match account email. Please cancel and try again.");
+        
+        // New validation: User input must match Firebase email
+        if (confirmEmail !== user.email) 
+            throw new Error("The entered current email does not match your account email.");
 
         await reload(user);
-        const credential = EmailAuthProvider.credential(user.email, currentPasswordInput.value);
+        
+        // Use user-entered 'confirmEmail' and 'currentPassword' to reauthenticate
+        const credential = EmailAuthProvider.credential(confirmEmail, currentPassword);
         await reauthenticateWithCredential(user, credential);
 
         const usersRef = collection(db, "users");
-        const q = query(usersRef, where("email", "==", newEmailInput.value));
+        const q = query(usersRef, where("email", "==", newEmail));
         const querySnapshot = await getDocs(q);
         if (!querySnapshot.empty) throw new Error("Email already in use");
 
-        await updateDoc(doc(db, "users", user.uid), { pendingEmail: newEmailInput.value });
-        await verifyBeforeUpdateEmail(user, newEmailInput.value);
+        await updateDoc(doc(db, "users", user.uid), { pendingEmail: newEmail });
+        await verifyBeforeUpdateEmail(user, newEmail);
 
-        showReLoginPopup("Email updated successfully! Please login again to confirm new email.");
+        showReLoginPopup("Email change verification sent! Please check your new email's inbox. You will be logged out now.");
     },
     () => {
         if (emailEditFields) emailEditFields.style.display = "block";
         if (emailInput) emailInput.disabled = true;
-        if (currentEmailInput) currentEmailInput.value = auth.currentUser.email;
+        if (currentEmailInput) currentEmailInput.disabled = false; // Ensure current email input is enabled for entry
     },
     () => {
         if (emailEditFields) emailEditFields.style.display = "none";
         if (emailInput) emailInput.disabled = true;
+        if (currentEmailInput) currentEmailInput.value = ""; // Clear on cancel
         if (newEmailInput) newEmailInput.value = "";
         if (currentPasswordInput) currentPasswordInput.value = "";
     }
@@ -532,28 +555,33 @@ setupEditSaveCancel(
     "editPhoneBtn",
     "savePhoneBtn",
     "cancelPhoneBtn",
-    [phoneInput, currentPhoneInput, newPhoneInput, currentPhonePasswordInput],
+    [phoneInput, newPhoneInput, currentPhonePasswordInput], // <<< currentPhoneInput REMOVED from generic handler
     "phoneForm",
     async () => {
         const user = auth.currentUser;
         if (!user) throw new Error("No account detected.");
-        if (!currentPhoneInput.value || !newPhoneInput.value || !currentPhonePasswordInput.value)
+        
+        const confirmPhoneMasked = currentPhoneInput.value.trim();
+        const newPhone = newPhoneInput.value.trim();
+        const currentPassword = currentPhonePasswordInput.value;
+
+        if (!confirmPhoneMasked || !newPhone || !currentPassword)
             throw new Error("All fields are required");
 
         const docRef = doc(db, "users", user.uid);
         const docSnap = await getDoc(docRef);
         if (!docSnap.exists()) throw new Error("User data not found.");
         const data = docSnap.data();
-
-        // Check if the masked current phone matches the masked saved phone
-        if (currentPhoneInput.value !== maskPhone(data.phoneNumber))
-             throw new Error("Current phone does not match saved number. Please cancel and try again.");
+        
+        // Validation: User input (which should be the masked number) must match the saved masked number
+        if (confirmPhoneMasked !== maskPhone(data.phoneNumber))
+             throw new Error("The entered current phone number does not match your masked account number. Please enter the number as it appears masked above.");
         
         // Re-authenticate using email/password
-        const credential = EmailAuthProvider.credential(user.email, currentPhonePasswordInput.value);
+        const credential = EmailAuthProvider.credential(user.email, currentPassword);
         await reauthenticateWithCredential(user, credential);
 
-        let newPhoneNumber = newPhoneInput.value.trim();
+        let newPhoneNumber = newPhone;
         // Format to E.164 (e.g., +639XXXXXXXXX) for Firebase
         if (newPhoneNumber.startsWith("09")) newPhoneNumber = "+63" + newPhoneNumber.slice(1);
         else if (!newPhoneNumber.startsWith("+63")) newPhoneNumber = "+63" + newPhoneNumber.replace(/[^0-9]/g, "").slice(-10);
@@ -604,15 +632,16 @@ setupEditSaveCancel(
     () => {
         if (phoneEditFields) phoneEditFields.style.display = "block";
         if (phoneInput) phoneInput.disabled = true;
+        if (currentPhoneInput) currentPhoneInput.disabled = false; // Ensure current phone input is enabled for entry
     },
     () => {
         if (phoneEditFields) phoneEditFields.style.display = "none";
         if (phoneInput) phoneInput.disabled = true;
+        if (currentPhoneInput) currentPhoneInput.value = ""; // Clear on cancel
         if (newPhoneInput) newPhoneInput.value = "";
         if (currentPhonePasswordInput) currentPhonePasswordInput.value = "";
     }
 );
-
 
 // ===================================
 // Address Tab Logic
