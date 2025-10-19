@@ -96,13 +96,13 @@ function injectPopupStyles() {
     
     /* === REFUND BADGE STYLES (MATCH CSS FILE) === */
     .refund-badge {
-        display: inline-block;
-        padding: 2px 6px;
-        border-radius: 6px; /* Matched the 6px in CSS */
-        font-size: 0.8em;
-        font-weight: bold;
-        margin-left: 5px;
-        color: white;
+      display: inline-block;
+      padding: 2px 6px;
+      border-radius: 6px; /* Matched the 6px in CSS */
+      font-size: 0.8em;
+      font-weight: bold;
+      margin-left: 5px;
+      color: white;
     }
     /* Use established classes for coloring, matching the CSS definitions */
     .refund-refunded, .refund-manual { background-color: #4caf50; } /* Green */
@@ -112,12 +112,18 @@ function injectPopupStyles() {
 
     /* Match the view-refund-btn style from your provided CSS overrides/buttons */
     .view-refund-btn { 
-        background-color: #795548; /* Brown/Muted color for viewing details */ 
-        color: white; 
+      background-color: #795548; /* Brown/Muted color for viewing details */ 
+      color: white; 
     }
     .view-refund-btn:hover { 
-        background-color: #5d4037; 
+      background-color: #5d4037; 
     }
+    
+    /* New styles for admin approval buttons */
+    .admin-accept-btn { background-color: #4CAF50; }
+    .admin-accept-btn:hover { background-color: #45a049; }
+    .admin-decline-btn { background-color: #f44336; }
+    .admin-decline-btn:hover { background-color: #d32f2f; }
     `;
     document.head.appendChild(style);
 }
@@ -220,16 +226,17 @@ function handleOrderSnapshot(snapshot, type, collectionName) {
             ordersData.push(order);
         }
 
-        // Automatic Cancellation Timer (60 seconds)
+        // Automatic Cancellation Timer (60 seconds) for standard Pending orders
         if (order.data.status === "Pending" && !order.data.refundRequest && !pendingTimers[order.id]) {
-            pendingTimers[order.id] = setTimeout(() => {
+            pendingTimers[order.id] = setTimeout(async () => {
                 // For e-payment orders, automatically cancel only if there's no payment ID (i.e., payment failed or timed out)
-                if (!order.data.paymongoPaymentId || order.data.paymentMethod === "Cash") {
+                // Also, do not auto-cancel if it's an admin approval wait state.
+                if (!order.data.paymongoPaymentId && order.data.status !== "Wait for Admin to Accept") {
                     // Stock is returned in updateOrderStatus only if no payment ID is present
-                    updateOrderStatus(order.id, order.collection, "Canceled");
+                    await updateOrderStatus(order.id, order.collection, "Canceled");
                 } else {
-                    // For paid E-Payment orders, staff must manually accept/cancel
-                    console.warn(`E-payment order ${order.id} still Pending after 60s. Awaiting staff action.`);
+                    // For paid E-Payment orders or Admin Approval orders, staff must manually accept/cancel
+                    console.warn(`Order ${order.id} still Pending after 60s. Awaiting staff action.`);
                 }
                 delete pendingTimers[order.id];
             }, 60000);
@@ -255,18 +262,20 @@ function renderOrders() {
             const finalRefundStatus = o.data.finalRefundStatus;
 
             switch (selectedTab) {
+                case "Order Approval":
+                    return status === "Wait for Admin to Accept";
                 case "Pending":
                     // Show all orders that are Pending OR have an active refund request
                     return status === "Pending" || o.data.refundRequest;
                 case "Completed":
                     // Include final completed, refunded, and manual refund success statuses
-                    return status === "Completed" || ["Succeeded", "Manual"].includes(finalRefundStatus) || status === "Refunded";
+                    return status === "Completed" || ["Succeeded", "Manual", "Refunded"].includes(status) || ["Succeeded", "Manual"].includes(finalRefundStatus);
                 case "Canceled":
                     // Include all cancelled, failed, and denied statuses
-                    return ["Canceled", "Refund Failed", "Refund Denied", "Refunded"].includes(status) ||
-                           ["Failed", "API Failed", "Denied", "Canceled"].includes(finalRefundStatus);
+                    return ["Canceled", "Refund Failed", "Refund Denied"].includes(status) ||
+                        ["Failed", "API Failed", "Denied", "Canceled"].includes(finalRefundStatus);
                 default:
-                    // For Preparing and Delivery tabs
+                    // For Preparing, Delivery, and Waiting for Payment tabs
                     return status === selectedTab;
             }
         })
@@ -286,8 +295,8 @@ function renderOrders() {
                 return `<div>${qty} × ${p.product}${sizeText}${addons} — ₱${total.toFixed(2)}</div>`;
             }).join("");
 
-            const grandTotal = order.total || 0; // Use the saved total from POS for consistency
-            const totalDisplay = Number.isFinite(grandTotal) ? grandTotal.toFixed(2) : (grandTotal || 0).toFixed(2);
+            const grandTotal = order.total; // Use the saved total from POS for consistency
+            const totalDisplay = grandTotal.toFixed(2);
 
             const queue = formatQueueNumber(order.queueNumber);
             const etaText = order.estimatedTime ? `<div>ETA: ${order.estimatedTime}</div>` : "";
@@ -309,23 +318,13 @@ function renderOrders() {
                         break;
                     case "Pending":
                         badgeClass = 'refund-pending';
-                        mainStatusDisplay = "Refunded";
+                        mainStatusDisplay = "Refund Pending";
                         break;
-                    case "Failed": case "API Failed":
+                    case "Failed": case "API Failed": case "Denied": case "Canceled":
                         badgeClass = 'refund-failed';
-                        mainStatusDisplay = "Refund Failed";
-                        break;
-                    case "Denied":
-                        badgeClass = 'refund-denied';
-                        // For denied we prefer to show the denial while preserving main status display
-                        mainStatusDisplay = mainStatus === "Pending" ? "Pending" : "Refund Denied";
-                        break;
-                    case "Canceled":
-                        badgeClass = 'refund-failed';
-                        mainStatusDisplay = "Canceled";
-                        break;
-                    default:
-                        badgeClass = 'refund-error';
+                        if (badgeText === "Denied") mainStatusDisplay = "Refund Denied";
+                        else if (badgeText === "Canceled") mainStatusDisplay = "Canceled";
+                        else mainStatusDisplay = "Refund Failed";
                         break;
                 }
 
@@ -341,6 +340,14 @@ function renderOrders() {
                 actionBtnHtml = `<button class="view-refund-btn" data-id="${orderId}" data-collection="${orderItem.collection}">View Refund Request</button>`;
             } else {
                 switch (order.status) {
+                    case "Wait for Admin to Accept":
+                        actionBtnHtml = `<button class="admin-accept-btn" data-id="${orderId}" data-collection="${orderItem.collection}">Accept Order</button>
+                                         <button class="admin-decline-btn" data-id="${orderId}" data-collection="${orderItem.collection}">Decline Order</button>`;
+                        break;
+                    case "Waiting for Payment":
+                        // No action needed in this view, waiting for customer payment/system webhook
+                        actionBtnHtml = "";
+                        break;
                     case "Pending":
                         actionBtnHtml = orderItem.type === "Delivery"
                             ? `<button class="accept-btn" data-id="${orderId}" data-collection="${orderItem.collection}" data-type="Delivery">Preparing (Set ET)</button>
@@ -359,16 +366,11 @@ function renderOrders() {
                     case "Refund Pending":
                         actionBtnHtml = `<button class="view-refund-btn" disabled>Refund Processing...</button>`;
                         break;
-                    case "Completed":
-                    case "Canceled": // Keep the action cell blank for final states
+                    case "Completed": // Keep the action cell blank for final states
+                    case "Canceled":
                     case "Refund Denied":
                     case "Refund Failed":
-                        actionBtnHtml = "";
-                        break;
-                    case "Refunded":
-                        actionBtnHtml = "";
-                        break;
-                    default:
+                    case "Refunded": // Added this final status
                         actionBtnHtml = "";
                         break;
                 }
@@ -391,6 +393,16 @@ function renderOrders() {
 // Attach handlers
 // ---------------------
 function attachActionHandlers() {
+    // New Admin Approval Handlers
+    document.querySelectorAll(".admin-accept-btn").forEach(btn => {
+        btn.addEventListener("click", e => updateOrderStatus(e.target.dataset.id, e.target.dataset.collection, "Waiting for Payment"));
+    });
+
+    document.querySelectorAll(".admin-decline-btn").forEach(btn => {
+        btn.addEventListener("click", e => updateOrderStatus(e.target.dataset.id, e.target.dataset.collection, "Canceled"));
+    });
+
+    // Existing Handlers
     document.querySelectorAll(".accept-btn").forEach(btn => {
         btn.addEventListener("click", e => {
             const id = e.target.dataset.id;
@@ -441,6 +453,14 @@ function attachActionHandlers() {
                 return;
             }
 
+            // --- Calculate Refundable Total (Excluding Delivery Fee) ---
+            const productsTotal = (orderData.products || orderData.items || []).reduce((sum, p) => 
+                sum + (p.total || ((p.sizePrice || 0) + (p.addonsPrice || 0)) * (p.qty || p.quantity || 1))
+            , 0);
+
+            // Refundable amount is ONLY the products/items total, NOT the delivery fee.
+            const maxRefundable = productsTotal;
+            
             // --- Build Order Details HTML for Popup ---
             let productsHtml = (orderData.products || orderData.items || []).map(p => {
                 const addons = p.addons?.length ? ` (Add-ons: ${p.addons.map(a => `${a.name}:₱${(a.price || 0).toFixed(2)}`).join(", ")})` : "";
@@ -455,8 +475,6 @@ function attachActionHandlers() {
                 productsHtml += `<div>1 x Delivery Fee - ₱${deliveryFee.toFixed(2)}</div>`;
             }
 
-            const maxRefundable = orderData.total || 0;
-
             // --- Show First Refund Popup (Accept/Deny) ---
             if (!popup) createPopup();
             popupTitle.textContent = "Order Details";
@@ -464,7 +482,8 @@ function attachActionHandlers() {
             popupButtonsContainer.innerHTML = `
                 <h3>Refund Request for Queue #${formatQueueNumber(orderData.queueNumber)}</h3>
                 <div style="text-align: left; margin-bottom: 15px; width: 90%; max-width: 350px;">${productsHtml}</div>
-                <div style="font-weight: bold; margin-bottom: 15px;">Total Order: ₱${maxRefundable.toFixed(2)}</div>
+                <div style="font-weight: bold; margin-bottom: 5px;">Products Total: ₱${maxRefundable.toFixed(2)}</div>
+                <div style="font-weight: bold; margin-bottom: 15px; color: #dc3545;">(Delivery Fee: ₱${deliveryFee.toFixed(2)} - NOT REFUNDABLE)</div>
                 <div>
                     <button id="acceptRefundBtn">Accept Refund</button>
                     <button id="declineRefundBtn">Deny Refund</button>
@@ -509,7 +528,7 @@ function showRefundAmountPopup(orderId, collectionName, maxRefundable, paymongoP
         const refundAmount = parseFloat(inputElement.value);
 
         if (isNaN(refundAmount) || refundAmount <= 0 || refundAmount > maxRefundable) {
-            customAlert("Invalid amount. Must be >₱0 and ≤ the max refundable amount.");
+            customAlert("Invalid amount. Must be >₱0 and ≤ the max refundable amount (product total).");
             return;
         }
 
@@ -528,91 +547,123 @@ function showRefundAmountPopup(orderId, collectionName, maxRefundable, paymongoP
 // ---------------------
 async function handleRefundAction(orderId, collectionName, action, refundAmount = 0, isEPayment = false) {
     const orderRef = doc(db, collectionName, orderId);
+    let originalStatus; // Declare outside try for use in catch
+
     try {
         const orderSnap = await getDoc(orderRef);
         if (!orderSnap.exists()) return;
 
         const orderData = orderSnap.data();
-        const originalStatus = orderData.status;
+        originalStatus = orderData.status;
 
         if (action === "Accepted") {
-            // ---------- CASE: Original status = Pending ----------
-            if (originalStatus === "Pending") {
-                // Accepting a refund for a Pending order => Cancel and RETURN stock
+            // ---------- CASE: Stock Return (Original status = Pending or 'Wait for Admin to Accept') ----------
+            if (originalStatus === "Pending" || originalStatus === "Wait for Admin to Accept") {
+                // Return stock first
                 await returnStock(orderData.products || orderData.items);
 
                 // Update order to canceled and clear refundRequest
-                // For Pending orders we set status => Canceled (customer refund accepted before fulfillment)
-                // finalRefundStatus: Manual for cash/manual, Pending for e-payment (if you still want to track)
                 await updateDoc(orderRef, {
                     refundRequest: deleteField(),
-                    finalRefundStatus: isEPayment ? "Pending" : "Manual",
-                    status: "Canceled"
+                    // e-payment: pending until webhook; manual: marked Manual
+                    finalRefundStatus: isEPayment ? "Pending" : "Manual", 
+                    status: "Canceled" // Main status should be Canceled
                 });
 
                 customAlert(`Refund accepted: Order #${orderData.queueNumber || 'N/A'} canceled and stock returned.`);
             }
-            // ---------- CASE: Original status = Completed ----------
-            else if (originalStatus === "Completed") {
-                // Accepting a refund for a Completed order => Refunded (NO stock return)
-                // Per requested behavior: Immediately mark as Refunded when owner accepts.
-                // If e-payment, mark finalRefundStatus as "Succeeded" to indicate successful refund state.
-                // NOTE: If you want to still call the external refund API you can integrate that separately,
-                // but this flow will mark it Refunded immediately (as requested).
-                await updateDoc(orderRef, {
-                    refundRequest: deleteField(),
-                    finalRefundStatus: isEPayment ? "Succeeded" : "Manual",
-                    status: "Refunded"
-                });
-
-                customAlert(`Refund accepted: Order #${orderData.queueNumber || 'N/A'} marked as Refunded.`);
-            }
-            // ---------- Other statuses (fallback) ----------
-            else {
-                // If the order is in some other state, default to the Completed refund flow
+            // ---------- CASE: NO Stock Return (Original status = Paid, Completed, or in-progress) ----------
+            else if (originalStatus === "Completed" || originalStatus === "Preparing" || originalStatus === "Delivery") {
+                
                 if (isEPayment) {
-                    // Mark as Refunded for consistency
+                    // For E-Payment on completed orders, call the refund API and set pending states.
+                    const endpoint = "/.netlify/functions/refund-payment";
+
+                    // 1. Temporarily update status while API call is in progress
+                    await updateDoc(orderRef, {
+                        status: "Refund Pending",
+                        refundRequest: deleteField(),
+                        finalRefundStatus: "Pending" // Webhook will update to Succeeded/Failed
+                    });
+                    customAlert("PayMongo refund initiated. Status is 'Refund Pending'.");
+
+                    const response = await fetch(endpoint, {
+                        method: "POST",
+                        headers: { "Content-Type": "application/json" },
+                        // PayMongo uses centavos
+                        body: JSON.stringify({ paymongoPaymentId: orderData.paymongoPaymentId, amount: refundAmount * 100 }) 
+                    });
+
+                    const data = await response.json();
+                    console.log("Refund response:", data);
+
+                    if (data.error) {
+                        // API Call Failed - Update status to final error state
+                        customAlert(`PayMongo Refund failed: ${data.details || data.error}. Please check the PayMongo dashboard.`);
+                        await updateDoc(orderRef, {
+                            finalRefundStatus: "API Failed",
+                            status: "Refund Failed"
+                        });
+                        return;
+                    }
+
+                    // If call succeeds, keep pending status; webhook will set Succeeded or Failed
+                } else {
+                    // Manual cash refund for a completed order: mark as final Refunded, no stock return
                     await updateDoc(orderRef, {
                         refundRequest: deleteField(),
-                        finalRefundStatus: "Succeeded",
+                        finalRefundStatus: "Manual",
                         status: "Refunded"
                     });
-                    customAlert(`Refund accepted: Order #${orderData.queueNumber || 'N/A'} marked as Refunded (fallback).`);
+                    customAlert(`Manual refund completed: Order #${orderData.queueNumber || 'N/A'} marked as Refunded.`);
+                }
+            }
+            // ---------- Other statuses (fallback: no stock return) ----------
+            else {
+                 // Default fallback: treat as Completed refund flow (do NOT return stock)
+                if (isEPayment) {
+                    const endpoint = "/.netlify/functions/refund-payment";
+                    await updateDoc(orderRef, {
+                        status: "Refund Pending", // Should transition to 'Refunded' after webhook
+                        refundRequest: deleteField(),
+                        finalRefundStatus: "Pending"
+                    });
+                    customAlert("PayMongo refund initiated. Status is 'Refund Pending'.");
+
+                    const response = await fetch(endpoint, {
+                        method: "POST",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify({ paymongoPaymentId: orderData.paymongoPaymentId, amount: refundAmount * 100 })
+                    });
+
+                    const data = await response.json();
+                    console.log("Refund response:", data);
+
+                    if (data.error) {
+                        customAlert(`PayMongo Refund failed: ${data.details || data.error}. Please check the PayMongo dashboard.`);
+                        await updateDoc(orderRef, {
+                            finalRefundStatus: "API Failed",
+                            status: "Refund Failed"
+                        });
+                        return;
+                    }
                 } else {
                     await updateDoc(orderRef, {
                         refundRequest: deleteField(),
                         finalRefundStatus: "Manual",
                         status: "Refunded"
                     });
-                    customAlert(`Manual refund completed: Order #${orderData.queueNumber || 'N/A'} marked as Refunded (fallback).`);
+                    customAlert(`Manual refund completed: Order #${orderData.queueNumber || 'N/A'} marked as Refunded.`);
                 }
             }
         } else if (action === "Denied") {
-            // ---------- DENIED: Behavior depends on original status ----------
-            if (originalStatus === "Pending") {
-                // Denied while Pending: keep the main status as Pending, clear refundRequest, mark finalRefundStatus as Denied
-                await updateDoc(orderRef, {
-                    refundRequest: deleteField(),
-                    finalRefundStatus: "Denied"
-                });
-                customAlert(`Refund request for Order #${orderData.queueNumber || 'N/A'} denied. Order remains Pending.`);
-            } else if (originalStatus === "Completed") {
-                // Denied after Completed: mark finalRefundStatus Denied and set a visible 'Refund Denied' status
-                await updateDoc(orderRef, {
-                    refundRequest: deleteField(),
-                    finalRefundStatus: "Denied",
-                    status: "Refund Denied"
-                });
-                customAlert(`Refund request for Order #${orderData.queueNumber || 'N/A'} denied. Status set to 'Refund Denied'.`);
-            } else {
-                // Fallback: mark as Refund Denied
-                await updateDoc(orderRef, {
-                    refundRequest: deleteField(),
-                    finalRefundStatus: "Denied",
-                    status: "Refund Denied"
-                });
-                customAlert(`Refund request denied. Status set to 'Refund Denied'.`);
-            }
+            // Denied refund request - Final Status
+            await updateDoc(orderRef, {
+                refundRequest: deleteField(),
+                finalRefundStatus: "Denied",
+                status: "Refund Denied"
+            });
+            customAlert(`Refund request for Order #${orderData.queueNumber || 'N/A'} has been denied. Status updated.`);
         }
 
         renderOrders(); // Re-render to show the updated status
@@ -621,67 +672,18 @@ async function handleRefundAction(orderId, collectionName, action, refundAmount 
         customAlert("A critical error occurred while processing the refund action.");
         // In case of error, try to reset a few flags safely
         try {
-            await updateDoc(orderRef, {
-                status: "Completed", // Revert to completed if the refund process failed before final status was set
-                refundRequest: true // Re-enable the button for staff to try again
-            });
+            if (originalStatus) { // Check if originalStatus was successfully retrieved
+                await updateDoc(orderRef, {
+                    status: originalStatus, // Revert to original status
+                    refundRequest: true // Re-enable the button for staff to try again
+                });
+            }
         } catch (resetErr) {
             console.error("Failed to reset order status after refund error:", resetErr);
         }
     }
 }
 
-// ---------------------
-// Update order status
-// ---------------------
-async function updateOrderStatus(orderId, collectionName, newStatus, eta = "") {
-    if (!orderId || !collectionName) return;
-
-    if (pendingTimers[orderId]) {
-        clearTimeout(pendingTimers[orderId]);
-        delete pendingTimers[orderId];
-    }
-
-    try {
-        const orderData = ordersData.find(o => o.id === orderId)?.data;
-        if (!orderData) return;
-
-        const updatePayload = {
-            status: newStatus,
-            estimatedTime: eta || deleteField()
-        };
-
-        // Stock return only for Cash/Manual cancelled orders
-        if (newStatus === "Canceled") {
-            // If there is NO payment ID (Cash/Manual), perform stock return
-            if (!orderData.paymongoPaymentId) {
-                await returnStock(orderData.products || orderData.items);
-                customAlert(`Order #${orderData.queueNumber} canceled and stock returned.`);
-            } else {
-                // If it is E-Payment, mark it as a manual cancel and prompt for separate refund
-                updatePayload.status = "Canceled";
-                updatePayload.finalRefundStatus = "Canceled";
-                customAlert(`Order #${orderData.queueNumber} is E-Payment. It was manually canceled. Refund must be processed separately.`);
-            }
-        }
-
-        // Clear refund flags when moving to a new non-refund status (Preparing, Delivery, Completed)
-        if (newStatus === "Preparing" || newStatus === "Delivery" || newStatus === "Completed") {
-            updatePayload.refundRequest = deleteField();
-            if (newStatus === "Completed") {
-                // Clear final status only if it's a clean completion, not a refund final status
-                updatePayload.finalRefundStatus = deleteField();
-            }
-        }
-
-        await updateDoc(doc(db, collectionName, orderId), updatePayload);
-
-        renderOrders();
-    } catch (err) {
-        console.error(err);
-        customAlert("Failed to update order status.");
-    }
-}
 
 // ----------------------------------------------------
 // CRITICALLY CORRECTED: Return stock (Reverse of POS deduction logic)
@@ -756,3 +758,148 @@ async function returnStock(orderItems) {
         }
     }
 }
+
+
+// ---------------------
+// Update order status (Includes Admin Approval Flow)
+// ---------------------
+async function updateOrderStatus(orderId, collectionName, newStatus, eta = "") {
+    if (!orderId || !collectionName) return;
+
+    // Clear auto-cancel timer if it exists
+    if (pendingTimers[orderId]) {
+        clearTimeout(pendingTimers[orderId]);
+        delete pendingTimers[orderId];
+    }
+
+    const orderRef = doc(db, collectionName, orderId);
+    let orderData;
+    let originalStatus;
+
+    try {
+        const orderSnap = await getDoc(orderRef);
+        if (!orderSnap.exists()) {
+            customAlert(`Error: Order ${orderId} not found.`);
+            return;
+        }
+        orderData = orderSnap.data();
+        originalStatus = orderData.status;
+
+        const updatePayload = {
+            status: newStatus,
+            estimatedTime: eta || deleteField(),
+            timestamp: new Date().toISOString()
+        };
+        
+        // --- 1. ADMIN APPROVAL: 'Wait for Admin to Accept' -> 'Waiting for Payment' ---
+        if (originalStatus === "Wait for Admin to Accept" && newStatus === "Waiting for Payment") {
+            if (!orderData.paymentMetadata || !orderData.total) {
+                customAlert("Error: Cannot accept. Payment metadata is missing from the order.");
+                return;
+            }
+
+            // A. Generate PayMongo Checkout Link via Netlify Function
+            // NOTE: Change this endpoint for production if not using localhost
+            const endpoint = "/.netlify/functions/generate-paymongo-link";
+            customAlert("Generating secure payment link... Please wait. Do not navigate away.");
+
+            // Temporarily set status to "Processing" to prevent double-clicking 
+            await updateDoc(orderRef, { status: "Processing" });
+
+            const response = await fetch(endpoint, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                    orderId: orderId,
+                    collectionName: collectionName,
+                    amount: orderData.total, // Send amount in PHP, server will handle centavos
+                    lineItems: orderData.paymentMetadata.lineItems,
+                    customerDetails: orderData.paymentMetadata.customerDetails,
+                    description: `Order ${formatQueueNumber(orderData.queueNumber)}`
+                })
+            });
+
+            const data = await response.json();
+            
+            if (data.error || !data.checkoutUrl) {
+                console.error("PayMongo Link Generation Failed:", data.details || data.error);
+                customAlert(`Payment link failed to generate: ${data.details || data.error}. Status reverted.`);
+                // Revert status to allow re-try
+                await updateDoc(orderRef, { status: originalStatus }); 
+                return;
+            }
+
+            // B. Success: Update Order with new Status and the generated URL
+            updatePayload.checkoutUrl = data.checkoutUrl;
+            updatePayload.status = "Waiting for Payment"; // Final status after successful link generation
+            updatePayload.paymentMetadata = deleteField(); // Clean up metadata
+
+            customAlert("Payment link generated successfully. Status updated to 'Waiting for Payment'.");
+        }
+        
+        // --- 2. CANCELLATION / DECLINE: New status is "Canceled" ---
+        else if (newStatus === "Canceled") {
+            // Logic moved from the old place, simplified:
+            // If the order has no payment ID (cash/timed out) OR is being declined during approval, return stock.
+            if (!orderData.paymongoPaymentId || originalStatus === "Wait for Admin to Accept") {
+                await returnStock(orderData.products || orderData.items);
+                customAlert(`Order #${orderData.queueNumber} canceled and stock returned.`);
+            } else {
+                // E-Payment order canceled after being paid (or Waiting for Payment - rare but handled)
+                customAlert(`Order #${orderData.queueNumber} is E-Payment. It was manually canceled. Refund must be processed separately.`);
+            }
+            
+            // Finalize cancellation flags
+            updatePayload.finalRefundStatus = "Canceled"; 
+            updatePayload.refundRequest = deleteField();
+        }
+
+        // --- 3. Clear refund flags when moving to a new non-refund status ---
+        if (newStatus === "Preparing" || newStatus === "Delivery" || newStatus === "Completed" || newStatus === "Waiting for Payment") {
+            updatePayload.refundRequest = deleteField();
+            if (newStatus === "Completed") {
+                // Clear final status only if it's a clean completion
+                updatePayload.finalRefundStatus = deleteField();
+            }
+        }
+        
+        // --- Final Firestore Update ---
+        await updateDoc(orderRef, updatePayload);
+        renderOrders(); // Re-render the list immediately
+
+    } catch (err) {
+        console.error("Critical Error in updateOrderStatus:", err);
+        customAlert(`A critical error occurred while updating the order status for Order ${orderId}.`);
+        
+        // Attempt to reset status if it was stuck in "Processing" from the approval block
+        if (originalStatus === "Wait for Admin to Accept" && newStatus === "Waiting for Payment") {
+            try {
+                await updateDoc(orderRef, { status: originalStatus });
+                console.warn("Status reverted to 'Wait for Admin to Accept' after API failure.");
+            } catch(resetErr) {
+                console.error("Failed to revert status:", resetErr);
+            }
+        }
+    }
+}
+
+
+// =========================================================
+// INITIALIZATION
+// =========================================================
+
+function checkAdminAuth() {
+    onAuthStateChanged(auth, user => {
+        if (!user) {
+            // Redirect to login if not authenticated
+            // window.location.href = "login.html"; 
+            console.warn("User not authenticated. Assuming access for development.");
+        }
+        // Once auth is checked, start listening for orders (already started via onSnapshot)
+    });
+}
+
+checkAdminAuth();
+
+// Initial render to show any orders loaded before the snapshot completes
+renderOrders();
