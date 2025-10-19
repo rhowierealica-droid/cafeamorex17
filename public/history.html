@@ -1,37 +1,48 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Order History | Café Amore</title>
 
-  <!-- CSS -->
-  <link rel="stylesheet" href="history.css">
-  <link rel="stylesheet" href="customer-side.css"> <!-- Sidebar CSS -->
-    <link rel="stylesheet" href="OrderStatusNotif.css">
-
+  <!-- CSS Files -->
+  <link rel="stylesheet" href="history.css" />
+  <link rel="stylesheet" href="customer-side.css" />
+  <link rel="stylesheet" href="OrderStatusNotif.css" />
 
   <!-- Font Awesome -->
-  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
+  <link
+    rel="stylesheet"
+    href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css"
+  />
 </head>
+
 <body>
 
+  <!-- ========================= -->
   <!-- Notification Bell -->
-<div id="notifBellContainer">
-  <i class="fas fa-bell"></i>
-  <span class="badge">0</span>
-</div>
-<div id="notifDropdown"></div>
+  <!-- ========================= -->
+  <div id="notifBellContainer">
+    <i class="fas fa-bell"></i>
+    <span class="badge">0</span>
+  </div>
+  <div id="notifDropdown"></div>
 
+  <!-- ========================= -->
   <!-- Hamburger (for small screens) -->
-  <div class="hamburger hidden" id="hamburger"><i class="fas fa-bars"></i></div>
+  <!-- ========================= -->
+  <div class="hamburger hidden" id="hamburger">
+    <i class="fas fa-bars"></i>
+  </div>
 
+  <!-- ========================= -->
   <!-- Sidebar Navigation -->
+  <!-- ========================= -->
   <aside class="sidebar" id="sidebar">
     <div class="close-btn hidden" id="closeBtn">&times;</div>
 
     <div class="logo">
-      <img src="logo.png" alt="Café Amore Logo">
+      <img src="logo.png" alt="Café Amore Logo" />
       <span class="brand">Café Amore</span>
     </div>
 
@@ -41,11 +52,13 @@
         <li class="cart-link"><i class="fas fa-shopping-cart"></i> Cart</li>
         <li class="order-status-link"><i class="fas fa-truck"></i> Order Status</li>
         <li class="favorites-link"><i class="fas fa-heart"></i> Favorites</li>
-        <li class="history-link"><i class="fas fa-history"></i> History</li>
+        <li class="history-link active"><i class="fas fa-history"></i> History</li>
       </ul>
     </nav>
 
-    <div class="login-link"><i class="fas fa-sign-in-alt"></i> Login</div>
+    <div class="login-link">
+      <i class="fas fa-sign-in-alt"></i> Login
+    </div>
 
     <div class="profile-card">
       <div class="profile-avatar"><i class="fas fa-user-circle"></i></div>
@@ -58,8 +71,11 @@
     <div class="logout"><i class="fas fa-sign-out-alt"></i> Log Out</div>
   </aside>
 
+  <!-- ========================= -->
   <!-- Main Content -->
+  <!-- ========================= -->
   <main class="history-main">
+    <!-- Login Popup -->
     <div id="loginPopup" class="popup">
       <div class="popup-content">
         <p>You must login to view your order history.</p>
@@ -71,14 +87,27 @@
       <h1>Order History</h1>
     </header>
 
+    <!-- ========================= -->
+    <!-- Filter Dropdown -->
+    <!-- ========================= -->
+    <div id="filterContainer" class="filter-container">
+      <!-- The dropdown is injected dynamically by history.js -->
+    </div>
+
+    <!-- ========================= -->
+    <!-- Order History Container -->
+    <!-- ========================= -->
     <div class="history-container">
-      <!-- Orders will be appended here -->
+      <!-- Orders load dynamically here -->
     </div>
   </main>
 
-  <!-- JS -->
+  <!-- ========================= -->
+  <!-- Scripts -->
+  <!-- ========================= -->
   <script type="module" src="history.js"></script>
-  <script type="module" src="customer-side.js"></script> <!-- Sidebar toggle -->
+  <script type="module" src="customer-side.js"></script>
   <script type="module" src="OrderStatusNotif.js"></script>
+
 </body>
 </html>
