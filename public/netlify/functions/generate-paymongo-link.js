@@ -12,12 +12,10 @@ const AUTH_HEADER = PAYMONGO_SECRET_KEY
 
 /**
  * Handles the logic for generating a PayMongo Checkout Session link.
- * * NOTE: The signature is changed from (req, res) to the standard Netlify (event, context)
- * to resolve the 'Runtime.HandlerNotFound' error and handle body parsing reliably.
  * * @param {object} event - The event object (contains request body in event.body).
  * @param {object} context - The context object.
  */
-exports.handler = async (event, context) => { // Using exports.handler to fix the error
+exports.handler = async (event, context) => { 
     
     // 1. Check for Secret Key
     if (!PAYMONGO_SECRET_KEY) {
@@ -27,7 +25,7 @@ exports.handler = async (event, context) => { // Using exports.handler to fix th
         };
     }
 
-    // 2. Parse the Request Body (CRITICAL FIX for Netlify functions)
+    // 2. Parse the Request Body (CRITICAL for Netlify functions)
     let parsedBody;
     try {
         // Netlify event.body is a string
@@ -82,9 +80,9 @@ exports.handler = async (event, context) => { // Using exports.handler to fix th
                                 country: "PH"
                             }
                         },
-                        // >>> MUST CHANGE THIS IN PRODUCTION <<<
-                        success_url: "https://[YOUR_NETLIFY_DOMAIN]/public/index.html", 
-                        cancel_url: "https://[YOUR_NETLIFY_DOMAIN]/public/index.html", 
+                        // CORRECTED: Using the live Netlify domain
+                        success_url: "https://inquisitive-tarsier-f8128f.netlify.app/public/index.html", 
+                        cancel_url: "https://inquisitive-tarsier-f8128f.netlify.app/public/index.html", 
                         send_email_receipt: true,
                         description: description || "Order Payment (Admin Approved)",
                         line_items: lineItems,
@@ -131,5 +129,4 @@ exports.handler = async (event, context) => { // Using exports.handler to fix th
     }
 };
 
-// No need for a separate module.exports = exports.handler; when using exports.handler
-// for the main Netlify function entry point.
+// Netlify uses exports.handler as the entry point, so no other exports are needed.
