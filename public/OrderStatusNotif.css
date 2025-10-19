@@ -47,6 +47,30 @@
     z-index: 9999;
 }
 
+/* Control Buttons (Read All / Clear All) */
+#notifDropdown button {
+    cursor: pointer;
+    border: none;
+    border-radius: 6px; /* slightly larger radius for buttons */
+    padding: 6px 10px; /* slightly more padding for buttons */
+    font-weight: 500;
+    transition: background-color 0.2s, opacity 0.2s;
+}
+
+#notifDropdown button:first-child { /* Read All */
+    background: #f59e0b;
+    color: #fff;
+}
+
+#notifDropdown button:last-child { /* Clear All */
+    background: #ef4444;
+    color: #fff;
+}
+
+#notifDropdown button:hover {
+    opacity: 0.85;
+}
+
 /* Individual notification */
 #notifDropdown .notifItem {
     padding: 12px 16px;
@@ -56,13 +80,17 @@
     justify-content: space-between;
     align-items: center;
     background: #fefefe;
-    transition: background 0.2s;
+    /* The JS applies specific inline background-color for 'unread' and 'read' states, 
+       so only use this transition property. */
+    transition: background-color 0.3s; 
 }
 
 #notifDropdown .notifItem:hover {
-    background: #fef3c7; /* soft yellow hover */
+    /* Keep a soft hover effect over the base color */
+    background: #fef3c7 !important; 
 }
 
+/* Ensure the last notification item doesn't have a border */
 #notifDropdown .notifItem:last-child {
     border-bottom: none;
 }
@@ -71,6 +99,7 @@
     flex: 1;
     margin-right: 10px;
     word-break: break-word;
+    cursor: pointer; /* Ensure the text area is clearly clickable */
 }
 
 #notifDropdown .notifItem .notifClose {
@@ -84,6 +113,16 @@
 #notifDropdown .notifItem .notifClose:hover {
     color: #b45309;
 }
+
+/* Empty Message */
+#notifEmpty {
+    padding: 12px;
+    text-align: center;
+    color: #9ca3af; /* softer color */
+    font-size: 14px;
+    font-style: italic;
+}
+
 
 /* Toast container */
 #toastContainer {
@@ -110,6 +149,9 @@
     transition: opacity 0.3s ease, transform 0.3s ease;
     pointer-events: auto; /* allow clicks on toast */
     white-space: pre-wrap; /* wrap long messages */
+    max-width: 300px; /* Limit width */
+    overflow: hidden;
+    text-overflow: ellipsis;
 }
 
 /* Toast visible state */
@@ -117,15 +159,3 @@
     opacity: 1;
     transform: translateX(0);
 }
-
-/* Optional: add slight slide-down stacking effect for multiple toasts */
-#toastContainer .toast + .toast {
-    margin-top: 8px;
-}
-
-/* Highlight unread notifications */
-#notifDropdown .notifItem.unread {
-    background: #fff4e5; /* soft yellow background for unread */
-    font-weight: bold;   /* optional: make text bold */
-}
-

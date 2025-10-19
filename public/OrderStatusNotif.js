@@ -9,6 +9,8 @@ let bellContainer = document.getElementById("notifBellContainer") || (() => {
     const el = document.createElement("div");
     el.id = "notifBellContainer";
     el.innerHTML = `<i class="fas fa-bell"></i><span class="badge">0</span>`;
+    // Added style to ensure it's hidden until user logs in
+    el.style.cssText = `position:fixed; top:20px; right:20px; font-size:24px; cursor:pointer; display:none;`; 
     document.body.appendChild(el);
     return el;
 })();
@@ -65,14 +67,20 @@ clearAllBtn.textContent = "Clear All";
 clearAllBtn.style.cssText = "cursor:pointer; background:#ef4444; color:#fff; border:none; border-radius:4px; padding:4px 8px;";
 controlContainer.appendChild(readAllBtn);
 controlContainer.appendChild(clearAllBtn);
-notifDropdown.prepend(controlContainer);
+// Ensure controlContainer is only prepended once
+if (notifDropdown.firstChild !== controlContainer) {
+    notifDropdown.prepend(controlContainer);
+}
 
 // Empty message
 const emptyMessage = document.createElement("div");
 emptyMessage.id = "notifEmpty";
 emptyMessage.textContent = "You don't have notifications";
 emptyMessage.style.cssText = "padding: 12px; text-align: center; color: #555; font-size: 14px;";
-notifDropdown.appendChild(emptyMessage);
+// Ensure emptyMessage is only appended once
+if (notifDropdown.lastChild !== emptyMessage) {
+    notifDropdown.appendChild(emptyMessage);
+}
 
 // --- Toggle dropdown ---
 bellContainer.addEventListener("click", () => {
@@ -97,7 +105,7 @@ onAuthStateChanged(auth, async user => {
         bellContainer.style.display = "inline-block";
         notifDropdown.style.display = "none"; // hidden initially
 
-        loadUserNotifications();
+        await loadUserNotifications();
         if (!listenersAttached) {
             listenOrders();
             listenersAttached = true;
@@ -106,45 +114,88 @@ onAuthStateChanged(auth, async user => {
         // Hide notifications completely
         bellContainer.style.display = "none";
         notifDropdown.style.display = "none";
+        // CRUCIAL: Clear state on logout
+        listenersAttached = false;
+        Object.keys(orderStatusMap).forEach(key => delete orderStatusMap[key]);
+        // Clear all notifications from UI on logout
+        notifDropdown.querySelectorAll(".notifItem").forEach(el => el.remove()); 
+        displayedNotifs.clear();
+        unreadCount = 0;
+        updateBadge();
+        updateEmptyMessage();
     }
 });
 
-// --- Load notifications ---
+// ----------------------------------------------------------------------
+// --- UPDATED: Load notifications (Clears UI and uses query filter) ---
+// ----------------------------------------------------------------------
 async function loadUserNotifications() {
+    if (!currentUser) return;
+
+    // Clear UI before loading fresh data
+    notifDropdown.querySelectorAll(".notifItem").forEach(el => el.remove()); 
+    displayedNotifs.clear();
+    unreadCount = 0;
+
     const notifQuery = query(
         collection(db, "Notifications"),
+        // FILTER: Only load notifications belonging to the current user
         where("userId", "==", currentUser.uid),
         orderBy("timestamp", "desc")
     );
+    
     const snapshot = await getDocs(notifQuery);
     snapshot.forEach(docSnap => {
         const data = docSnap.data();
         showNotification(data.message, docSnap.id, !data.read);
     });
     updateEmptyMessage();
+    updateBadge(); // Ensure badge is updated after loading all
 }
 
-// --- Listen for new orders ---
+// -----------------------------------------------------------------
+// --- CRITICAL FIX: Listen for user-specific orders only ---
+// -----------------------------------------------------------------
 function listenOrders() {
+    if (!currentUser || !currentUser.uid) {
+        console.error("Cannot listen to orders: currentUser is null.");
+        return;
+    }
+    
+    const currentUserId = currentUser.uid;
     const orderCollections = ["InStoreOrders", "DeliveryOrders"];
+    
     orderCollections.forEach(coll => {
-        onSnapshot(collection(db, coll), snapshot => {
+        
+        // FILTERING QUERY: Only listen to orders belonging to the current user!
+        const userOrderQuery = query(
+            collection(db, coll), 
+            where("userId", "==", currentUserId) 
+        );
+
+        onSnapshot(userOrderQuery, snapshot => {
             snapshot.docChanges().forEach(async change => {
                 const order = change.doc.data();
                 const orderId = change.doc.id;
 
+                // 1. Initial Status Mapping
                 if (!orderStatusMap[orderId]) {
                     orderStatusMap[orderId] = order.status;
                     return;
                 }
 
+                // 2. Status Change Detected
                 if (orderStatusMap[orderId] !== order.status) {
                     orderStatusMap[orderId] = order.status;
+                    
+                    if (!currentUser) return; // Safety check
+                    
                     const message = `Order #${order.queueNumber || orderId} status changed to ${order.status}`;
 
+                    // Write Notification to Firestore
                     const notifRef = doc(collection(db, "Notifications"));
                     await setDoc(notifRef, {
-                        userId: currentUser.uid,
+                        userId: currentUser.uid, // Guaranteed to be the owner of the changed order
                         message,
                         read: false,
                         timestamp: Date.now()
@@ -154,21 +205,35 @@ function listenOrders() {
                     showToast(message);
                 }
             });
+        }, (error) => {
+             console.error(`Error listening to user's orders in ${coll}:`, error);
         });
     });
 }
 
-// --- Show notification ---
+// ----------------------------------------------------------------
+// --- Show notification (Minor UI refinement to prepend/use classes) ---
+// ----------------------------------------------------------------
 function showNotification(message, docId, isUnread = true) {
     if (displayedNotifs.has(docId)) return;
     displayedNotifs.add(docId);
 
     const notifItem = document.createElement("div");
     notifItem.className = "notifItem";
-    notifItem.style.cssText = "padding: 12px 16px; display:flex; justify-content:space-between; align-items:center; border-bottom:1px solid #eee;";
-    if (isUnread) notifItem.classList.add("unread");
-    notifItem.innerHTML = `<div class="notifText">${message}</div><div class="notifClose">&times;</div>`;
-    notifDropdown.appendChild(notifItem);
+    notifItem.dataset.docId = docId; 
+
+    // Apply basic styling and unread class
+    notifItem.style.cssText = "padding: 12px 16px; display:flex; justify-content:space-between; align-items:center; border-bottom:1px solid #eee; background-color: white; transition: background-color 0.3s;";
+
+    if (isUnread) {
+        notifItem.classList.add("unread");
+        notifItem.style.backgroundColor = "#f0f7ff";
+    }
+
+    notifItem.innerHTML = `<div class="notifText" style="flex-grow:1; cursor:pointer;">${message}</div><div class="notifClose" style="cursor:pointer; font-size:18px; color:#aaa; margin-left:10px;">&times;</div>`;
+    
+    // Prepend (insert after the control container) for newest notifications on top
+    notifDropdown.insertBefore(notifItem, notifDropdown.children[1]); 
 
     if (isUnread) {
         unreadCount++;
@@ -176,20 +241,25 @@ function showNotification(message, docId, isUnread = true) {
     }
 
     notifItem.querySelector(".notifText").addEventListener("click", async () => {
-        if (isUnread) {
+        if (notifItem.classList.contains("unread")) {
             await updateDoc(doc(db, "Notifications", docId), { read: true });
+            
             unreadCount = Math.max(0, unreadCount - 1);
             updateBadge();
-            isUnread = false;
+
             notifItem.classList.remove("unread");
+            notifItem.style.backgroundColor = "white"; // Clear background on read
         }
     });
 
     notifItem.querySelector(".notifClose").addEventListener("click", async () => {
+        const wasUnread = notifItem.classList.contains("unread");
+        
         await deleteDoc(doc(db, "Notifications", docId));
         notifItem.remove();
         displayedNotifs.delete(docId);
-        if (isUnread) {
+        
+        if (wasUnread) {
             unreadCount = Math.max(0, unreadCount - 1);
             updateBadge();
         }
@@ -213,11 +283,18 @@ function updateEmptyMessage() {
 // --- Read all ---
 readAllBtn.addEventListener("click", async () => {
     if (!currentUser) return;
-    const notifDocs = await getDocs(query(collection(db, "Notifications"), where("userId", "==", currentUser.uid)));
+    const notifDocs = await getDocs(query(collection(db, "Notifications"), where("userId", "==", currentUser.uid), where("read", "==", false)));
+    
     notifDocs.forEach(docSnap => {
-        if (!docSnap.data().read) updateDoc(doc(db, "Notifications", docSnap.id), { read: true });
+        updateDoc(doc(db, "Notifications", docSnap.id), { read: true });
     });
-    document.querySelectorAll(".notifItem.unread").forEach(el => el.classList.remove("unread"));
+    
+    // Update UI elements
+    document.querySelectorAll(".notifItem.unread").forEach(el => {
+        el.classList.remove("unread");
+        el.style.backgroundColor = "white";
+    });
+    
     unreadCount = 0;
     updateBadge();
 });
@@ -226,7 +303,9 @@ readAllBtn.addEventListener("click", async () => {
 clearAllBtn.addEventListener("click", async () => {
     if (!currentUser) return;
     const notifDocs = await getDocs(query(collection(db, "Notifications"), where("userId", "==", currentUser.uid)));
+    
     notifDocs.forEach(docSnap => deleteDoc(doc(db, "Notifications", docSnap.id)));
+    
     document.querySelectorAll(".notifItem").forEach(el => el.remove());
     displayedNotifs.clear();
     unreadCount = 0;
@@ -239,13 +318,18 @@ function showToast(message) {
     const toast = document.createElement("div");
     toast.className = "toast";
     toast.textContent = message;
-    toast.style.cssText = "background:#f59e0b;color:#fff;padding:10px 16px;border-radius:8px;box-shadow:0 4px 12px rgba(0,0,0,0.2);opacity:0;transform:translateX(100%);transition:opacity 0.3s ease, transform 0.3s ease;";
+    toast.style.cssText = "background:#f59e0b;color:#fff;padding:10px 16px;border-radius:8px;box-shadow:0 4px 12px rgba(0,0,0,0.2);opacity:0;transform:translateX(100%);transition:opacity 0.3s ease, transform 0.3s ease; max-width: 300px; overflow: hidden; white-space: nowrap; text-overflow: ellipsis;";
     toastContainer.appendChild(toast);
 
-    requestAnimationFrame(() => toast.classList.add("show"));
+    requestAnimationFrame(() => {
+        toast.style.opacity = '1';
+        toast.style.transform = 'translateX(0)';
+    });
+    
     setTimeout(() => {
-        toast.classList.remove("show");
-        setTimeout(() => toast.remove(), 300);
+        toast.style.opacity = '0';
+        toast.style.transform = 'translateX(100%)';
+        setTimeout(() => toast.remove(), 300); 
     }, 3000);
 }
 
