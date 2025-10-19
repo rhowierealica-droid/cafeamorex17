@@ -95,7 +95,7 @@ exports.handler = async (event, context) => {
             send_email_receipt: true,
             description: description || "Order Payment (Admin Approved)",
             line_items: lineItems,
-            payment_method_types: ["gcash"],
+            payment_method_types: ["gcash", "card", "paymaya", "grab_pay"],
             metadata: {
               orderId,
               collectionName,
@@ -146,4 +146,3 @@ exports.handler = async (event, context) => {
 };
 
 // Netlify automatically uses exports.handler as the function entry point
-
