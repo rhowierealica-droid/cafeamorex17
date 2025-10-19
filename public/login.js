@@ -7,7 +7,6 @@ import {
     sendPasswordResetEmail, 
     RecaptchaVerifier, 
     signInWithPhoneNumber,
-    // ADDED: Import the email verification function
     sendEmailVerification 
 } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
 
@@ -58,6 +57,7 @@ let emailCredential = { email: '', password: '' };
 /* ===============================
     Recaptcha Setup
 =============================== */
+// Initialize recaptchaVerifier only once
 window.recaptchaVerifier = new RecaptchaVerifier(auth, "recaptcha-container", { size: "invisible" });
 
 /* ===============================
@@ -75,8 +75,16 @@ if (loginForm) {
         try {
             // 1. Check Firestore for user account existence/role
             const usersRef = collection(db, "users");
-            const qEmail = query(usersRef, where("email", "==", emailInput));
-            const querySnapshot = await getDocs(qEmail);
+            
+            // Query 1: Search by primary email
+            let qEmail = query(usersRef, where("email", "==", emailInput));
+            let querySnapshot = await getDocs(qEmail);
+            
+            // If not found by primary email, Query 2: Search by pendingEmail (the unverified new email)
+            if (querySnapshot.empty) {
+                qEmail = query(usersRef, where("pendingEmail", "==", emailInput));
+                querySnapshot = await getDocs(qEmail);
+            }
 
             if (querySnapshot.empty) return showMessage("Account does not exist.");
 
@@ -90,10 +98,7 @@ if (loginForm) {
             // ============================
             // Identify Secure vs. Insecure Login Flow
             // ============================
-            // SECURE AUTH FLOW (Super Admin, Admin, Customer)
             const isSecureRole = (currentRole === "Super admin" || currentRole === "Admin" || currentRole === "Customer");
-            
-            // INSECURE DB FLOW (Cashier, Bartender, Driver)
             const isInsecureRole = (currentRole !== "Super admin" && currentRole !== "Admin" && currentRole !== "Customer");
 
 
@@ -139,19 +144,42 @@ if (loginForm) {
                 // Sign in with Firebase Authentication
                 const userCredential = await signInWithEmailAndPassword(auth, emailInput, pass);
                 const user = userCredential.user;
+                
+                // Store the credentials used for the successful sign-in
                 emailCredential.email = emailInput;
                 emailCredential.password = pass;
 
                 await user.reload(); // Get latest verification status
 
+                // The primary problem: The email is not verified yet
                 if (!user.emailVerified) {
-                    showMessage(`Your email is not verified yet. Please check your inbox: ${emailInput}`);
+                    
+                    let verificationMessage = `Your email is not verified yet. Please check your inbox: ${emailInput}`;
+
+                    // If the user's current Auth email (user.email) is NOT the one they typed (emailInput), 
+                    // it means they logged in with the old email and the change is pending.
+                    // However, in the case of email change, the user is temporarily signed out, 
+                    // and subsequent login with the *new* unverified email will often fail with user-not-found/invalid-credential 
+                    // until the link is clicked.
+                    
+                    // We rely on the core Firebase behavior: you must click the link to finalize the change.
+                    
+                    if (currentUserData.pendingEmail === emailInput) {
+                        verificationMessage = `Email change pending: A verification link was sent to your new email (${emailInput}). You must click the link in that email before you can log in with it.`;
+                    }
+                    
+                    showMessage(verificationMessage);
                     
                     if (resendVerificationBtn) {
                         resendVerificationBtn.style.display = 'block'; 
                         
+                        // Set the click handler to resend the verification link.
                         resendVerificationBtn.onclick = async () => {
                             try {
+                                // Since the user is logged in here (via signInWithEmailAndPassword), 
+                                // Firebase knows which user to send the verification to (their current user record).
+                                // Even if the primary email is the old one, sendEmailVerification() should send 
+                                // to the new email if a change is pending.
                                 if (user) {
                                     await sendEmailVerification(user);
                                     showMessage(`Verification email successfully resent to ${emailInput}. Please check your spam folder.`);
@@ -180,9 +208,14 @@ if (loginForm) {
             }
         } catch (error) {
             console.error("Login error:", error);
-            if (error.code === 'auth/wrong-password' || error.code === 'auth/user-not-found' || error.code === 'auth/invalid-credential') {
+            if (error.code === 'auth/wrong-password' || error.code === 'auth/invalid-credential') {
                 showMessage("Wrong password.");
-            } else {
+            } else if (error.code === 'auth/user-not-found') {
+                // The user is not found in Firebase Auth's system under this email. 
+                // This is the common error when trying to log in with an unverified pendingEmail.
+                showMessage("Account does not exist or email change is pending. Please ensure you have clicked the verification link sent to your new email.");
+            } 
+            else {
                 showMessage("Error logging in. Please try again.");
             }
         }
@@ -218,7 +251,7 @@ if (verifyOtpBtn) {
 
             // Redirect based on the role stored earlier
             if (currentRole === "Customer") {
-                window.location.href = "index.html";
+                window.location.href = "menu.html";
             } else if (currentRole === "Admin") {
                 window.location.href = "adminpanel.html";
             } else if (currentRole === "Super admin") {
