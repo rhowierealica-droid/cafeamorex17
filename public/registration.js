@@ -26,7 +26,7 @@ popupOkBtn.addEventListener("click", () => {
 });
 
 /* ===============================
-   Terms Popup
+   Terms Popup with Scroll Requirement
 =============================== */
 const termsPopup = document.getElementById("termsPopup");
 const termsCheckbox = document.getElementById("terms");
@@ -89,20 +89,41 @@ function validatePassword(pass) {
 /* ===============================
    Delivery Fee Mapping
 =============================== */
-const deliveryFees = { /* same as your previous mapping */ };
+const deliveryFees = {
+  "Alima": 5, "Aniban I": 10, "Aniban II": 15, "Aniban III": 20,
+  "Aniban IV": 25, "Aniban V": 30, "Banalo": 35, "Bayanan": 40,
+  "Campo Santo": 45, "Daang Bukid": 50, "Digman": 55, "Dulong Bayan": 60,
+  "Habay I": 65, "Habay II": 70, "Ligas I": 75, "Ligas II": 80,
+  "Ligas III": 85, "Mabolo I": 90, "Mabolo II": 95, "Mabolo III": 100,
+  "Maliksi I": 105, "Maliksi II": 110, "Maliksi III": 115, "Mambog I": 120,
+  "Mambog II": 125, "Mambog III": 130, "Mambog IV": 135, "Mambog V": 140,
+  "Molino I": 145, "Molino II": 150, "Molino III": 155, "Molino IV": 160,
+  "Molino V": 165, "Molino VI": 170, "Molino VII": 175, "Niog I": 180,
+  "Niog II": 185, "Niog III": 190, "P.F. Espiritu I (Panapaan)": 195,
+  "P.F. Espiritu II": 200, "P.F. Espiritu III": 205, "P.F. Espiritu IV": 210,
+  "P.F. Espiritu V": 215, "P.F. Espiritu VI": 220, "P.F. Espiritu VII": 225,
+  "P.F. Espiritu VIII": 230, "Queens Row Central": 235, "Queens Row East": 240,
+  "Queens Row West": 245, "Real I": 250, "Real II": 255, "Salinas I": 260,
+  "Salinas II": 265, "Salinas III": 270, "Salinas IV": 275, "San Nicolas I": 280,
+  "San Nicolas II": 285, "San Nicolas III": 290, "Sineguelasan": 295,
+  "Tabing Dagat (Poblacion)": 300, "Talaba I": 305, "Talaba II": 310,
+  "Talaba III": 315, "Talaba IV": 320, "Talaba V": 325, "Talaba VI": 330,
+  "Talaba VII": 335, "Zapote I": 340, "Zapote II": 345, "Zapote III": 350,
+  "Zapote IV": 355, "Zapote V": 360
+};
+
 function getDeliveryFee(barangay) {
   return deliveryFees[barangay] || 0;
 }
 
 /* ===============================
-   Phone Authentication
+   Phone Authentication Setup
 =============================== */
 const phoneInput = document.getElementById("phoneNumber");
 const sendOtpBtn = document.getElementById("sendOtpBtn");
 const otpPopup = document.getElementById("otpPopup");
 const otpCode = document.getElementById("otpCode");
 let otpErrorMsg = document.getElementById("otpErrorMsg");
-
 if (!otpErrorMsg) {
   otpErrorMsg = document.createElement("div");
   otpErrorMsg.id = "otpErrorMsg";
@@ -127,6 +148,7 @@ function clearOtpError() {
 
 if (sendOtpBtn) {
   window.recaptchaVerifier = new RecaptchaVerifier(auth, "recaptcha-container", { size: "invisible" });
+
   sendOtpBtn.addEventListener("click", async () => {
     const phoneNumber = phoneInput.value.trim();
     if (!phoneNumber.startsWith("+63")) {
@@ -139,7 +161,6 @@ if (sendOtpBtn) {
       clearOtpError();
     } catch (error) {
       showMessage("Failed to send OTP. Please try again.");
-      console.error(error);
     }
   });
 }
@@ -171,7 +192,7 @@ if (closeOtpBtn) {
 }
 
 /* ===============================
-   Registration
+   Registration with Email + Phone + SendGrid
 =============================== */
 const registerForm = document.getElementById("registerForm");
 const password = document.getElementById("password");
@@ -223,16 +244,12 @@ if (registerForm) {
     try {
       const userCred = await createUserWithEmailAndPassword(auth, email, pass);
 
-      // ✅ Fixed local endpoint for SendGrid
-      try {
-        await fetch('http://localhost:3000/.netlify/functions/sendVerificationEmail', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ email: userCred.user.email, uid: userCred.user.uid })
-        });
-      } catch (err) {
-        console.error("SendGrid verification failed:", err);
-      }
+      // Send verification email via Netlify + SendGrid
+await fetch('http://localhost:8888/sendVerificationEmail', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: userCred.user.email, uid: userCred.user.uid })
+      });
 
       const deliveryFee = getDeliveryFee(barangay);
 
@@ -257,9 +274,13 @@ if (registerForm) {
 
     } catch (error) {
       let errorMessage = "Something went wrong. Please try again.";
-      if (error.code === "auth/email-already-in-use") errorMessage = "The email is already in use. Please use a different email.";
-      else if (error.code === "auth/invalid-email") errorMessage = "The email address is not valid.";
-      else if (error.code === "auth/weak-password") errorMessage = "Password is too weak. Please choose a stronger password.";
+      if (error.code === "auth/email-already-in-use") {
+        errorMessage = "The email is already in use. Please use a different email.";
+      } else if (error.code === "auth/invalid-email") {
+        errorMessage = "The email address is not valid.";
+      } else if (error.code === "auth/weak-password") {
+        errorMessage = "Password is too weak. Please choose a stronger password.";
+      }
       showMessage(errorMessage);
     }
   });
