@@ -1,13 +1,9 @@
-// generate-paymongo-link.js (Standalone Module for Admin Approval Flow - Netlify Format)
-
 const axios = require('axios');
 const { v4: uuidv4 } = require('uuid'); 
+
 // Environment variables are accessed directly inside the handler via process.env
 const PAYMONGO_SECRET_KEY = process.env.PAYMONGO_SECRET_KEY;
 const PAYMONGO_API = "https://api.paymongo.com/v1";
-
-// NOTE: The previous global AUTH_HEADER calculation is REMOVED as it may fail to load
-// the environment variable during cold starts. The calculation is now inside the handler.
 
 /**
  * Handles the logic for generating a PayMongo Checkout Session link.
@@ -24,11 +20,11 @@ exports.handler = async (event, context) => { 
         };
     }
 
-    // CRITICAL FIX: Calculate the AUTH_HEADER here to ensure environment variables are loaded
-    const AUTH_HEADER = Buffer.from(PAYMONGO_SECRET_KEY + ":").toString("base64");
+    // Calculate the AUTH_HEADER here to ensure environment variables are loaded
+    const AUTH_HEADER = Buffer.from(PAYMONGO_SECRET_KEY + ":").toString("base64");
 
 
-    // 2. Parse the Request Body (CRITICAL for Netlify functions)
+    // 2. Parse the Request Body
     let parsedBody;
     try {
         // Netlify event.body is a string
@@ -54,7 +50,6 @@ exports.handler = async (event, context) => { 
     const amountInCentavos = Math.round(Number(amount) * 100);
 
     // 3. Basic Validation
-    // PayMongo minimum amount is 100 centavos (1 PHP)
     if (!orderId || !collectionName || amountInCentavos < 100 || !lineItems?.length) {
         return {
             statusCode: 400,
@@ -71,8 +66,7 @@ exports.handler = async (event, context) => { 
             {
                 data: {
                     attributes: {
-                        // FIX 2: Added mandatory 'amount' field to attributes
-                        amount: amountInCentavos, 
+                        amount: amountInCentavos, 
                         billing: {
                             name: customerDetails.name,
                             phone: customerDetails.phone,
@@ -86,9 +80,9 @@ exports.handler = async (event, context) => { 
                                 country: "PH"
                             }
                         },
-                        // Use the live Netlify domain for redirect
-                        success_url: "https://inquisitive-tarsier-f8128f.netlify.app/public/index.html", 
-                        cancel_url: "https://inquisitive-tarsier-f8128f.netlify.app/public/index.html", 
+                        // NOTE: REPLACE THESE WITH YOUR ACTUAL SUCCESS/CANCEL URLS
+                        success_url: "YOUR_NETLIFY_DOMAIN/public/index.html", 
+                        cancel_url: "YOUR_NETLIFY_DOMAIN/public/index.html", 
                         send_email_receipt: true,
                         description: description || "Order Payment (Admin Approved)",
                         line_items: lineItems,
@@ -100,15 +94,14 @@ exports.handler = async (event, context) => { 
                         },
                     },
                 },
-            },
-            {
-                headers: {
-                    Authorization: `Basic ${AUTH_HEADER}`, // Use the corrected header
-                    "Content-Type": "application/json",
-                    Accept: "application/json",
-                    "Idempotency-Key": idempotencyKey,
-                },
-            }
+                {
+                    headers: {
+                        Authorization: `Basic ${AUTH_HEADER}`, // Use the corrected header
+                        "Content-Type": "application/json",
+                        Accept: "application/json",
+                        "Idempotency-Key": idempotencyKey,
+                    },
+                }
         );
 
         // Success response (Netlify format)
@@ -123,20 +116,17 @@ exports.handler = async (event, context) => { 
             error.response?.data || error.message
         );
        
-        // Extract the most helpful error detail from PayMongo's response structure
-        const paymongoErrorDetail = error.response?.data?.errors?.[0]?.detail || error.message;
+        // Extract the most helpful error detail from PayMongo's response structure
+        const paymongoErrorDetail = error.response?.data?.errors?.[0]?.detail || error.message;
 
         // Error response (Netlify format)
         return {
-            // Return the actual HTTP status code from PayMongo if available, otherwise 500
-            statusCode: error.response?.status || 500, 
+            // Return a 400 for client errors (like missing line items) or 500 otherwise
+            statusCode: error.response?.status || 500, 
             body: JSON.stringify({
                 error: "Failed to create checkout session for admin approval",
-                // This detail is what should now appear in your client-side error message
                 details: paymongoErrorDetail,
             }),
         };
     }
 };
-
-// Netlify uses exports.handler as the entry point, so no other exports are needed.
