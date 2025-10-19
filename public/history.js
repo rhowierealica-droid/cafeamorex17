@@ -1,205 +1,241 @@
+// ==========================
+// history.js (Receipt-Style + Dropdown Filter + Real-Time + Pagination + Auth)
+// ==========================
 import { db } from './firebase-config.js';
-import { collection, getDocs } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+import {
+  collection,
+  query,
+  onSnapshot,
+  orderBy
+} from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 import { getAuth, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
 
+// ==========================
+// DOM Elements
+// ==========================
 const historyContainer = document.querySelector('.history-container');
 const loginPopup = document.getElementById('loginPopup');
 const loginRedirect = document.getElementById('loginRedirect');
+const filterContainer = document.getElementById('filterContainer'); // container for dropdown
 
-loginRedirect.addEventListener('click', () => window.location.href = 'login.html');
+loginRedirect.addEventListener('click', () => {
+  window.location.href = 'login.html';
+});
 
 const auth = getAuth();
 let currentUser = null;
+let allOrders = [];
+let filteredOrders = [];
+let currentPage = 1;
+const itemsPerPage = 10;
+let selectedStatus = "All";
 
+// ==========================
+// Wait for Auth State
+// ==========================
 onAuthStateChanged(auth, async (user) => {
-  currentUser = user;
-  if (!currentUser) {
+  if (user) {
+    currentUser = user;
+    loginPopup.style.display = 'none';
+    createFilterDropdown();
+    listenToHistory();
+  } else {
+    currentUser = null;
     loginPopup.style.display = 'flex';
-    return;
+    historyContainer.innerHTML = '';
+    if (filterContainer) filterContainer.innerHTML = '';
   }
-  await loadHistory();
 });
 
-async function loadHistory() {
-  const ordersSnapshot = await getDocs(collection(db, "DeliveryOrders"));
+// ==========================
+// Real-time listener for user's order history
+// ==========================
+function listenToHistory() {
+  const ordersRef = collection(db, "DeliveryOrders");
+  const q = query(ordersRef, orderBy("createdAt", "desc"));
 
-  const userOrders = ordersSnapshot.docs
-    .map(doc => ({ id: doc.id, ...doc.data() }))
-    .filter(order => 
-      order.userId === currentUser.uid &&
-      (order.status?.includes("Completed") || order.status?.includes("Canceled"))
+  onSnapshot(q, (snapshot) => {
+    const userOrders = snapshot.docs
+      .map(doc => ({ id: doc.id, ...doc.data() }))
+      .filter(order =>
+        order.userId === currentUser?.uid &&
+        (
+          order.status?.includes("Completed") ||
+          order.status?.includes("Canceled") ||
+          order.status?.includes("Refunded") ||
+          order.status?.includes("Completed by Customer")
+        )
+      );
+
+    allOrders = userOrders;
+    applyFilter();
+  });
+}
+
+// ==========================
+// Create dropdown filter (combine Completed + Completed by Customer)
+// ==========================
+function createFilterDropdown() {
+  if (!filterContainer) return;
+
+  filterContainer.innerHTML = `
+    <label for="statusFilter" class="filter-label">Filter by Status:</label>
+    <select id="statusFilter" class="status-filter">
+      <option value="All">All</option>
+      <option value="Completed">Completed</option>
+      <option value="Canceled">Canceled</option>
+      <option value="Refunded">Refunded</option>
+    </select>
+  `;
+
+  const statusFilter = document.getElementById('statusFilter');
+  statusFilter.addEventListener('change', (e) => {
+    selectedStatus = e.target.value;
+    applyFilter();
+  });
+}
+
+// ==========================
+// Apply dropdown filter (combine completed statuses)
+// ==========================
+function applyFilter() {
+  if (selectedStatus === "All") {
+    filteredOrders = allOrders;
+  } else if (selectedStatus === "Completed") {
+    filteredOrders = allOrders.filter(order =>
+      order.status === "Completed" || order.status === "Completed by Customer"
     );
+  } else {
+    filteredOrders = allOrders.filter(order => order.status === selectedStatus);
+  }
 
-  if (userOrders.length === 0) {
-    historyContainer.innerHTML = '<p class="no-orders">You have no completed or cancelled orders yet.</p>';
+  currentPage = 1;
+  renderPaginatedHistory();
+}
+
+// ==========================
+// Pagination + Render
+// ==========================
+function renderPaginatedHistory() {
+  historyContainer.innerHTML = '';
+
+  if (filteredOrders.length === 0) {
+    historyContainer.innerHTML = '<p class="no-orders">No orders found for this status.</p>';
     return;
   }
 
-  userOrders.forEach(order => {
-    if (document.getElementById(`order-${order.id}`)) return;
+  const startIndex = (currentPage - 1) * itemsPerPage;
+  const endIndex = startIndex + itemsPerPage;
+  const paginatedOrders = filteredOrders.slice(startIndex, endIndex);
+
+  renderHistory(paginatedOrders);
+  renderPaginationControls();
+}
+
+// ==========================
+// Render orders (Receipt-Style Layout)
+// ==========================
+function renderHistory(orders) {
+  orders.forEach(order => {
+    const date = order.createdAt?.toDate?.()?.toLocaleDateString('en-US', {
+      year: 'numeric', month: 'short', day: 'numeric'
+    }) || "Unknown Date";
 
     const card = document.createElement('div');
     card.className = 'order-card';
-    card.id = `order-${order.id}`;
 
-    const date = order.createdAt?.toDate?.()?.toLocaleString() || "Unknown date";
-
-    card.innerHTML = `
-      <h3>Order #${order.queueNumber || order.id}</h3>
-      <p class="order-date"><strong>Date:</strong> ${date}</p>
-      <p class="status ${order.status}">Status: ${order.status}</p>
-      <div class="order-items"></div>
-      <p><strong>Delivery Fee:</strong> ₱${Number(order.deliveryFee || 0).toFixed(2)}</p>
-      <p><strong>Total:</strong> ₱${Number(order.total || 0).toFixed(2)}</p>
+    // Header
+    const header = `
+      <div class="order-header">
+        <span>Queue #: ${order.queueNumber || "N/A"}</span>
+        <span>${date}</span>
+      </div>
+      <div class="order-status ${order.status}">
+        Status: ${order.status || "Unknown"}
+      </div>
+      <div class="order-divider"></div>
     `;
 
-    const itemsContainer = card.querySelector('.order-items');
+    // Items
+    let itemsHTML = '';
     const items = order.items || [];
+    items.forEach(item => {
+      itemsHTML += `
+        <div class="order-item-row">
+          <div class="order-item-name">${item.product || 'Unnamed'}</div>
+          <div class="order-item-qty">${item.qty || item.quantity || 1}pc</div>
+          <div class="order-item-price">₱${Number(item.total || item.totalPrice || 0).toFixed(2)}</div>
+        </div>
+      `;
+    });
 
-    if (items[0]) {
-      const item = items[0];
+    // Summary
+    const summary = `
+      <div class="order-divider"></div>
+      <div class="order-summary">
+        <div class="order-summary-row">
+          <span>Delivery Fee</span>
+          <span>₱${Number(order.deliveryFee || 0).toFixed(2)}</span>
+        </div>
+        <div class="order-address">Address: ${order.address || 'No address provided'}</div>
+        <div class="order-total">
+          <span>Total</span>
+          <span>₱${Number(order.total || 0).toFixed(2)}</span>
+        </div>
+      </div>
+      <div class="order-divider"></div>
+    `;
 
-      // Create image container
-      const imgContainer = document.createElement('div');
-      imgContainer.className = 'order-item';
-      const img = document.createElement('img');
-      img.src = item.image || 'placeholder.png';
-      img.alt = item.product || 'Product Image';
-      imgContainer.appendChild(img);
-      itemsContainer.appendChild(imgContainer);
-
-      // Product info stays in order-card
-      const nameP = document.createElement('p');
-      nameP.className = 'item-name';
-      nameP.textContent = `Product: ${item.product || 'Unnamed Item'}`;
-      const sizeP = document.createElement('p');
-      sizeP.className = 'item-size';
-      sizeP.textContent = `Size: ${item.size || 'N/A'} - ₱${Number(item.sizePrice || 0).toFixed(2)}`;
-      const addonsP = document.createElement('p');
-      addonsP.className = 'item-addons';
-      if (item.addons && item.addons.length) {
-        addonsP.innerHTML = `Add-ons:<br>${item.addons.map(a => `${a.name} - ₱${Number(a.price).toFixed(2)}`).join("<br>")}`;
-      } else addonsP.textContent = 'Add-ons: None';
-      const qtyP = document.createElement('p');
-      qtyP.className = 'item-qty';
-      qtyP.textContent = `Quantity: ${item.qty || item.quantity || 1}`;
-      const totalP = document.createElement('p');
-      totalP.className = 'item-total';
-      totalP.textContent = `Total: ₱${Number(item.total || item.totalPrice || 0).toFixed(2)}`;
-
-      itemsContainer.appendChild(nameP);
-      itemsContainer.appendChild(sizeP);
-      itemsContainer.appendChild(addonsP);
-      itemsContainer.appendChild(qtyP);
-      itemsContainer.appendChild(totalP);
-    }
-
-    // Show All Button
-    if (items.length > 1) {
-      const showBtn = document.createElement('button');
-      showBtn.textContent = `Show All (${items.length})`;
-      showBtn.className = 'show-all-btn';
-      showBtn.addEventListener('click', () => openOrderModal(items, order.id, order.deliveryFee));
-      itemsContainer.appendChild(showBtn);
-    }
-
+    card.innerHTML = header + itemsHTML + summary;
     historyContainer.appendChild(card);
   });
 }
 
-// Modal creation function
-function openOrderModal(items, orderId, deliveryFee = 0) {
-  const modal = document.createElement('div');
-  modal.className = 'order-modal';
-  modal.id = `modal-${orderId}`;
-  modal.style.display = 'flex';
-  modal.style.position = 'fixed';
-  modal.style.top = '0';
-  modal.style.left = '0';
-  modal.style.width = '100%';
-  modal.style.height = '100%';
-  modal.style.backgroundColor = 'rgba(0,0,0,0.5)';
-  modal.style.justifyContent = 'center';
-  modal.style.alignItems = 'center';
-  modal.style.zIndex = '1000';
+// ==========================
+// Render Pagination Controls
+// ==========================
+function renderPaginationControls() {
+  const totalPages = Math.ceil(filteredOrders.length / itemsPerPage);
+  if (totalPages <= 1) return;
 
-  const modalContent = document.createElement('div');
-  modalContent.className = 'order-modal-content';
-  modalContent.style.backgroundColor = '#fff';
-  modalContent.style.padding = '20px';
-  modalContent.style.borderRadius = '10px';
-  modalContent.style.maxHeight = '80vh';
-  modalContent.style.overflowY = 'auto';
-  modalContent.style.width = '90%';
-  modalContent.innerHTML = `<h2>All Products</h2>`;
+  const paginationDiv = document.createElement('div');
+  paginationDiv.className = 'pagination-controls';
 
-  let grandTotal = 0;
-
-  items.forEach(item => {
-    const itemDiv = document.createElement('div');
-    itemDiv.className = 'order-item';
-    itemDiv.style.display = 'flex';
-    itemDiv.style.marginBottom = '12px';
-
-    const img = document.createElement('img');
-    img.src = item.image || 'placeholder.png';
-    img.alt = item.product || 'Product Image';
-    img.style.width = '60px';
-    img.style.height = '60px';
-    img.style.objectFit = 'cover';
-    img.style.borderRadius = '6px';
-    itemDiv.appendChild(img);
-
-    const infoDiv = document.createElement('div');
-    infoDiv.style.marginLeft = '10px';
-
-    const nameP = document.createElement('p');
-    nameP.textContent = `Product: ${item.product || 'Unnamed Item'}`;
-    const sizeP = document.createElement('p');
-    sizeP.textContent = `Size: ${item.size || 'N/A'} - ₱${Number(item.sizePrice || 0).toFixed(2)}`;
-    const addonsP = document.createElement('p');
-    if (item.addons && item.addons.length) {
-      addonsP.innerHTML = `Add-ons:<br>${item.addons.map(a => `${a.name} - ₱${Number(a.price).toFixed(2)}`).join("<br>")}`;
-    } else addonsP.textContent = 'Add-ons: None';
-    const qtyP = document.createElement('p');
-    qtyP.textContent = `Quantity: ${item.qty || item.quantity || 1}`;
-    const totalP = document.createElement('p');
-    const itemTotal = Number(item.total || item.totalPrice || 0);
-    totalP.textContent = `Total: ₱${itemTotal.toFixed(2)}`;
-    grandTotal += itemTotal;
-
-    infoDiv.appendChild(nameP);
-    infoDiv.appendChild(sizeP);
-    infoDiv.appendChild(addonsP);
-    infoDiv.appendChild(qtyP);
-    infoDiv.appendChild(totalP);
-    itemDiv.appendChild(infoDiv);
-    modalContent.appendChild(itemDiv);
+  const prevButton = document.createElement('button');
+  prevButton.textContent = 'Previous';
+  prevButton.disabled = currentPage === 1;
+  prevButton.addEventListener('click', () => {
+    if (currentPage > 1) {
+      currentPage--;
+      renderPaginatedHistory();
+    }
   });
 
-  const deliveryP = document.createElement('p');
-  deliveryP.innerHTML = `<strong>Delivery Fee:</strong> ₱${Number(deliveryFee).toFixed(2)}`;
-  const grandTotalP = document.createElement('p');
-  grandTotalP.innerHTML = `<strong>Grand Total:</strong> ₱${(grandTotal + Number(deliveryFee)).toFixed(2)}`;
-  modalContent.appendChild(deliveryP);
-  modalContent.appendChild(grandTotalP);
+  const pageInfo = document.createElement('span');
+  pageInfo.textContent = `Page ${currentPage} of ${totalPages}`;
 
-  const closeBtn = document.createElement('button');
-  closeBtn.textContent = 'Close';
-  closeBtn.className = 'modal-close-btn';
-  closeBtn.style.marginTop = '15px';
-  closeBtn.addEventListener('click', () => modal.remove());
-
-  modalContent.appendChild(closeBtn);
-  modal.appendChild(modalContent);
-  document.body.appendChild(modal);
-
-  modal.addEventListener('click', e => {
-    if (e.target === modal) modal.remove();
+  const nextButton = document.createElement('button');
+  nextButton.textContent = 'Next';
+  nextButton.disabled = currentPage === totalPages;
+  nextButton.addEventListener('click', () => {
+    if (currentPage < totalPages) {
+      currentPage++;
+      renderPaginatedHistory();
+    }
   });
+
+  paginationDiv.appendChild(prevButton);
+  paginationDiv.appendChild(pageInfo);
+  paginationDiv.appendChild(nextButton);
+
+  historyContainer.appendChild(paginationDiv);
 }
 
-// Close login popup
+// ==========================
+// Close login popup when clicking outside
+// ==========================
 window.addEventListener('click', e => {
-  if (e.target === loginPopup) loginPopup.style.display = 'none';
+  if (e.target === loginPopup) {
+    loginPopup.style.display = 'none';
+  }
 });
