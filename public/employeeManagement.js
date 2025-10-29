@@ -3,10 +3,7 @@ import { doc, setDoc, getDocs, collection, deleteDoc, query, where, updateDoc } 
 import { getAuth, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
 
 
-// ==========================
-// DOM Elements
-// ==========================
-const auth = getAuth();  // ← this was missing
+const auth = getAuth();
 const employeeForm = document.getElementById('employeeForm');
 const employeeTableBody = document.querySelector('#employeeTable tbody');
 const credentialsDiv = document.getElementById('credentials');
@@ -21,29 +18,23 @@ const confirmMessage = document.getElementById('confirmMessage');
 const confirmYes = document.getElementById('confirmYes');
 const confirmNo = document.getElementById('confirmNo');
 
-let confirmAction = null; // function to execute when yes is clicked
+let confirmAction = null; 
 
-// Redirect if not logged in
 onAuthStateChanged(auth, async (user) => {
   if (!user) {
-    window.location.replace("login.html"); // redirect
+    window.location.replace("login.html");
     return;
   }
 
-  // User is logged in -> initialize the app
   await init();
 });
-// ==========================
-// Modal Controls
-// ==========================
+
 addBtn.addEventListener('click', () => modal.style.display = 'flex');
 closeModal.addEventListener('click', () => modal.style.display = 'none');
 window.addEventListener('click', e => { if (e.target === modal) modal.style.display = 'none'; });
 window.addEventListener('click', e => { if (e.target === confirmModal) confirmModal.style.display = 'none'; });
 
-// ==========================
-// Helper Functions
-// ==========================
+
 function sanitizeName(name) { return name.toLowerCase().replace(/[^a-z0-9]/g, ''); }
 
 function generateEmail(firstName, lastName) {
@@ -60,16 +51,13 @@ async function isEmailTaken(email) {
     } catch (error) { console.error(error); return true; }
 }
 
-// ==========================
-// Show Confirmation Modal
-// ==========================
+
 function showConfirm(message, action) {
     confirmMessage.textContent = message;
     confirmAction = action;
     confirmModal.style.display = 'flex';
 }
 
-// Handle Yes / No buttons
 confirmYes.addEventListener('click', () => { 
     confirmModal.style.display='none'; 
     if(confirmAction) confirmAction(); 
@@ -79,9 +67,6 @@ confirmNo.addEventListener('click', () => {
     confirmAction=null; 
 });
 
-// ==========================
-// Create Employee
-// ==========================
 employeeForm.addEventListener('submit', async e => {
     e.preventDefault();
     const firstName = document.getElementById('firstName').value.trim();
@@ -104,9 +89,6 @@ employeeForm.addEventListener('submit', async e => {
     }
 });
 
-// ==========================
-// Load Employees (only Cashier, Driver)
-// ==========================
 async function loadEmployees() {
     employeeTableBody.innerHTML = "";
     const snapshot = await getDocs(collection(db, "users"));
@@ -114,11 +96,9 @@ async function loadEmployees() {
     snapshot.forEach(docSnap => {
         const data = docSnap.data();
 
-        // Only show specific roles
         if (["Cashier", "Driver"].includes(data.role)) {
             const tr = document.createElement('tr');
 
-            // Hide password in table
             const hiddenPassword = '******';
 
             tr.innerHTML = `
@@ -136,9 +116,6 @@ async function loadEmployees() {
         }
     });
 
-    // ==========================
-    // Reset Password Button
-    // ==========================
     document.querySelectorAll(".resetBtn").forEach(btn => {
         btn.addEventListener("click", () => {
             const uid = btn.getAttribute("data-uid");
@@ -151,9 +128,6 @@ async function loadEmployees() {
         });
     });
 
-    // ==========================
-    // Delete Employee Button
-    // ==========================
     document.querySelectorAll(".deleteBtn").forEach(btn => {
         btn.addEventListener("click", () => {
             const uid = btn.getAttribute("data-uid");
@@ -167,7 +141,4 @@ async function loadEmployees() {
     });
 }
 
-// ==========================
-// Initial Load
-// ==========================
 loadEmployees();
