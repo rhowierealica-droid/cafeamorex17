@@ -1,32 +1,18 @@
-/*
- * AdminNotification.css
- * -----------------------------------------------------
- * Styles for the admin notification bell and dropdown.
- * Admin Theme Color: #6f4e37 (Coffee/Brown)
- * -----------------------------------------------------
- */
-
-/* ================================================= */
-/* 1. BELL CONTAINER AND BADGE */
-/* ================================================= */
-
 #adminNotifBellContainer {
-    /* The JS handles position:fixed, z-index, and display */
     font-size: 26px;
-    color: #6f4e37; /* Admin primary color */
+    color: #6f4e37; 
     transition: color 0.2s;
 }
 
 #adminNotifBellContainer:hover {
-    color: #4b3424; /* Darker hover */
+    color: #4b3424; 
 }
 
-/* Badge for unread count */
 #adminNotifBellContainer .badge {
     position: absolute; 
     top: -6px; 
     right: -6px;
-    background: #ef4444; /* Standard alert red */
+    background: #ef4444; 
     color: #fff;
     font-size: 12px;
     font-weight: bold;
@@ -35,23 +21,14 @@
     box-shadow: 0 0 4px rgba(0,0,0,0.4); 
 }
 
-/* ================================================= */
-/* 2. NOTIFICATION DROPDOWN CONTAINER */
-/* ================================================= */
-
 #adminNotifDropdown {
-    /* The JS handles position:fixed, top, right, etc. */
     background: #fff;
     border: 1px solid #ccc;
     border-radius: 8px;
     box-shadow: 0 4px 12px rgba(0,0,0,0.2);
     font-family: Arial, sans-serif;
-    gap: 4px; /* Matches the gap set in the JS */
+    gap: 4px;
 }
-
-/* ================================================= */
-/* 3. CONTROL BUTTONS (READ ALL / CLEAR ALL) */
-/* ================================================= */
 
 .control-container {
     display: flex;
@@ -70,12 +47,12 @@
     transition: opacity 0.2s;
 }
 
-#readAllBtn { /* Read All Button */
+#readAllBtn {
     background: #6f4e37; 
     color: #fff;
 }
 
-#clearAllBtn { /* Clear All Button */
+#clearAllBtn {
     background: #ef4444; 
     color: #fff;
 }
@@ -83,10 +60,6 @@
 #adminNotifDropdown button:hover {
     opacity: 0.85;
 }
-
-/* ================================================= */
-/* 4. INDIVIDUAL NOTIFICATION ITEM */
-/* ================================================= */
 
 #adminNotifDropdown .notifItem {
     padding: 12px 16px;
@@ -96,7 +69,6 @@
     transition: background-color 0.3s; 
 }
 
-/* Style for UNREAD notifications (JS adds the 'unread' class and inline background) */
 #adminNotifDropdown .notifItem.unread {
     border-left: 4px solid #6f4e37; 
     padding-left: 12px; 
@@ -117,7 +89,6 @@
     margin-right: 10px;
 }
 
-/* Close button (X) */
 #adminNotifDropdown .notifItem .notifClose {
     cursor: pointer;
     color: #a0a0a0; 
@@ -129,10 +100,6 @@
 #adminNotifDropdown .notifItem .notifClose:hover {
     color: #6f4e37; 
 }
-
-/* ================================================= */
-/* 5. EMPTY MESSAGE */
-/* ================================================= */
 
 #notifEmpty {
     padding: 12px;
