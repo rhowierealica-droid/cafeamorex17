@@ -6,16 +6,8 @@ import {
 import { getAuth, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
 import { addToCart } from './cart.js';
 
-// ===================================
-// 🔥 CRITICAL CHANGE: Global Inventory Map
-// This must be declared outside any function so loadProductsRealtime can update it, 
-// and openCartPopup can read it.
-// ===================================
 let inventoryMap = {};
 
-// ==========================
-// Toast Notification
-// ==========================
 function showToast(message = "Item added!", duration = 2000, type = "success") {
   let toast = document.querySelector('.toast');
   if (!toast) {
@@ -47,9 +39,6 @@ function showToast(message = "Item added!", duration = 2000, type = "success") {
   }, duration);
 }
 
-// ==========================
-// DOM Elements
-// ==========================
 const drinksSection = document.querySelector('section.main-section .category-list[data-main="Drink"]')?.parentElement;
 const drinksContainer = document.querySelector('.category-list[data-main="Drink"]');
 const sandwichSection = document.querySelector('section.main-section .category-list[data-main="Sandwich"]')?.parentElement;
@@ -60,9 +49,6 @@ const termsPopup = document.getElementById('termsPopup');
 const profileNameEl = document.querySelector('.profile-name');
 const welcomeHeader = document.querySelector('.main-content header h1');
 
-// ==========================
-// Popup System
-// ==========================
 function openPopup(popupEl) {
   if (!popupEl) return;
   popupEl.style.display = 'flex';
@@ -89,14 +75,10 @@ function closePopup(popupEl) {
   }
 }
 
-// Create a simple, temporary cart popup element if it doesn't exist
 const cartPopup = document.createElement('div');
 cartPopup.id = 'cartPopup';
 cartPopup.className = 'popup';
 
-// ==========================
-// Cart Popup (dynamic)
-// ==========================
 cartPopup.innerHTML = `
   <div class="popup-content cart-popup">
     <h2 class="product-name"></h2>
@@ -116,7 +98,6 @@ cartPopup.innerHTML = `
 `;
 document.body.appendChild(cartPopup);
 
-// Quantity button functionality
 document.addEventListener("click", (e) => {
   const qtyInput = cartPopup.querySelector(".quantity-input");
   if (!qtyInput) return;
@@ -132,25 +113,17 @@ document.addEventListener("click", (e) => {
   }
 });
 
-
-// ==========================
-// Load User Name
-// ==========================
 const storedName = localStorage.getItem("currentUserName");
 if (storedName) {
   if (profileNameEl) profileNameEl.textContent = storedName;
   if (welcomeHeader) welcomeHeader.textContent = `Welcome, ${storedName}`;
 }
 
-// ==========================
-// Firebase Auth
-// ==========================
 const auth = getAuth();
 let currentUser = null;
 onAuthStateChanged(auth, async (user) => {
   currentUser = user;
   if (!user) {
-    // If user logs out, re-run to show login prompt
     loadProductsRealtime();
     return;
   }
@@ -167,14 +140,10 @@ onAuthStateChanged(auth, async (user) => {
     }
   }
 
-  // When auth state changes, re-run loader to show favorites for logged-in user
   loadProductsRealtime();
 });
 loginRedirect?.addEventListener('click', () => window.location.href = 'login.html');
 
-// ==========================
-// Stock Calculation (FIXED)
-// ==========================
 function calculateProductStock(product, inventoryMap) {
   let stockPerSize = [];
   if (product.sizes?.length) {
@@ -232,42 +201,33 @@ function loadProductsRealtime() {
     return;
   }
 
-  // 1. Listen to Inventory in real-time
   onSnapshot(collection(db, "Inventory"), inventorySnapshot => {
     inventoryMap = {};
     inventorySnapshot.forEach(docSnap => {
       inventoryMap[docSnap.id] = { id: docSnap.id, ...docSnap.data() };
     });
 
-    // 2. Listen to Favorites in real-time
     const favQuery = query(collection(db, "favorites"), where("userId", "==", currentUser.uid));
     onSnapshot(favQuery, async favSnapshot => {
       const favoriteProductIds = favSnapshot.docs.map(d => d.data().productId);
       if (!favoriteProductIds.length) return renderProducts([]);
 
-      // 3. Listen to Products in real-time
       const productsQuery = query(collection(db, "products"));
       onSnapshot(productsQuery, productSnapshot => {
         const products = productSnapshot.docs
           .map(doc => ({ id: doc.id, ...doc.data() }))
           .filter(p => favoriteProductIds.includes(p.id));
 
-        // Render products with latest inventory and availability
-        renderProducts(products, favoriteProductIds);
+          renderProducts(products, favoriteProductIds);
       });
     });
   });
 }
 
-
-// ==========================
-// Product Rendering Logic (Centralized)
-// ==========================
 function renderProducts(products, favoriteProductIds = []) {
   drinksContainer.innerHTML = "";
   sandwichContainer.innerHTML = "";
 
-  // Display no favorites message if the list is empty
   if (!products.length && currentUser) {
     if (drinksContainer) drinksContainer.innerHTML = `<p style="padding:12px;">You have no favorite products yet.</p>`;
     return;
@@ -340,10 +300,7 @@ function renderProducts(products, favoriteProductIds = []) {
           card.appendChild(starsContainer);
           card.appendChild(ratingNumber);
 
-          // ASYNC FUNCTION WRAPPED IN A SELF-EXECUTING FUNCTION TO HANDLE RATING FETCH
           (async () => {
-            // You should consider moving this data aggregation to a cloud function or pre-calculating it
-            // for performance, but keeping it here for continuity.
             const orderSnapshot = await getDocs(collection(db, "DeliveryOrders"));
             let totalRating = 0, count = 0;
             orderSnapshot.forEach(docSnap => {
@@ -370,22 +327,16 @@ function renderProducts(products, favoriteProductIds = []) {
             });
           }
 
-          // Favorite Icon Logic
           const favIcon = document.createElement('i');
-          // On the favorites page, the heart is always solid.
           favIcon.className = 'fa-solid fa-heart favorite-icon favorited';
           card.appendChild(favIcon);
 
-          // Clicking unfavorites it
           favIcon.addEventListener('click', async () => {
             if (!currentUser) { openPopup(loginPopup); return; }
             const favRef = doc(db, "favorites", `${currentUser.uid}_${product.id}`);
             try {
               await deleteDoc(favRef);
               showToast(`${product.name} removed from favorites`, 1500, "error");
-              // *** CRITICAL UPDATE: Instead of card.remove(), let the onSnapshot listener re-render ***
-              // The onSnapshot listener on the 'favorites' collection handles the UI update automatically
-              // which avoids race conditions when multiple unfavorites occur or if inventory changes.
             } catch (err) { console.error("Error removing favorite:", err); }
           });
 
@@ -415,9 +366,6 @@ function renderProducts(products, favoriteProductIds = []) {
   });
 }
 
-// ==========================
-// Cart Popup (UPDATED WITH FIXED ADD-ONS)
-// ==========================
 function openCartPopup(product, stockInfo = []) {
   openPopup(cartPopup);
   cartPopup.querySelector('.product-name').textContent = product.name || 'Unnamed Product';
@@ -426,7 +374,7 @@ function openCartPopup(product, stockInfo = []) {
   const sizesContainer = cartPopup.querySelector('.sizes-container');
   sizesContainer.innerHTML = '';
   let selectedSize = null;
-  let selectedAddons = []; // Reset selected addons when popup opens
+  let selectedAddons = []; 
 
   if (Array.isArray(stockInfo) && stockInfo.length) {
     const heading = document.createElement('p'); heading.textContent = 'Sizes:'; sizesContainer.appendChild(heading);
@@ -470,7 +418,6 @@ function openCartPopup(product, stockInfo = []) {
         selectedSize = { ...size };
         updateMaxQty(selectedSize);
 
-        // Reload add-ons for the newly selected size
         loadAddons(selectedSize);
       });
       
@@ -483,7 +430,7 @@ function openCartPopup(product, stockInfo = []) {
   
   function loadAddons(size) {
     addonsContainer.innerHTML = '';
-    selectedAddons = []; // Clear selected addons on size change
+    selectedAddons = []; 
     if (!size?.addons?.length) return;
     const heading = document.createElement('p'); heading.textContent = 'Add-ons:'; addonsContainer.appendChild(heading);
 
@@ -522,7 +469,6 @@ function openCartPopup(product, stockInfo = []) {
     });
   }
 
-  // Initial load for add-ons
   if (selectedSize) loadAddons(selectedSize);
 
   const quantityInput = cartPopup.querySelector('.quantity-input');
@@ -558,9 +504,6 @@ function openCartPopup(product, stockInfo = []) {
   };
 }
 
-// ==========================
-// Reviews Popup (modern)
-// ==========================
 function showReviewsPopup(productName, feedbacks) {
   const popup = document.createElement('div'); 
   popup.className = 'popup reviews-popup'; 
@@ -624,17 +567,11 @@ function showReviewsPopup(productName, feedbacks) {
   });
 }
 
-// ==========================
-// Terms Popup
-// ==========================
 if (termsPopup) {
   const closeTerms = termsPopup.querySelector('.close-terms');
   if (closeTerms) closeTerms.addEventListener('click', () => closePopup(termsPopup));
 }
 
-// ==========================
-// Stars CSS
-// ==========================
 const style = document.createElement('style');
 style.textContent = `
 .stars-outer { position: relative; display: inline-block; color: #ccc; font-size: 16px; font-family: Arial, sans-serif; }
@@ -644,7 +581,4 @@ style.textContent = `
 `;
 document.head.appendChild(style);
 
-// ==========================
-// INIT
-// ==========================
 loadProductsRealtime();
