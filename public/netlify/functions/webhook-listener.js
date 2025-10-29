@@ -1,4 +1,4 @@
-// netlify/functions/paymongo-webhook.js (FINAL VERSION WITH FIX)
+// netlify/functions/paymongo-webhook.js (FINAL VERSION WITH FIX for Admin Link)
 
 require("dotenv").config();
 const admin = require("firebase-admin");
@@ -252,6 +252,7 @@ exports.handler = async (event, context) => {
     const metadata = dataObject?.attributes?.metadata || {};
     const userId = metadata.userId;
     const queueNumber = metadata.queueNumber;
+    const orderDocId = metadata.orderId; // This comes from the admin link flow
     const paymentId = dataObject.id;
     const rawCartItemIds =
       metadata.cartItemIds ??
@@ -261,29 +262,58 @@ exports.handler = async (event, context) => {
     const cartItemIds = safeParse(rawCartItemIds, []);
     
     const orderType = metadata.orderType || "Delivery";
-    const collectionName = (orderType === "Delivery") ? "DeliveryOrders" : "InStoreOrders";
+    const collectionName = metadata.collectionName || (orderType === "Delivery" ? "DeliveryOrders" : "InStoreOrders");
     
-    if (!userId || !queueNumber) {
-      console.error("❌ Missing required metadata (userId or queueNumber). Cannot proceed.");
-      return { statusCode: 200, body: JSON.stringify({ received: true, error: "Missing metadata" }) };
+    // NOTE: Removed the early exit check for missing userId/queueNumber. 
+    // We now rely on finding the order within the transaction using the available metadata.
+
+    // If we don't have enough data to identify the order (not even an orderId for admin link), we fail gracefully.
+    if (!orderDocId && (!userId || !queueNumber)) {
+        console.error("❌ Insufficient metadata (need orderId OR userId/queueNumber). Cannot proceed with payment hook.");
+        return { statusCode: 200, body: JSON.stringify({ received: true, error: "Insufficient metadata" }) };
     }
     
-    // --- Start Transaction for Atomic Update (THE CRITICAL FIX) ---
+    // --- Start Transaction for Atomic Update ---
     try {
       const finalOrderRef = await db.runTransaction(async (transaction) => {
         let orderRef;
         let orderItems;
         let finalOrderRefId = null;
+        let orderSnap = null;
+        let existingOrderFound = false;
 
-        // 1. Get the EXISTING order reference within the transaction
-        const existingOrderQuery = await transaction.get(db.collection(collectionName)
-            .where("userId", "==", userId)
-            .where("queueNumber", "==", queueNumber)
-            .limit(1));
 
-        if (!existingOrderQuery.empty) {
-            const orderSnap = existingOrderQuery.docs[0];
-            orderRef = orderSnap.ref;
+        // 1. Try to find the EXISTING order reference within the transaction
+        
+        // A. Lookup by Document ID (Covers Admin Link Flow)
+        if (orderDocId) {
+            orderRef = db.collection(collectionName).doc(orderDocId);
+            orderSnap = await transaction.get(orderRef);
+            if (orderSnap.exists) {
+                existingOrderFound = true;
+            } else {
+                // If order ID was provided but the doc doesn't exist, something is wrong.
+                console.warn(`⚠️ Admin Link Flow: Document ID ${orderDocId} not found in collection ${collectionName}.`);
+                orderSnap = null;
+            }
+        }
+        
+        // B. Fallback to Query by userId/queueNumber (Covers Standard Checkout Flow)
+        if (!existingOrderFound && userId && queueNumber) {
+            const existingOrderQuery = await transaction.get(db.collection(collectionName)
+                .where("userId", "==", userId)
+                .where("queueNumber", "==", queueNumber)
+                .limit(1));
+
+            if (!existingOrderQuery.empty) {
+                orderSnap = existingOrderQuery.docs[0];
+                orderRef = orderSnap.ref;
+                existingOrderFound = true;
+            }
+        }
+
+
+        if (orderSnap && existingOrderFound) {
             finalOrderRefId = orderRef.id;
 
             // 2. ⭐ CRITICAL CHECK: If already paid, skip. This is now atomic.
@@ -294,10 +324,28 @@ exports.handler = async (event, context) => {
             
             // Get items from the existing order
             orderItems = orderSnap.data().items || orderSnap.data().products || [];
+            
+            // 3. Perform the deduction *within the Transaction*
+            await deductInventory(orderItems, transaction);
+            console.log(`✅ Inventory Deduction applied for order ID ${finalOrderRefId}.`);
+            
+            // 4. Update the Order document
+            transaction.update(orderRef, {
+                paymongoPaymentId: paymentId,
+                status: "Pending", // Set the final confirmed status
+                paymentMetadata: admin.firestore.FieldValue.delete(),
+            });
+            console.log(`✅ Existing Order ID ${finalOrderRefId} updated with payment success within transaction.`);
+
         } else {
-          // Case 2: Order didn't exist (FALLBACK for direct payment links)
-          // NOTE: Creating the order within the transaction requires fetching items outside.
-          // We rely on the frontend creating the initial order. If it fails, we fall back.
+          // Case 3: Order didn't exist (FALLBACK for direct payment links without pre-existing order document)
+          
+          // Note: This fallback relies on having cart item IDs and proper userId, which 
+          // might be missing in the Admin Link flow, but is kept for legacy robustness.
+          
+          if (!userId || !cartItemIds.length) {
+              throw new Error("Order not found and fallback data (userId/cartItemIds) is missing.");
+          }
           
           orderItems = await fetchOrderItemsFromCart(userId, cartItemIds);
           if (!orderItems.length && metadata.orderItems) {
@@ -316,6 +364,9 @@ exports.handler = async (event, context) => {
           orderRef = db.collection(collectionName).doc(); // Get a new reference
           finalOrderRefId = orderRef.id;
           
+          await deductInventory(orderItems, transaction);
+          console.log(`✅ Inventory Deduction applied for new fallback order ID ${finalOrderRefId}.`);
+          
           transaction.set(orderRef, {
             userId,
             customerName: metadata.customerName || "",
@@ -333,24 +384,7 @@ exports.handler = async (event, context) => {
             paymongoPaymentId: paymentId,
             cartItemIds,
           });
-          console.log(`✅ New Order ID ${finalOrderRefId} created from payment success within transaction.`);
-
-          // Fallback logic complete, continue to deduction
-        }
-        
-        // 3. Perform the deduction *within the Transaction*
-        await deductInventory(orderItems, transaction);
-        console.log(`✅ Inventory Deduction applied for order ID ${finalOrderRefId}.`);
-
-        // 4. Update the Order document (Skip if it was a new order as it was set in step 2)
-        // Check if orderRef existed originally (was an update)
-        if (existingOrderQuery.docs.length > 0) {
-            transaction.update(orderRef, {
-                paymongoPaymentId: paymentId,
-                status: "Pending",
-                paymentMetadata: admin.firestore.FieldValue.delete(),
-            });
-            console.log(`✅ Existing Order ID ${finalOrderRefId} updated with payment success within transaction.`);
+          console.log(`✅ New Order ID ${finalOrderRefId} created from payment success within transaction (Fallback).`);
         }
         
         return orderRef;
@@ -361,6 +395,7 @@ exports.handler = async (event, context) => {
         // Atomically delete cart items (This is safe because the order is now FINAL)
         const batch = db.batch();
         for (const itemId of cartItemIds) {
+          // This will only work if cartItemIds were passed in the metadata (Standard Checkout)
           batch.delete(db.collection("users").doc(userId).collection("cart").doc(itemId));
         }
         await batch.commit();
