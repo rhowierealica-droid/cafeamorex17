@@ -1,18 +1,5 @@
-/* ===============================
-   Custom Font (Montserrat)
-=============================== */
 @import url('https://fonts.googleapis.com/css2?family=Montserrat:wght@400;600;700;800&display=swap');
 
-/* ===============================
-   Color Palette
-   Dark Brown: #552915
-   Mid Brown: #a65b35
-   Lightest Cream: #fff8f0
-   Off-White Text: #f2e6dc
-   Subtle Background: #fff3e8
-=============================== */
-
-/* Reset */
 * {
   margin: 0;
   padding: 0;
@@ -28,10 +15,6 @@ body {
   color: #552915;
   line-height: 1.6;
 }
-
-/* ===================================
-   1. NAVIGATION BAR
-=================================== */
 
 nav.customer-nav {
   width: 100%;
@@ -81,7 +64,6 @@ nav.customer-nav ul li a {
   gap: 6px;
 }
 
-/* Hover alignment fix */
 nav.customer-nav ul li:not(#loginLink) a:hover {
   color: #fff8f0;
   background: #a65b35;
@@ -97,7 +79,6 @@ nav.customer-nav ul li:not(#loginLink) a:hover {
   border-radius: 5px !important;
 }
 
-/* No underline for links */
 nav.customer-nav ul li a:after {
   content: '';
   position: absolute;
@@ -114,7 +95,6 @@ nav.customer-nav ul li a:hover:after,
   width: 0;
 }
 
-/* Login button */
 .nav-login-btn {
   padding: 8px 15px !important;
   border-radius: 20px;
@@ -130,14 +110,10 @@ nav.customer-nav ul li a:hover:after,
   width: 0;
 }
 
-/* Removed Hamburger Menu Completely */
 .hamburger {
   display: none !important;
 }
 
-/* ===================================
-   2. HERO SECTION
-=================================== */
 
 .hero-section {
   position: relative;
@@ -224,10 +200,6 @@ nav.customer-nav ul li a:hover:after,
   color: #552915;
 }
 
-/* ===================================
-   3. FEATURED PRODUCTS SECTION
-=================================== */
-
 .featured-products-section {
   padding: 80px 5%;
   text-align: center;
@@ -292,10 +264,6 @@ nav.customer-nav ul li a:hover:after,
   flex-grow: 1;
 }
 
-/* ===================================
-   4. MENU CTA BANNER
-=================================== */
-
 .menu-cta-banner {
   background: #552915;
   padding: 60px 5%;
@@ -336,10 +304,6 @@ nav.customer-nav ul li a:hover:after,
   background: #f2e6dc;
   transform: scale(1.05);
 }
-
-/* ===================================
-   5. FOOTER
-=================================== */
 
 footer {
   background: #a65b35;
@@ -382,10 +346,6 @@ footer {
   font-size: 0.85em;
   opacity: 0.8;
 }
-
-/* ===================================
-   6. POPUP MODAL
-=================================== */
 
 .popup-modal {
   display: none;
@@ -442,10 +402,6 @@ footer {
   background: none;
   border: none;
 }
-
-/* ===================================
-   7. RESPONSIVE DESIGN (No hamburger)
-=================================== */
 
 @media (max-width: 992px) {
   .hero-content-new h1 {
