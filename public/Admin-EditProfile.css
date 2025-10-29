@@ -1,6 +1,3 @@
-/* =========================
-   Reset & Base
-========================= */
 * {
   margin: 0;
   padding: 0;
@@ -16,9 +13,6 @@ body {
   color: #4b3621;
 }
 
-/* =========================
-   Profile Wrapper
-========================= */
 .profile-wrapper {
   flex: 1;
   display: flex;
@@ -30,9 +24,6 @@ body {
   transition: margin-left 0.25s ease-in-out, max-width 0.25s ease-in-out;
 }
 
-/* =========================
-   Profile Container
-========================= */
 .profile-container {
   background: #fff8f0;
   padding: 30px 40px;
@@ -54,9 +45,6 @@ body {
   font-size: 1.2em;
 }
 
-/* =========================
-   Tabs
-========================= */
 .tabs {
   display: flex;
   justify-content: space-between;
@@ -84,9 +72,6 @@ body {
   color: #fff;
 }
 
-/* =========================
-   Inputs & Form Structure
-========================= */
 .input-group {
   display: flex;
   flex-direction: column;
@@ -137,9 +122,6 @@ select[disabled] {
   min-width: 200px;
 }
 
-/* =========================
-   Buttons
-========================= */
 .button-group {
   display: flex;
   justify-content: flex-end;
@@ -186,9 +168,6 @@ select[disabled] {
   background: #cc0000;
 }
 
-/* =========================
-   Info Tab Styling
-========================= */
 .tab-content hr {
   border: 0;
   height: 1px;
@@ -210,156 +189,6 @@ select[disabled] {
   margin-top: 10px;
 }
 
-/* =========================
-   Sidebar
-========================= */
-.sidebar {
-  position: fixed;
-  top: 0;
-  left: 0;
-  width: 240px;
-  height: 100%;
-  background: #f3e9dc;
-  padding-bottom: 20px;
-  z-index: 2000;
-  display: flex;
-  flex-direction: column;
-  box-sizing: border-box;
-  overflow-y: auto;
-  transform: translateX(0);
-  transition: transform 0.25s ease-in-out, box-shadow 0.25s ease-in-out;
-  box-shadow: 2px 0 8px rgba(0, 0, 0, 0.1);
-}
-
-.sidebar .logo {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  padding: 20px 18px;
-}
-
-.sidebar .logo img {
-  width: 40px;
-  height: 40px;
-}
-
-.sidebar .brand {
-  font-weight: bold;
-  font-size: 1.3em;
-  color: #4b3621;
-}
-
-.sidebar nav ul {
-  list-style: none;
-  padding: 0;
-  margin-top: 10px;
-}
-
-.sidebar nav ul li {
-  padding: 12px 18px;
-  margin: 4px 10px;
-  border-radius: 8px;
-  cursor: pointer;
-  font-weight: 600;
-  color: #4b3621;
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  transition: background 0.3s, color 0.3s, transform 0.2s;
-}
-
-.sidebar nav ul li:hover,
-.sidebar nav ul li.active {
-  background: #6f4e37;
-  color: #fff;
-  transform: scale(1.02);
-}
-
-/* =========================
-   Profile Card
-========================= */
-.profile-card {
-  margin-top: auto;
-  padding: 15px 18px;
-  display: none;
-  align-items: center;
-  gap: 12px;
-  border-top: 1px solid #ddd;
-  cursor: pointer;
-  background: #fff8f0;
-  color: #4b3621;
-  transition: background 0.25s, color 0.25s;
-}
-
-.profile-card.active {
-  background: #6f4e37 !important;
-  color: #fff !important;
-}
-
-.profile-avatar i {
-  font-size: 2em;
-  color: #552915;
-}
-
-.profile-info .profile-name {
-  font-weight: bold;
-  color: #4b3621;
-}
-
-.profile-info .edit-text {
-  font-size: 0.85em;
-  color: #777;
-}
-
-/* =========================
-   Logout
-========================= */
-.logout {
-  padding: 14px 18px;
-  display: none;
-  align-items: center;
-  gap: 10px;
-  font-weight: 700;
-  border-top: 1px solid #ddd;
-  cursor: pointer;
-  color: #552915;
-  transition: background 0.25s, color 0.25s;
-}
-
-.logout:hover {
-  background: #6f4e37;
-  color: #fff;
-}
-
-/* =========================
-   Hamburger & Close
-========================= */
-.hamburger {
-  position: fixed;
-  top: 20px;
-  left: 15px;
-  font-size: 2em;
-  color: #552915;
-  cursor: pointer;
-  z-index: 2003;
-  display: none;
-}
-
-.sidebar .close-btn {
-  position: absolute;
-  top: 10px;
-  right: 10px;
-  font-size: 1.5em;
-  cursor: pointer;
-  color: #552915;
-  transition: color 0.25s, opacity 0.25s;
-  opacity: 0;
-  z-index: 2010;
-}
-
-/* =========================
-   OTP Popup
-========================= */
 #otpPopup {
   display: none;
   position: fixed;
@@ -382,6 +211,7 @@ select[disabled] {
   max-width: 350px;
   text-align: center;
   box-shadow: 0 10px 30px rgba(0, 0, 0, 0.25);
+  position: relative;
   animation: slideDown 0.3s ease-in-out;
 }
 
@@ -399,6 +229,7 @@ select[disabled] {
   font-size: 1em;
   margin-bottom: 10px;
   outline: none;
+  transition: border-color 0.3s, box-shadow 0.3s;
 }
 
 #otpPopup input:focus {
@@ -421,16 +252,6 @@ select[disabled] {
   background: #6f4e37;
 }
 
-#otpError {
-  color: #ff4d4d;
-  font-size: 0.9em;
-  margin-top: 5px;
-  display: none;
-}
-
-/* =========================
-   Animations
-========================= */
 @keyframes fadeIn {
   from { opacity: 0; }
   to { opacity: 1; }
@@ -441,9 +262,6 @@ select[disabled] {
   to { transform: translateY(0); opacity: 1; }
 }
 
-/* =========================
-   Responsive
-========================= */
 @media (max-width: 1024px) {
   .hamburger { display: block; }
   .sidebar { transform: translateX(-240px); }
