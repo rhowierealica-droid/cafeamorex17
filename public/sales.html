@@ -1,30 +1,28 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Café Amore - Sales Dashboard</title>
 
-  <!-- Font Awesome -->
-  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
-  
-  <!-- Chart.js -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css" />
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-  
-  <!-- Flatpickr -->
-  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css" />
   <script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
-  
-  <!-- CSS -->
-  <link rel="stylesheet" href="sales.css">
-  <link rel="stylesheet" href="admin-nav.css">
-</head>
-<body>
 
-  <!-- Sidebar -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf.plugin.autotable.min.js"></script>
+
+      <link rel="stylesheet" href="AdminNotification.css">
+
+  <link rel="stylesheet" href="sales.css" />
+  <link rel="stylesheet" href="admin-nav.css" />
+</head>
+
+<body>
   <aside class="sidebar" id="sidebar">
     <div class="logo">
-      <img src="logo.png" alt="Café Amore Logo">
+      <img src="logo.png" alt="Café Amore Logo" />
       <span class="brand">Café Amore</span>
     </div>
 
@@ -53,14 +51,11 @@
     <div class="logout"><i class="fas fa-sign-out-alt"></i> Log Out</div>
   </aside>
 
-  <!-- Hamburger -->
   <div class="hamburger" id="hamburger"><i class="fas fa-bars"></i></div>
 
-  <!-- Main Content -->
   <div class="main-content">
     <h1>Sales Dashboard</h1>
 
-    <!-- Filters Section -->
     <div class="filter-section">
       <label for="salesFilter">Time:</label>
       <select id="salesFilter">
@@ -92,7 +87,10 @@
       <input type="text" id="productFilter" placeholder="Search product" />
     </div>
 
-    <!-- Dashboard Cards -->
+    <button id="generatePdfBtn" class="action-btn">
+      <i class="fas fa-file-pdf"></i> Generate Sales PDF
+    </button>
+
     <div class="cards">
       <div class="card">
         <h3 id="salesLabel">Sales Today</h3>
@@ -106,16 +104,18 @@
         <h3 id="cancelledLabel">Cancelled Orders Today</h3>
         <p id="cancelledToday">0</p>
       </div>
+      <div class="card">
+        <h3 id="refundedLabel">Refunded Orders Today</h3>
+        <p id="refundedToday">0</p>
+      </div>
     </div>
 
-    <!-- Chart & Payment Cards -->
     <div class="chart-wrapper">
-      <!-- Chart Section -->
       <div class="chart-section">
         <canvas id="salesChart"></canvas>
+        <hr />
       </div>
 
-      <!-- Payment Cards & Top Sellers -->
       <div class="payment-cards">
         <div class="card payment-card">
           <h3>Cash Payments</h3>
@@ -126,7 +126,6 @@
           <p id="ePayTotal">₱0.00</p>
         </div>
 
-        <!-- Top 5 Best Sellers -->
         <div class="payment-best-sellers">
           <h2>Top 5 Best Sellers</h2>
           <table>
@@ -137,19 +136,19 @@
                 <th>Total Sales</th>
               </tr>
             </thead>
-            <tbody id="bestSellersTable">
-              <!-- JS fills this -->
-            </tbody>
+            <tbody id="bestSellersTable"></tbody>
           </table>
         </div>
       </div>
     </div>
   </div>
 
-  <!-- Scripts -->
   <script type="module" src="sales.js"></script>
   <script type="module" src="admin-nav.js"></script>
-          <script type="module" src="AccessAdmin.js"></script>
+  <script type="module" src="AccessAdmin.js"></script>
+  <script type="module" src="AutoCancel.js"></script>
+  <script type="module" src="AdminNotification.js"></script>
+
 
   <script type="module">
     import { initOrderBadge } from './notification.js';
