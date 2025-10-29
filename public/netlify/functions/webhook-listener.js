@@ -24,7 +24,7 @@ try {
 }
 
 // ---------------------
-// 2. Helper Functions (Inventory and Others - UNCHANGED)
+// 2. Helper Functions (Inventory and Others)
 // ---------------------
 function safeParse(value, fallback = []) {
   if (Array.isArray(value) && value.length > 0) return value;
@@ -54,8 +54,8 @@ async function fetchOrderItemsFromCart(userId, cartItemIds) {
   }));
 }
 
-// Inventory Helpers (UNCHANGED, but now only called inside the transaction)
-async function deductInventory(orderItems, batch) {
+// Inventory Helpers (MODIFIED to accept a transaction/batch object)
+async function deductInventory(orderItems, transaction) {
   if (!orderItems || !orderItems.length) return;
   
   for (const item of orderItems) {
@@ -73,15 +73,15 @@ async function deductInventory(orderItems, batch) {
       if (!part.id) continue;
       const invRef = db.collection("Inventory").doc(part.id);
       const qtyToDeduct = (part.qty || 1) * qtyMultiplier * -1;
-      // We use the passed batch/transaction object for the update
-      batch.update(invRef, {
+      
+      // Use the transaction object to ensure atomicity
+      transaction.update(invRef, {
         quantity: admin.firestore.FieldValue.increment(qtyToDeduct),
       });
     }
   }
 }
 
-// (returnInventory helper function remains the same, committing its own batch)
 async function returnInventory(orderItems) {
   if (!orderItems || !orderItems.length) return;
   const batch = db.batch();
@@ -268,71 +268,90 @@ exports.handler = async (event, context) => {
       return { statusCode: 200, body: JSON.stringify({ received: true, error: "Missing metadata" }) };
     }
     
-    // --- Start Transaction for Atomic Update ---
+    // --- Start Transaction for Atomic Update (THE CRITICAL FIX) ---
     try {
       const finalOrderRef = await db.runTransaction(async (transaction) => {
         let orderRef;
         let orderItems;
-        let orderSnap;
         let finalOrderRefId = null;
 
-        // 1. Find the EXISTING order reference
+        // 1. Get the EXISTING order reference within the transaction
         const existingOrderQuery = await transaction.get(db.collection(collectionName)
             .where("userId", "==", userId)
             .where("queueNumber", "==", queueNumber)
             .limit(1));
 
         if (!existingOrderQuery.empty) {
-            orderSnap = existingOrderQuery.docs[0];
+            const orderSnap = existingOrderQuery.docs[0];
             orderRef = orderSnap.ref;
             finalOrderRefId = orderRef.id;
 
-            // 2. ⭐ CRITICAL CHECK within the Transaction: Is the order already processed?
+            // 2. ⭐ CRITICAL CHECK: If already paid, skip. This is now atomic.
             if (orderSnap.data().paymongoPaymentId) {
                 console.warn(`⚠️ DUPLICATE PAYMENT HOOK (Transaction): Order ID ${finalOrderRefId} already has Payment ID ${orderSnap.data().paymongoPaymentId}. Skipping.`);
-                // Return null to indicate the transaction succeeded but no further action needed
-                return null; 
+                return null; // Signal that no further action is needed
             }
             
             // Get items from the existing order
             orderItems = orderSnap.data().items || orderSnap.data().products || [];
         } else {
-          // If order doesn't exist (Fallback for direct payment links)
-          // Fetch items outside the transaction, as fetchOrderItemsFromCart is not part of the transaction
-          // For simplicity in the transaction block, we only proceed if an order exists or if 
-          // we are sure to create it from fallback data (which is gathered outside).
+          // Case 2: Order didn't exist (FALLBACK for direct payment links)
+          // NOTE: Creating the order within the transaction requires fetching items outside.
+          // We rely on the frontend creating the initial order. If it fails, we fall back.
           
-          // NOTE: The original logic for creating a new order from cart/metadata is complex 
-          // to put *entirely* inside a transaction. We will rely on the FRONTEND to create the order first.
+          orderItems = await fetchOrderItemsFromCart(userId, cartItemIds);
+          if (!orderItems.length && metadata.orderItems) {
+             orderItems = safeParse(metadata.orderItems, []);
+          }
           
-          console.error("❌ Order not found in database. Relying on frontend order creation failed.");
-          // To ensure this is always safe, you would need to fetch fallback items outside
-          // and then create the order *inside* the transaction if needed, which is complex.
-          // For now, we assume a failed lookup means we can't safely proceed to deduct inventory.
-          throw new Error("Order not found, skipping transaction.");
+          if (!orderItems.length) {
+              throw new Error("Order not found and fallback items are empty.");
+          }
+          
+          // Recalculate total for fallback order creation
+          const deliveryFee = Number(metadata.deliveryFee || 0);
+          const totalAmount = orderItems.reduce((sum, i) => sum + Number(i.total || 0), 0) + deliveryFee;
+
+          // Create the order *inside* the transaction
+          orderRef = db.collection(collectionName).doc(); // Get a new reference
+          finalOrderRefId = orderRef.id;
+          
+          transaction.set(orderRef, {
+            userId,
+            customerName: metadata.customerName || "",
+            customerEmail: metadata.customerEmail || "",
+            ...(orderType === "Delivery" && { address: metadata.address || "" }),
+            queueNumber: metadata.queueNumber,
+            queueNumberNumeric: Number(metadata.queueNumberNumeric) || 0,
+            orderType: orderType,
+            items: orderItems,
+            deliveryFee,
+            total: totalAmount,
+            paymentMethod: "E-Payment",
+            status: "Pending", // Set the final confirmed status
+            createdAt: admin.firestore.FieldValue.serverTimestamp(),
+            paymongoPaymentId: paymentId,
+            cartItemIds,
+          });
+          console.log(`✅ New Order ID ${finalOrderRefId} created from payment success within transaction.`);
+
+          // Fallback logic complete, continue to deduction
         }
         
-        // Ensure we have items to deduct
-        if (!orderItems.length) {
-          // Fallback: If the order was empty (maybe due to race condition clearing cart), use metadata
-          orderItems = safeParse(metadata.orderItems, []);
-          if (!orderItems.length) {
-             throw new Error("Order items empty, cannot proceed with deduction.");
-          }
-        }
-
-        // 3. Perform the deduction and update within the Transaction
-        // Pass the transaction object to the helper to use for atomic batch updates
+        // 3. Perform the deduction *within the Transaction*
         await deductInventory(orderItems, transaction);
         console.log(`✅ Inventory Deduction applied for order ID ${finalOrderRefId}.`);
 
-        // 4. Update the Order document (THIS is the critical idempotent step)
-        transaction.update(orderRef, {
-            paymongoPaymentId: paymentId,
-            status: "Pending", // Set the final confirmed status
-            paymentMetadata: admin.firestore.FieldValue.delete(), // Clean up metadata
-        });
-        console.log(`✅ Existing Order ID ${finalOrderRefId} updated with payment success within transaction.`);
+        // 4. Update the Order document (Skip if it was a new order as it was set in step 2)
+        // Check if orderRef existed originally (was an update)
+        if (existingOrderQuery.docs.length > 0) {
+            transaction.update(orderRef, {
+                paymongoPaymentId: paymentId,
+                status: "Pending",
+                paymentMetadata: admin.firestore.FieldValue.delete(),
+            });
+            console.log(`✅ Existing Order ID ${finalOrderRefId} updated with payment success within transaction.`);
+        }
         
         return orderRef;
       });
@@ -356,12 +375,15 @@ exports.handler = async (event, context) => {
       }
 
     } catch (err) {
-      // Note: A transaction failure (e.g., contention) will automatically retry up to 5 times.
-      // If it fails after all retries, the final error is thrown here.
+      // Transaction failures (like contention or the manual error throw) end up here
       console.error("❌ Transaction failed (Inventory or Order Update):", err.message);
+      
+      // The error message from the provided logs "A critical error occurred while updating the order status: Failed to fetch"
+      // is likely happening because the client-side code is expecting a status update that never happens due to a server error.
+      // Returning a 200 here prevents PayMongo from retrying repeatedly for a fatal error.
       return {
         statusCode: 200,
-        body: JSON.stringify({ received: true, error: err.message, fatal: true }),
+        body: JSON.stringify({ received: true, error: "Internal processing error: " + err.message, fatal: true }),
       };
     }
   }
