@@ -1,24 +1,12 @@
-// ==========================
-// --- index.js ---
-// ==========================
-
 import { db } from './firebase-config.js';
-import { 
-  collection, getDocs, doc, setDoc, getDoc, deleteDoc, 
+import { 
+  collection, getDocs, doc, setDoc, getDoc, deleteDoc, 
   onSnapshot
 } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 import { getAuth, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
-// 💡 IMPORTANT: Import the popup function from cart.js
 import { addToCart, showLoginPopup } from './cart.js'; 
-
-// ===================================
-// 🔥 CRITICAL CHANGE: Global Inventory Map
-// ===================================
 let inventoryMap = {};
 
-// ==========================
-// Toast Notification
-// ==========================
 function showToast(message = "Item added!", duration = 2000, type = "success") {
   let toast = document.querySelector('.toast');
   if (!toast) {
@@ -50,10 +38,6 @@ function showToast(message = "Item added!", duration = 2000, type = "success") {
   }, duration);
 }
 
-// ==========================
-// DOM Elements (UPDATED for Tab HTML)
-// ==========================
-// Select the main section containers based on their data-category attribute
 const drinksSection = document.querySelector('.category-section[data-category="Drinks"]');
 const drinksContainer = document.querySelector('.category-list[data-main="Drinks"]');
 const foodSection = document.querySelector('.category-section[data-category="Food"]');
@@ -67,21 +51,31 @@ const termsPopup = document.getElementById('termsPopup');
 const profileNameEl = document.querySelector('.profile-name');
 const welcomeHeader = document.querySelector('.main-content header h1');
 
-// Create the cartPopup element if it doesn't exist
 const cartPopup = document.getElementById('cartPopup') || document.createElement('div');
 cartPopup.id = 'cartPopup';
 cartPopup.className = 'popup';
 
-// ==========================
-// Popup System
-// ==========================
+
+
 
 if (loginRedirect) {
   loginRedirect.addEventListener('click', () => {
-    window.location.href = 'login.html'; // replace with your actual login page URL
+    window.location.href = 'login.html';
   });
 }
 
+
+document.getElementById('emailLink').addEventListener('click', function (e) {
+    e.preventDefault();
+    const email = 'cafeamorex17s@gmail.com';
+    const gmailUrl = `https://mail.google.com/mail/?view=cm&fs=1&to=${email}`;
+    const newTab = window.open(gmailUrl, '_blank');
+
+
+    if (!newTab || newTab.closed || typeof newTab.closed === 'undefined') {
+      window.location.href = `mailto:${email}`;
+    }
+  });
 
 function openPopup(popupEl) {
   if (!popupEl) return;
@@ -109,9 +103,6 @@ function closePopup(popupEl) {
   }
 }
 
-// ==========================
-// Cart Popup (dynamic)
-// ==========================
 cartPopup.innerHTML = `
   <div class="popup-content cart-popup">
     <h2 class="product-name"></h2>
@@ -131,7 +122,6 @@ cartPopup.innerHTML = `
 `;
 document.body.appendChild(cartPopup);
 
-// Quantity button functionality
 document.addEventListener("click", (e) => {
   const qtyInput = cartPopup.querySelector(".quantity-input");
   if (!qtyInput) return;
@@ -147,24 +137,16 @@ document.addEventListener("click", (e) => {
   }
 });
 
-
-// ==========================
-// Load User Name
-// ==========================
 const storedName = localStorage.getItem("currentUserName");
 if (storedName) {
   if (profileNameEl) profileNameEl.textContent = storedName;
   if (welcomeHeader) welcomeHeader.textContent = `Welcome, ${storedName}`;
 }
 
-// ==========================
-// Firebase Auth
-// ==========================
 const auth = getAuth();
 let currentUser = null;
 onAuthStateChanged(auth, async (user) => {
   currentUser = user;
-  // 💡 No change here, let cart.js handle auth state for cart logic
   if (!user) return;
   if (!storedName) {
     try {
@@ -180,9 +162,6 @@ onAuthStateChanged(auth, async (user) => {
   }
 });
 
-// ==========================
-// Stock Calculation
-// ==========================
 function calculateProductStock(product, inventoryMap) {
   let stockPerSize = [];
   if (product.sizes?.length) {
@@ -231,9 +210,6 @@ function calculateProductStock(product, inventoryMap) {
   return stockPerSize;
 }
 
-// ==========================
-// Tab Management (NEW)
-// ==========================
 function setupTabs(firstCategoryWithProducts) {
   const tabButtons = document.querySelectorAll('.tab-button');
   const tabSections = document.querySelectorAll('.category-section');
@@ -259,17 +235,22 @@ function setupTabs(firstCategoryWithProducts) {
     });
   });
 
-  // Initial display: Show the first tab with products, or default to Drinks
   const initialCategory = firstCategoryWithProducts || 'Drinks';
   showTab(initialCategory);
 }
 
+// Stars ng bohai ko
+function getStarHtml(rating) {
+  const maxStars = 5;
+  let starsHtml = '';
+  for (let i = 1; i <= maxStars; i++) {
+    starsHtml += i <= rating ? '★' : '☆';
+  }
+  return `<span class="rating-stars">${starsHtml}</span>`;
+}
 
-// ==========================
-// Load Products Realtime (FIXED CATEGORY GROUPING)
-// ==========================
+
 function loadProductsRealtime() {
-  // Check if at least one container exists before proceeding
   if (!drinksContainer && !foodContainer && !othersContainer) return;
   
   onSnapshot(collection(db, "Inventory"), inventorySnapshot => {
@@ -280,19 +261,15 @@ function loadProductsRealtime() {
 
     onSnapshot(collection(db, "products"), productSnapshot => {
       const products = productSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-      
-      // Clear containers
-      if(drinksContainer) drinksContainer.innerHTML = "";
+      if(drinksContainer) drinksContainer.innerHTML = "";
       if(foodContainer) foodContainer.innerHTML = "";
       if(othersContainer) othersContainer.innerHTML = "";
 
       const grouped = {};
       for (const product of products) {
-        // Use the categoryMain and categorySub properties, defaulting to "Others" if missing
         const mainCategory = product.categoryMain || "Others";
-        const subCategory = product.categorySub || "General"; // Default to General for Others
+        const subCategory = product.categorySub || "General";
         
-        // Use .trim() for clean key lookup.
         const normalizedMainCategory = mainCategory.trim(); 
 
         if (!grouped[normalizedMainCategory]) grouped[normalizedMainCategory] = {};
@@ -309,20 +286,16 @@ function loadProductsRealtime() {
       let firstCategoryWithProducts = null;
 
       mainCats.forEach(({ name, container, section }) => {
-        if (!container) return; // Skip if container is missing
+        if (!container) return; 
         container.innerHTML = "";
         let mainCatHasProducts = false;
 
-        // Get and sort sub-categories for stable display order
         if (grouped[name]) {
-          // Define a specific order for sub-categories for better UX
           let orderedSubCats = [];
-          // Define preferred order based on category
           if (name === "Drinks") orderedSubCats = ["Hot Coffee", "Ice Espresso", "Ice Cold Brew", "Non Coffee", "Others"]; 
           else if (name === "Food") orderedSubCats = ["Sandwiches", "Burger", "Snack", "Others"];
           else if (name === "Others") orderedSubCats = ["General"];
 
-          // Add any sub-categories found in the data but not in the predefined list
           const subCatKeys = Object.keys(grouped[name]);
           subCatKeys.forEach(key => {
             if (!orderedSubCats.includes(key)) {
@@ -404,7 +377,6 @@ function loadProductsRealtime() {
               const addBtn = card.querySelector('.add-cart-btn');
               if (!isUnavailable && addBtn) {
                 addBtn.addEventListener('click', () => {
-                  // 💡 Removed currentUser check here, now in cart.js
                   openCartPopup(product, stockInfo);
                 });
               }
@@ -452,7 +424,12 @@ function loadProductsRealtime() {
                   const order = docSnap.data();
                   order.items?.forEach((item, index) => {
                     if (item.product === product.name && order.feedback?.[index]) {
-                      feedbacks.push({ text: order.feedback[index], customerEmail: order.customerName || "" });
+                      const rating = order.feedbackRating?.[index] || 0;
+                      feedbacks.push({ 
+                        text: order.feedback[index], 
+                        customerEmail: order.customerName || "", 
+                        rating: rating
+                      });
                     }
                   });
                 });
@@ -462,21 +439,16 @@ function loadProductsRealtime() {
           }
         }
 
-        // Keep track of the first category that actually has products
         if (mainCatHasProducts && !firstCategoryWithProducts) {
           firstCategoryWithProducts = name;
         }
       });
 
-      // AFTER loading products, set up and display the tabs
       setupTabs(firstCategoryWithProducts); 
     });
   });
 }
 
-// ==========================
-// Cart Popup 
-// ==========================
 function openCartPopup(product, stockInfo = []) {
   openPopup(cartPopup);
   cartPopup.querySelector('.product-name').textContent = product.name || 'Unnamed Product';
@@ -528,7 +500,6 @@ function openCartPopup(product, stockInfo = []) {
         selectedSize = { ...size };
         updateMaxQty(selectedSize);
 
-        // Reload add-ons for the newly selected size
         loadAddons(selectedSize);
       });
       
@@ -542,7 +513,7 @@ function openCartPopup(product, stockInfo = []) {
   
   function loadAddons(size) {
     addonsContainer.innerHTML = '';
-    selectedAddons = []; // Reset selected addons when size changes
+    selectedAddons = []; 
     if (!size?.addons?.length) return;
     const heading = document.createElement('p'); heading.textContent = 'Add-ons:'; addonsContainer.appendChild(heading);
 
@@ -581,7 +552,6 @@ function openCartPopup(product, stockInfo = []) {
     });
   }
 
-  // Initial load for add-ons
   if (selectedSize) loadAddons(selectedSize);
 
   const quantityInput = cartPopup.querySelector('.quantity-input');
@@ -601,10 +571,8 @@ function openCartPopup(product, stockInfo = []) {
     if (quantity <= 0) { showToast("Quantity must be greater than 0!", 2000, "error"); return; }
     if (quantity > selectedSize.stock) { showToast(`Only ${selectedSize.stock} left in stock for the selected size!`, 2000, "error"); return; }
     
-    // Final check for addon stock based on total quantity
     for (const addon of selectedAddons) {
       const inventoryItem = inventoryMap[addon.id];
-      // The required stock is the product quantity * the consumption quantity for the addon
       const requiredStock = (addon.qty || 1) * quantity; 
       if (!inventoryItem || inventoryItem.quantity < requiredStock) {
         showToast(`Not enough stock for the selected quantity of ${addon.name}!`, 2000, "error");
@@ -619,9 +587,6 @@ function openCartPopup(product, stockInfo = []) {
   };
 }
 
-// ==========================
-// Reviews Popup (modern)
-// ==========================
 function showReviewsPopup(productName, feedbacks) {
   const popup = document.createElement('div'); 
   popup.className = 'popup reviews-popup'; 
@@ -632,33 +597,30 @@ function showReviewsPopup(productName, feedbacks) {
   popupContent.className = 'popup-content';
   Object.assign(popupContent.style, {
     position: 'relative',
-    backgroundColor: '#fff',
-    padding: '20px',
-    borderRadius: '10px',
-    maxWidth: '400px',
-    width: '90%',
+    backgroundColor: '#fff8f0', 
+    padding: '30px 25px', 
+    borderRadius: '14px', 
+    maxWidth: '520px',
+    width: '100%',
     maxHeight: '80vh',
     overflowY: 'auto',
-    boxShadow: '0 8px 20px rgba(0,0,0,0.2)'
+    boxShadow: '0 12px 30px rgba(0,0,0,0.2)'
   });
 
   const closeBtn = document.createElement('button');
   closeBtn.className = 'close-reviews';
   closeBtn.innerHTML = '&times;';
-  Object.assign(closeBtn.style, { position: 'absolute', top: '10px', right: '10px', background: 'none', border: 'none', fontSize: '24px', cursor: 'pointer', color: '#333' });
   closeBtn.onclick = () => popup.remove();
 
   const title = document.createElement('h3'); 
   title.textContent = `Reviews for ${productName}`;
   title.style.marginTop = '0';
   title.style.marginBottom = '15px';
+  title.style.color = '#4b3621'; 
 
   const list = document.createElement('div'); 
   list.className = 'feedback-list';
-  list.style.display = 'flex';
-  list.style.flexDirection = 'column';
-  list.style.gap = '10px';
-
+  
   if (feedbacks.length) {
     feedbacks.forEach(f => {
       let emailMasked = f.customerEmail;
@@ -666,9 +628,36 @@ function showReviewsPopup(productName, feedbacks) {
         const [name, domain] = emailMasked.split('@'); 
         emailMasked = `${name.slice(0,3)}****@${domain}`; 
       }
-      const p = document.createElement('p'); 
-      p.textContent = `${emailMasked}: ${f.text}`; 
-      list.appendChild(p);
+
+      const ratingHtml = getStarHtml(f.rating);
+      
+      const reviewItem = document.createElement('div');
+      reviewItem.className = 'review-item'; 
+      
+      const header = document.createElement('div');
+      header.style.display = 'flex';
+      header.style.justifyContent = 'space-between';
+      header.style.alignItems = 'center';
+      header.style.marginBottom = '5px';
+      
+      const customerEl = document.createElement('span');
+      customerEl.textContent = emailMasked;
+      customerEl.style.fontWeight = 'bold';
+      customerEl.style.color = '#704225'; 
+
+      const ratingEl = document.createElement('span');
+      ratingEl.innerHTML = ratingHtml;
+
+      header.appendChild(customerEl);
+      header.appendChild(ratingEl);
+      
+      const feedbackTextEl = document.createElement('p');
+      feedbackTextEl.textContent = f.text;
+
+      reviewItem.appendChild(header);
+      reviewItem.appendChild(feedbackTextEl);
+      
+      list.appendChild(reviewItem);
     });
   } else {
     const p = document.createElement('p');
@@ -685,17 +674,11 @@ function showReviewsPopup(productName, feedbacks) {
   });
 }
 
-// ==========================
-// Terms Popup
-// ==========================
 if (termsPopup) {
   const closeTerms = termsPopup.querySelector('.close-terms');
   if (closeTerms) closeTerms.addEventListener('click', () => closePopup(termsPopup));
 }
 
-// ==========================
-// Styling (Stars and NEW Tabs CSS)
-// ==========================
 const style = document.createElement('style');
 style.textContent = `
 .stars-outer { position: relative; display: inline-block; color: #ccc; font-size: 16px; font-family: Arial, sans-serif; }
@@ -744,7 +727,4 @@ style.textContent = `
 `;
 document.head.appendChild(style);
 
-// ==========================
-// INIT
-// ==========================
 loadProductsRealtime();
