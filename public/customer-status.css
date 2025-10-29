@@ -1,16 +1,12 @@
-/* ========================== */
-/* General Improvements       */
-/* ========================== */
 body {
   font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-  background: #fdf6f0; /* match incoming orders background */
+  background: #fdf6f0;
   margin: 0;
   padding: 0;
   color: #4b3621;
   overflow-x: hidden;
 }
 
-/* Orders Container */
 .orders-container {
   width: calc(100% - 260px);
   margin: 30px 20px 30px 260px;
@@ -25,7 +21,6 @@ body {
   overflow-x: auto;
 }
 
-/* Responsive adjustments */
 @media (max-width: 1024px) {
   .orders-container {
     width: calc(100% - 40px);
@@ -42,9 +37,6 @@ body {
   }
 }
 
-/* ========================== */
-/* Tabs (Incoming Orders Style) */
-/* ========================== */
 .tabs {
   display: flex;
   justify-content: center;
@@ -73,9 +65,6 @@ body {
   color: #fff;
 }
 
-/* ========================== */
-/* Order Cards (Receipt Style) */
-/* ========================== */
 .user-order-card {
   background: #fff;
   padding: 18px;
@@ -169,11 +158,8 @@ body {
   background: #e65c00;
 }
 
-/* ========================== */
-/* Modal Styling               */
-/* ========================== */
 .modal {
-  display: none; /* hidden by default */
+  display: none; 
   position: fixed;
   z-index: 9999;
   left: 0;
@@ -188,7 +174,6 @@ body {
   box-sizing: border-box;
 }
 
-/* Show modal using JS by adding .show class */
 .modal.show {
   display: flex;
 }
@@ -226,9 +211,6 @@ body {
   color: #000;
 }
 
-/* ========================== */
-/* Modal Buttons               */
-/* ========================== */
 .modal-content button {
   padding: 10px 20px;
   margin: 10px 5px 0 5px;
@@ -246,7 +228,6 @@ body {
 #confirm-no { background-color: #dc3545; color: #fff; }
 #confirm-no:hover { background-color: #c82333; }
 
-/* Submit Feedback Button */
 #feedback-form button[type="submit"] {
   background-color: #007bff;
   color: #fff;
@@ -261,9 +242,6 @@ body {
   background-color: #0069d9;
 }
 
-/* ========================== */
-/* Feedback Items              */
-/* ========================== */
 .feedback-item {
   margin-bottom: 15px;
   background: #fffaf0;
@@ -284,9 +262,6 @@ body {
   resize: vertical;
 }
 
-/* ========================== */
-/* Star Rating (Feedback Modal)*/
-/* ========================== */
 .modal .star-rating .star {
   font-size: 20px;
   cursor: pointer;
@@ -294,9 +269,7 @@ body {
   display: inline-block;
 }
 
-/* ========================== */
-/* Responsiveness              */
-/* ========================== */
+
 @media screen and (max-width: 480px) {
   .modal-content { width: 95%; padding: 20px; }
   .tab-btn { padding: 6px 12px; font-size: 0.8em; margin: 4px; }
