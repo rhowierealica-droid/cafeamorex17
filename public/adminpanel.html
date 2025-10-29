@@ -5,10 +5,9 @@
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Café Amore - Admin Panel</title>
 
-  <!-- Font Awesome -->
+  
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
 
-  <!-- CSS -->
   <link rel="stylesheet" href="adminpanel.css">
   <link rel="stylesheet" href="admin-nav.css">
   <link rel="stylesheet" href="menumanagement.css">
@@ -17,7 +16,6 @@
 </head>
 <body>
 
-  <!-- Sidebar -->
   <aside class="sidebar" id="sidebar">
     <div class="logo">
       <img src="logo.png" alt="Café Amore Logo">
@@ -39,27 +37,24 @@
     </nav>
 
     <div class="profile-card">
-      <div class="profile-avatar"><i class="fas fa-user-circle"></i></div>
-      <div class="profile-info">
-        <p class="profile-name">Admin</p>
-        <p class="edit-text">Edit Profile</p>
-      </div>
-    </div>
+  <div class="profile-avatar"><i class="fas fa-user-circle"></i></div>
+  <div class="profile-info">
+    <p class="profile-name">Admin</p> <!-- JS will replace "Admin" with actual name -->
+    <p class="edit-text">Edit Profile</p>
+  </div>
+</div>
+
 
     <div class="logout"><i class="fas fa-sign-out-alt"></i> Log Out</div>
   </aside>
 
-  <!-- Hamburger -->
   <div class="hamburger" id="hamburger"><i class="fas fa-bars"></i></div>
 
-  <!-- Main Content -->
   <main class="main-content">
     <header>
       <h1>Welcome, Admin</h1>
-      <p>Manage and monitor your café operations at a glance</p>
     </header>
 
-    <!-- Dashboard -->
     <section class="dashboard">
       <div class="card">
         <h3><i class="fas fa-receipt"></i> Orders</h3>
@@ -80,7 +75,6 @@
     </section>
 
    
-    <!-- Analytics & Best Sellers Side by Side -->
     <section class="analytics-best-sellers">
       <div class="analytics">
         <div class="chart-card">
@@ -100,7 +94,7 @@
               </tr>
             </thead>
             <tbody>
-              <!-- Dynamically filled -->
+             
             </tbody>
           </table>
         </div>
@@ -111,7 +105,6 @@
 
   </main>
 
-  <!-- Popup Form for Adding Menu Items -->
   <div id="popup" class="popup">
     <div class="popup-content">
       <h3 id="popupTitle">Add Product</h3>
@@ -160,16 +153,13 @@
     </div>
   </div>
 
-  <!-- JS -->
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
   <script type="module" src="adminpanel.js"></script>
   <script type="module" src="admin-nav.js"></script>
   <script type="module" src="AdminNotification.js"></script>
-
+  <script type="module" src="AutoCancel.js"></script>
   <script type="module" src="menumanagement.js"></script>
 
-
-  <!-- Notification module -->
   <script type="module">
     import { initOrderBadge } from './notification.js';
     initOrderBadge();
