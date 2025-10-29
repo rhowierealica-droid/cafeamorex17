@@ -1,33 +1,55 @@
 import { auth } from './firebase-config.js';
 import { signOut } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
 
-// Set the maximum idle time in milliseconds (e.g., 1 minute)
+// 30 mins
 const IDLE_TIMEOUT = 30 * 60 * 1000;
 
-let idleTimer; // Variable to store the timeout ID
+let idleTimer;
 
-// Function to reset the idle timer
+const LOGOUT_CHANNEL = new BroadcastChannel('cafeamore-logout-channel');
+
+
+function startTimer() {
+    clearTimeout(idleTimer);
+    idleTimer = setTimeout(logoutUser, IDLE_TIMEOUT);
+}
+
+
 function resetIdleTimer() {
-  clearTimeout(idleTimer);
-  idleTimer = setTimeout(logoutUser, IDLE_TIMEOUT);
+    startTimer();
+    LOGOUT_CHANNEL.postMessage('activity');
 }
 
-// Function to perform the logout action
+
 async function logoutUser() {
-  try {
-    await signOut(auth); // ✅ Firebase logout
-    window.location.href = "login.html"; // Redirect to login page
-  } catch (error) {
-    console.error("Logout error:", error);
-    window.location.href = "login.html"; // Still redirect even if error
-  }
+    clearTimeout(idleTimer);
+    
+    LOGOUT_CHANNEL.postMessage('logout-complete');
+    
+    try {
+        await signOut(auth); 
+        console.log("User signed out due to inactivity.");
+        window.location.href = "login.html";
+    } catch (error) {
+        console.error("Logout error:", error);
+        window.location.href = "login.html"; 
+    }
 }
 
-// Add event listeners to detect user activity
+LOGOUT_CHANNEL.onmessage = (event) => {
+    if (event.data === 'activity') {
+        startTimer();
+    } else if (event.data === 'logout-complete') {
+        clearTimeout(idleTimer);
+        if (!window.location.pathname.includes('login.html')) {
+            window.location.href = "login.html";
+        }
+    }
+};
+
+startTimer();
+
 document.addEventListener("mousemove", resetIdleTimer);
 document.addEventListener("keypress", resetIdleTimer);
 document.addEventListener("click", resetIdleTimer);
-document.addEventListener("scroll", resetIdleTimer); // Optional
-
-// Initialize the timer when the page loads
-resetIdleTimer();
+document.addEventListener("scroll", resetIdleTimer);
