@@ -1,5 +1,6 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
@@ -7,19 +8,16 @@
 
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css" />
     <link rel="stylesheet" href="Admin-EditProfile.css" />
-    <link rel="stylesheet" href="admin-side.css" />
-        <link rel="stylesheet" href="admin-nav.css" />
+    <link rel="stylesheet" href="edit-profile.css" />
 
+    <link rel="stylesheet" href="admin-nav.css" />
 </head>
+
 <body>
 
-    <div class="top-bar">
-        <div class="hamburger" id="hamburger"><i class="fas fa-bars"></i></div>
-        <div class="mobile-logo">
-            <img src="logo.png" alt="Café Amore Logo" />
-            <span class="brand">Café Amore</span>
-        </div>
+    <div class="hamburger" id="hamburger"><i class="fas fa-bars"></i></div>
     </div>
+
 
     <aside class="sidebar" id="sidebar">
         <div class="logo">
@@ -29,12 +27,12 @@
 
         <nav>
             <ul>
-                <li><i class="fas fa-home"></i> Home</li>
-                <li><i class="fas fa-coffee"></i> Menu Management</li>
-                <li><i class="fas fa-list"></i> Orders</li>
-                <li><i class="fas fa-truck"></i> Incoming Orders</li>
-                <li><i class="fas fa-comment-dots"></i> Feedback</li>
-                <li><i class="fas fa-box"></i> Inventory</li>
+                <li class="active"><i class="fas fa-house"></i> Home</li>
+                <li><i class="fas fa-utensils"></i> Menu Management</li>
+                <li><i class="fas fa-clipboard-list"></i> Orders</li>
+                <li><i class="fas fa-inbox"></i> Incoming Orders</li>
+                <li><i class="fas fa-comment"></i> Feedback</li>
+                <li><i class="fas fa-boxes"></i> Inventory</li>
                 <li><i class="fas fa-users"></i> Employee Management</li>
                 <li><i class="fas fa-chart-line"></i> Sales</li>
             </ul>
@@ -76,7 +74,8 @@
                     <div class="button-group">
                         <button type="button" class="edit-btn" id="editNameBtn">Edit</button>
                         <button type="submit" class="save-btn" id="saveNameBtn" style="display:none;">Save</button>
-                        <button type="button" class="cancel-btn" id="cancelNameBtn" style="display:none;">Cancel</button>
+                        <button type="button" class="cancel-btn" id="cancelNameBtn"
+                            style="display:none;">Cancel</button>
                     </div>
                 </form>
 
@@ -107,7 +106,8 @@
                     <div class="button-group">
                         <button type="button" class="edit-btn" id="editEmailBtn">Edit</button>
                         <button type="submit" class="save-btn" id="saveEmailBtn" style="display:none;">Save</button>
-                        <button type="button" class="cancel-btn" id="cancelEmailBtn" style="display:none;">Cancel</button>
+                        <button type="button" class="cancel-btn" id="cancelEmailBtn"
+                            style="display:none;">Cancel</button>
                     </div>
                 </form>
 
@@ -123,7 +123,8 @@
                     <div class="password-edit-fields" id="passwordEditFields" style="display:none;">
                         <div class="input-group">
                             <label for="currentPasswordForChange">Enter Current Password</label>
-                            <input type="password" id="currentPasswordForChange" placeholder="Enter current password" required />
+                            <input type="password" id="currentPasswordForChange" placeholder="Enter current password"
+                                required />
                         </div>
                         <div class="input-group">
                             <label for="password">New Password</label>
@@ -138,7 +139,8 @@
                     <div class="button-group">
                         <button type="button" class="edit-btn" id="editPasswordBtn">Edit</button>
                         <button type="submit" class="save-btn" id="savePasswordBtn" style="display:none;">Save</button>
-                        <button type="button" class="cancel-btn" id="cancelPasswordBtn" style="display:none;">Cancel</button>
+                        <button type="button" class="cancel-btn" id="cancelPasswordBtn"
+                            style="display:none;">Cancel</button>
                     </div>
                 </form>
 
@@ -154,22 +156,28 @@
                     <div class="phone-edit-fields" id="phoneEditFields" style="display:none;">
                         <div class="input-group">
                             <label for="currentPhoneInput">Confirm Current Phone</label>
-                            <input type="text" id="currentPhoneInput" placeholder="09xxxxxxxxx" required />
+                            <input type="text" id="currentPhoneInput" placeholder="+63 9xxxxxxxxx" required
+                                pattern="^\+63\s?9\d{9}$"
+                                title="Phone number must start with +63 9 followed by 9 digits (e.g., +63 9123456789 or +639123456789)" />
                         </div>
                         <div class="input-group">
                             <label for="newPhone">Enter New Phone</label>
-                            <input type="text" id="newPhone" placeholder="09xxxxxxxxx" required />
+                            <input type="text" id="newPhone" placeholder="+63 9xxxxxxxxx" required
+                                pattern="^\+63\s?9\d{9}$"
+                                title="Phone number must start with +63 9 followed by 9 digits (e.g., +63 9123456789 or +639123456789)" />
                         </div>
                         <div class="input-group">
                             <label for="currentPhonePassword">Enter Current Password</label>
-                            <input type="password" id="currentPhonePassword" placeholder="Enter current password" required />
+                            <input type="password" id="currentPhonePassword" placeholder="Enter current password"
+                                required />
                         </div>
                     </div>
 
                     <div class="button-group">
                         <button type="button" class="edit-btn" id="editPhoneBtn">Edit</button>
                         <button type="submit" class="save-btn" id="savePhoneBtn" style="display:none;">Save</button>
-                        <button type="button" class="cancel-btn" id="cancelPhoneBtn" style="display:none;">Cancel</button>
+                        <button type="button" class="cancel-btn" id="cancelPhoneBtn"
+                            style="display:none;">Cancel</button>
                     </div>
                 </form>
             </div>
@@ -189,5 +197,8 @@
 
     <script type="module" src="Admin-EditProfile.js"></script>
     <script type="module" src="admin-nav.js"></script>
+    <script type="module" src="AutoCancel.js"></script>
+
 </body>
+
 </html>
