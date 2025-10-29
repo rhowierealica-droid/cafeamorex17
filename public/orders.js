@@ -1,18 +1,22 @@
-// ===============================
-// pos.js - STREAMLINED & FIXED
-// ===============================
-
-// --- imports ---
 import { db } from './firebase-config.js';
 import {
-    collection, addDoc, getDocs, updateDoc, doc,
-    serverTimestamp, onSnapshot, query, where, orderBy, limit, getDoc,
+    collection, 
+    addDoc,
+    getDocs, 
+    updateDoc, 
+    doc,
+    serverTimestamp, 
+    onSnapshot, 
+    query, 
+    where, 
+    orderBy, 
+    limit,
+    getDoc,
     increment 
 } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 
 import { getAuth, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
 
-// --- DOM Elements ---
 const auth = getAuth(); 
 const productTabs = document.getElementById("productTabs");
 const productList = document.getElementById("productList");
@@ -45,21 +49,13 @@ const cancelYesBtn = document.getElementById("cancelYesBtn");
 const cancelNoBtn = document.getElementById("cancelNoBtn");
 const messagePopup = document.getElementById("messagePopup");
 
-
-// --- State Variables ---
 let currentOrder = [];
 let selectedProduct = null;
 let totalPrice = 0;
-// Note: These categories MUST match the 'category' field in your 'products' Firestore documents.
 const CATEGORIES = ["all", "Drinks", "Food", "Others"]; 
 let activeCategory = "all";
+let globalGetInv = null; 
 
-
-// ====================================================
-// ✅ HELPER FUNCTIONS
-// ====================================================
-
-// --- Helper: Show toast message ---
 function showMessage(msg, type = "success") {
     messagePopup.textContent = msg;
     messagePopup.style.backgroundColor = (type === "error") ? "#e53935" : "#4caf50";
@@ -67,75 +63,55 @@ function showMessage(msg, type = "success") {
     setTimeout(() => messagePopup.classList.remove("show"), 2500);
 }
 
-// --- Helper: Close all popups ---
 function closeAllPopups() {
     [productPopup, paymentPopup, cashPopup, epaymentPopup, cancelConfirmPopup].forEach(p => {
         if (p) p.style.display = "none";
     });
 }
 
-// --- Helper: Get next queue number ---
 async function getNextQueueNumber() {
     const q = query(collection(db, "InStoreOrders"), orderBy("queueNumber", "desc"), limit(1));
     const snapshot = await getDocs(q);
     return !snapshot.empty ? (snapshot.docs[0].data().queueNumber || 0) + 1 : 1;
 }
 
-// ====================================================
-// ✅ AUTHENTICATION AND INITIALIZATION BLOCK
-// ====================================================
 onAuthStateChanged(auth, (user) => {
     if (!user) return window.location.replace("login.html");
     initProductTabs();
     setupOrderListener();
 });
 
-
-// ====================================================
-// ✅ TAB INITIALIZATION & SWITCHING LOGIC (FIXED)
-// ====================================================
 function initProductTabs() {
     if (!productTabs) return;
     productTabs.innerHTML = '';
     
-    // Create tab buttons
     CATEGORIES.forEach(category => {
         const button = document.createElement('button');
-        // Use categoryMain for filtering if necessary, but 'category' is simpler for POS.
-        // We'll use the capitalized category name for the button text.
         const categoryName = category === "all" ? "All" : category;
         button.textContent = categoryName;
         button.classList.add('tab-button');
-        button.dataset.category = categoryName; // Store the category name
+        button.dataset.category = categoryName;
         
         if (category === activeCategory) {
             button.classList.add('active');
-            // Load products for the initial 'all' category
             loadProducts(category); 
         }
 
         productTabs.appendChild(button);
     });
 
-    // Tab Switching Listener
     productTabs.addEventListener("click", (e) => {
       const target = e.target;
       if (target.classList.contains("tab-button")) {
-        const category = target.dataset.category; // e.g., "All", "Drinks", "Food"
+        const category = target.dataset.category;
 
         productTabs.querySelectorAll(".tab-button").forEach(btn => btn.classList.remove("active"));
         target.classList.add("active");
-
-        // Use category.toLowerCase() to match the 'activeCategory' state format
         loadProducts(category.toLowerCase()); 
       }
     });
 }
 
-
-// ====================================================
-// ✅ ORDER STATUS LISTENER (MONITORS FOR CANCELLATION)
-// ====================================================
 function setupOrderListener() {
     const q = query(collection(db, "InStoreOrders")); 
 
@@ -148,7 +124,6 @@ function setupOrderListener() {
                 returnInventory(order.items)
                     .then(() => {
                         showMessage(`Inventory returned for order #${order.queueNumber}.`, "success");
-                        // Use a new final status to prevent re-running this logic
                         updateDoc(doc(db, "InStoreOrders", orderId), {
                             status: "Canceled-Stock-Returned" 
                         });
@@ -162,33 +137,52 @@ function setupOrderListener() {
     });
 }
 
-// ====================================================
-// ✅ LOAD PRODUCTS LOGIC (FIXED CATEGORY FILTER & STOCK CALCULATION)
-// ====================================================
+/**
+ 
+ * @param {object} component 
+ * @param {function} getInv 
+ * @returns {number}
+ */
+function calculateComponentLimit(component, getInv) {
+    if (!component || !component.id) return Number.MAX_SAFE_INTEGER; 
+    const inv = getInv(component.id);
+    if (!inv || inv.available === false || Number(inv.quantity || 0) <= 0) return 0;
+    
+    const requiredQtyPerProduct = Math.max(Number(component.qty || 1), 1);
+    
+    let componentLimit = Math.floor(Number(inv.quantity || 0) / requiredQtyPerProduct);
+
+    const internalMaterials = [...(inv.ingredients || []), ...(inv.others || [])]; 
+    for (const mat of internalMaterials) {
+        const matInv = getInv(mat.id);
+        if (!matInv || matInv.available === false || (matInv.quantity / (mat.qty || 1)) <= 0) return 0;
+
+        const matRequiredQty = Math.max(Number(mat.qty || 1), 1);
+        componentLimit = Math.min(componentLimit, Math.floor(Number(matInv.quantity || 0) / matRequiredQty));
+    }
+
+    return componentLimit;
+}
+
 function loadProducts(category = activeCategory) {
     activeCategory = category;
 
-    // 1. Setup the main product query with Firestore's 'where' clause (THE FIX)
     let productQuery;
     const productsRef = collection(db, "products");
-    
-    // The category value must be capitalized to match the stored 'category' field
     const categoryFilterValue = activeCategory.charAt(0).toUpperCase() + activeCategory.slice(1);
 
     if (activeCategory === "all") {
-        productQuery = query(productsRef); // Query all for 'all' tab
+        productQuery = query(productsRef); 
     } else {
-        // ⭐ THIS IS THE CRUCIAL PART FOR TAB FILTERING TO WORK ⭐
-        // It filters products on the server using the capitalized category name.
         productQuery = query(productsRef, where("categoryMain", "==", categoryFilterValue));
     }
 
-    // 2. Listen to Inventory changes (Outer OnSnapshot)
     onSnapshot(collection(db, "Inventory"), invSnap => {
         const inventoryData = invSnap.docs.map(d => ({ id: d.id, ...d.data() }));
+        // Inventory ID
         const getInv = (id) => inventoryData.find(d => d.id === id);
+        globalGetInv = getInv; 
 
-        // 3. Listen to Products changes based on the filtered query (Inner OnSnapshot)
         onSnapshot(productQuery, snapshot => {
             productList.innerHTML = "";
 
@@ -203,29 +197,24 @@ function loadProducts(category = activeCategory) {
                 const displayName = product.name || product.flavor;
                 if (!displayName) return;
                 
-                // --- START STOCK LOGIC ---
                 let available = true;
-                let baseMinStock = Infinity;
+                let baseMinStock = Number.MAX_SAFE_INTEGER;
                 let productMinStock = 0;
                 
-                // 1. Check product-level flag
                 if (product.available === false) available = false;
 
-                // 2. Check base ingredients/others
                 if (available) {
-                  const rawMaterials = [...(product.ingredients || []), ...(product.others || [])];
-                  for (const mat of rawMaterials) {
-                    const inv = getInv(mat.id);
-                    if (!inv || inv.available === false || (inv.quantity / (mat.qty || 1)) <= 0) { 
-                      available = false;
-                      baseMinStock = 0;
-                      break;
+                    const rawMaterials = [...(product.ingredients || []), ...(product.others || [])];
+                    for (const mat of rawMaterials) {
+                        const limit = calculateComponentLimit(mat, getInv);
+                        baseMinStock = Math.min(baseMinStock, limit);
+                        if (baseMinStock === 0) {
+                            available = false;
+                            break;
+                        }
                     }
-                    baseMinStock = Math.min(baseMinStock, Math.floor(inv.quantity / (mat.qty || 1)));
-                  }
                 }
                 
-                // 3. Check sizes
                 if (available && product.sizes?.length) {
                     let hasAvailableSize = false;
                     let maxCapacityAcrossSizes = 0;
@@ -233,29 +222,19 @@ function loadProducts(category = activeCategory) {
                     product.sizes = product.sizes.map(s => {
                         let sizeAvailable = true;
                         let currentSizeStock = baseMinStock; 
-                        const sizeInv = getInv(s.id);
                         
-                        // A. Check Size item itself
-                        if (!sizeInv || sizeInv.available === false || (sizeInv.quantity / (s.qty || 1)) <= 0) {
-                            sizeAvailable = false;
-                            currentSizeStock = 0;
-                        } else {
-                            currentSizeStock = Math.min(currentSizeStock, Math.floor(sizeInv.quantity / (s.qty || 1)));
-                        }
-                        
-                        // B. Check Size's nested ingredients/others
-                        if (sizeAvailable && sizeInv) {
-                            const materials = [...(s.ingredients || []), ...(s.others || [])]; 
-                            for (const mat of materials) {
-                                const matInv = getInv(mat.id);
-                                
-                                if (!matInv || matInv.available === false || (matInv.quantity / (mat.qty || 1)) <= 0) {
-                                    sizeAvailable = false;
-                                    currentSizeStock = 0; 
-                                    break;
-                                }
-                                currentSizeStock = Math.min(currentSizeStock, Math.floor(matInv.quantity / (mat.qty || 1)));
+                        if (s.id) {
+                            const sizeInvItem = getInv(s.id);
+                            if (sizeInvItem) {
+                                const sizeLimit = calculateComponentLimit({id: s.id, qty: s.qty || 1}, getInv);
+                                currentSizeStock = Math.min(currentSizeStock, sizeLimit);
                             }
+                        }
+
+                        const materials = [...(s.ingredients || []), ...(s.others || [])]; 
+                        for (const mat of materials) {
+                            const limit = calculateComponentLimit(mat, getInv);
+                            currentSizeStock = Math.min(currentSizeStock, limit);
                         }
                         
                         if (currentSizeStock <= 0 || !sizeAvailable) {
@@ -274,49 +253,48 @@ function loadProducts(category = activeCategory) {
                     });
                     
                     if (!hasAvailableSize) {
-                      available = false;
-                      productMinStock = 0;
+                        available = false;
+                        productMinStock = 0;
                     } else {
-                      productMinStock = maxCapacityAcrossSizes; 
+                        productMinStock = maxCapacityAcrossSizes; 
                     }
                 } else if (available) {
-                  productMinStock = baseMinStock === Infinity ? 0 : baseMinStock;
-                  if (productMinStock <= 0) available = false;
+                    productMinStock = baseMinStock === Number.MAX_SAFE_INTEGER ? 0 : baseMinStock;
+                    if (productMinStock <= 0) available = false;
                 } else {
-                  productMinStock = 0;
+                    productMinStock = 0;
                 }
 
-                // 4. Final product box creation and display
                 const div = document.createElement("div");
                 div.classList.add("product-box");
 
-                const stockToDisplay = productMinStock === Infinity ? '✅' : Math.max(0, productMinStock);
-                const stockText = productMinStock === Infinity ? 'In Stock' : `Stock: ${stockToDisplay}`;
+                const stockToDisplay = productMinStock === Number.MAX_SAFE_INTEGER ? '✅' : Math.max(0, productMinStock);
+                const stockText = productMinStock === Number.MAX_SAFE_INTEGER ? 'In Stock' : `Stock: ${stockToDisplay}`;
                 let stockColor = '#28a745';
                 if (productMinStock > 0 && productMinStock <= 5) {
-                  stockColor = '#ffc107';
+                    stockColor = '#ffc107';
                 } else if (productMinStock <= 0) {
-                  stockColor = '#dc3545';
-                  available = false;
+                    stockColor = '#dc3545';
+                    available = false;
                 }
 
                 div.innerHTML = `
-                  <div>${displayName}</div>
-                  <small style="font-size: 0.8em; color: ${stockColor}; font-weight: bold; margin-top: 5px;">
-                    ${available ? stockText : 'Out of Stock'}
-                  </small>
+                    <div>${displayName}</div>
+                    <small style="font-size: 0.8em; color: ${stockColor}; font-weight: bold; margin-top: 5px;">
+                        ${available ? stockText : 'Out of Stock'}
+                    </small>
                 `;
 
                 if (!available) {
-                  div.classList.add("disabled");
+                    div.classList.add("disabled");
                 }
 
                 div.addEventListener("click", () => {
-                  if (div.classList.contains('disabled')) {
-                      showMessage(`${displayName} is currently out of stock.`, "error");
-                      return;
-                  }
-                  openProductPopup(product, displayName);
+                    if (div.classList.contains('disabled')) {
+                        showMessage(`${displayName} is currently out of stock.`, "error");
+                        return;
+                    }
+                    openProductPopup(product, displayName, getInv, baseMinStock); 
                 });
 
                 productList.appendChild(div);
@@ -324,21 +302,84 @@ function loadProducts(category = activeCategory) {
         });
     });
 }
-// --- END STOCK LOGIC ---
 
+/**
+ 
+ * @param {string} sizeName 
+ * @param {function} getInv 
+ */
+function renderAddonsForSelectedSize(sizeName, getInv) {
+    addonContainer.innerHTML = "";
+    if (!selectedProduct || !getInv) return;
 
-// ====================================================
-// ✅ PRODUCT POPUP LOGIC 
-// ====================================================
-function openProductPopup(product, displayName) {
+    const selectedSize = selectedProduct.sizes.find(s => s.name === sizeName);
+    if (!selectedSize) return;
+
+    const addons = selectedSize.addons || [];
+    
+    if (addons.length) {
+        const h4 = document.createElement("h4");
+        h4.textContent = "Add-ons (optional):";
+        addonContainer.appendChild(h4);
+
+        addons.forEach((a, i) => {
+            const addonInv = getInv(a.id);
+            let addonAvailable = true;
+            // Adds on stock calculation 
+            let addonStock = Number.MAX_SAFE_INTEGER; 
+
+            if (!addonInv || addonInv.available === false) {
+                addonAvailable = false;
+                addonStock = 0;
+            } else {
+                addonStock = calculateComponentLimit(a, getInv); 
+            }
+
+            if (addonStock <= 0 || !addonAvailable) {
+                addonAvailable = false;
+                addonStock = 0;
+            }
+
+            const stockToDisplay = Math.max(0, addonStock);
+            const stockColor = (addonStock > 5) ? 'green' : (addonStock > 0 ? 'orange' : 'red');
+            const stockText = addonAvailable ? 
+                `(Stock: <span style="font-weight: bold; color: ${stockColor};">${stockToDisplay}</span>)` : 
+                '(Out of Stock)';
+
+            const wrapper = document.createElement("div");
+            const checkbox = document.createElement("input");
+            checkbox.type = "checkbox";
+            checkbox.value = a.price || 0;
+            checkbox.dataset.name = a.name || null;
+            checkbox.dataset.id = a.id || null;
+            checkbox.dataset.stock = stockToDisplay; 
+            checkbox.dataset.qty = a.qty || 1; 
+            checkbox.id = `addon_${sizeName}_${i}`;
+            
+            if (!addonAvailable) {
+                checkbox.disabled = true;
+                wrapper.classList.add('disabled-addon');
+            }
+
+            const label = document.createElement("label");
+            label.htmlFor = checkbox.id;
+            // Display the stock
+            label.innerHTML = `${a.name || "Addon"} (₱${a.price || 0}) ${stockText}`;
+            wrapper.append(checkbox, label);
+            addonContainer.appendChild(wrapper);
+        });
+    }
+}
+
+function openProductPopup(product, displayName, getInv) {
     selectedProduct = product;
     popupProductName.textContent = displayName;
 
-    // Sizes
     sizeContainer.innerHTML = "";
+    
     (product.sizes || []).forEach((s, i) => {
-      const stock = s.stock === Infinity ? '✅' : Math.max(0, s.stock || 0);
-      const stockColor = (s.stock === Infinity || s.stock > 5) ? 'green' : (s.stock > 0 ? 'orange' : 'red');
+      const stock = s.stock === Number.MAX_SAFE_INTEGER ? '✅' : Math.max(0, s.stock || 0);
+      const stockColor = (s.stock === Number.MAX_SAFE_INTEGER || s.stock > 5) ? 'green' : (s.stock > 0 ? 'orange' : 'red');
       const stockText = s.available ? `(Available: <span style="font-weight: bold; color: ${stockColor};">${stock}</span>)` : '(Out of Stock)';
 
       const wrapper = document.createElement("div");
@@ -348,7 +389,8 @@ function openProductPopup(product, displayName) {
       radio.value = s.price || 0;
       radio.dataset.name = s.name || null;
       radio.dataset.id = s.id || null;
-      radio.dataset.stock = s.stock === Infinity ? Number.MAX_SAFE_INTEGER : s.stock;
+      radio.dataset.qty = s.qty || 1;
+      radio.dataset.stock = s.stock === Number.MAX_SAFE_INTEGER ? Number.MAX_SAFE_INTEGER : s.stock;
       radio.id = `size_${i}`;
 
       if (!s.available) {
@@ -356,71 +398,86 @@ function openProductPopup(product, displayName) {
           wrapper.classList.add('disabled-size');
       }
 
+      radio.addEventListener('change', (e) => {
+        renderAddonsForSelectedSize(e.target.dataset.name, getInv);
+      });
+
       const label = document.createElement("label");
       label.htmlFor = radio.id;
-      label.innerHTML = `${s.name || "Size"} (₱${s.price || 0}) ${stockText}`;  
+      label.innerHTML = `${s.name || "Size"} (₱${s.price || 0}) ${stockText}`;  
       wrapper.append(radio, label);
       sizeContainer.appendChild(wrapper);
     });
 
-    // Add-ons
     addonContainer.innerHTML = "";
-    if (product.addons?.length) {
-      const h4 = document.createElement("h4");
-      h4.textContent = "Add-ons (optional):";
-      addonContainer.appendChild(h4);
 
-      product.addons.forEach((a, i) => {
-        const wrapper = document.createElement("div");
-        const checkbox = document.createElement("input");
-        checkbox.type = "checkbox";
-        checkbox.value = a.price || 0;
-        checkbox.dataset.name = a.name || null;
-        checkbox.dataset.id = a.id || null;
-        checkbox.id = `addon_${i}`;
-        const label = document.createElement("label");
-        label.htmlFor = checkbox.id;
-        label.textContent = `${a.name || "Addon"} (₱${a.price || 0})`;
-        wrapper.append(checkbox, label);
-        addonContainer.appendChild(wrapper);
-      });
+    const sizeRadios = sizeContainer.querySelectorAll("input[name='size']");
+    let firstAvailableSizeName = null;
+
+    for (const radio of sizeRadios) {
+        if (!radio.disabled) {
+            radio.checked = true; 
+            firstAvailableSizeName = radio.dataset.name;
+            break; 
+        }
+    }
+
+    if (firstAvailableSizeName) {
+        renderAddonsForSelectedSize(firstAvailableSizeName, getInv);
     }
 
     quantityInput.value = 1;
     productPopup.style.display = "flex";
 }
 
-// ====================================================
-// ✅ ADD TO ORDER LOGIC
-// ====================================================
 addToOrderBtn.addEventListener("click", () => {
     if (!selectedProduct) return;
 
     const qty = parseInt(quantityInput.value) || 1;
     let basePrice = 0, sizeName = null, sizeId = null, availableStock = Number.MAX_SAFE_INTEGER;
+    let selectedSizeObj = null; 
+    let sizeQty = 1;
 
     if (selectedProduct.sizes?.length) {
       const sizeInput = document.querySelector("input[name='size']:checked");
       if (!sizeInput) return showMessage("Please select a size.", "error");
 
       availableStock = parseInt(sizeInput.dataset.stock);
+      sizeQty = parseInt(sizeInput.dataset.qty);
 
       if (qty > availableStock) {
-        return showMessage(`You can only order a maximum of ${availableStock} item(s) of this size.`, "error");
+        return showMessage(`You can only order a maximum of ${availableStock} item(s) of this size due to ingredient or container stock.`, "error");
       }
 
       basePrice = parseFloat(sizeInput.value) || 0;
       sizeName = sizeInput.dataset.name || null;
       sizeId = sizeInput.dataset.id || null;
+      selectedSizeObj = selectedProduct.sizes.find(s => s.name === sizeName); 
     }
 
     const addons = [];
     let addonsPrice = 0;
-    addonContainer.querySelectorAll("input[type='checkbox']:checked").forEach(cb => {
-      const price = parseFloat(cb.value) || 0;
-      addons.push({ name: cb.dataset.name || null, price, id: cb.dataset.id || null });
-      addonsPrice += price;
-    });
+    
+    // Adds on stock
+    const checkedAddons = addonContainer.querySelectorAll("input[type='checkbox']:checked");
+    
+    for (const cb of checkedAddons) {
+        const addonStock = parseInt(cb.dataset.stock);
+        const addonQty = parseInt(cb.dataset.qty);
+
+        if (qty > addonStock) { 
+            return showMessage(`You can only order a maximum of ${addonStock} item(s) because of the '${cb.dataset.name}' add-on's stock limitation.`, "error");
+        }
+        
+        const price = parseFloat(cb.value) || 0;
+        addons.push({ 
+            name: cb.dataset.name || null, 
+            price, 
+            id: cb.dataset.id || null, 
+            qty: addonQty || 1 
+        }); 
+        addonsPrice += price;
+    }
 
     const itemTotal = (basePrice + addonsPrice) * qty;
     currentOrder.push({
@@ -428,13 +485,12 @@ addToOrderBtn.addEventListener("click", () => {
       productId: selectedProduct.id || null,
       size: sizeName,
       sizeId,
+      sizeQty,
       qty,
       basePrice,
       addons,
-      // Store all necessary data for inventory deduction
-      ingredients: selectedProduct.ingredients || [],
-      others: selectedProduct.others || [],
-      productSizes: selectedProduct.sizes || [], 
+      ingredients: selectedSizeObj?.ingredients || selectedProduct.ingredients || [],
+      others: selectedSizeObj?.others || selectedProduct.others || [],
       total: itemTotal
     });
 
@@ -448,10 +504,6 @@ cancelPopupBtn.addEventListener("click", () => {
     selectedProduct = null;
 });
 
-
-// ====================================================
-// ✅ ORDER RECEIPT RENDERING (CART ITEMS REMAIN VISIBLE)
-// ====================================================
 function renderOrder() {
     currentOrderList.innerHTML = "";
     totalPrice = 0;
@@ -494,12 +546,14 @@ function renderOrder() {
     );
 }
 
-
-// ====================================================
-// ✅ INVENTORY DEDUCTION & RETURN LOGIC
-// ====================================================
+/**
+ 
+ * @param {Array<object>} order 
+ * @param {'deduct'|'return'} type 
+ */
 async function manageInventory(order, type = 'deduct') {
     const action = type === 'deduct' ? -1 : 1; 
+    const getInv = globalGetInv; 
     
     const updateInventoryItem = async (id, amount) => {
         if (!id) return;
@@ -508,46 +562,48 @@ async function manageInventory(order, type = 'deduct') {
             await updateDoc(invRef, { quantity: increment(action * Math.abs(amount)) });
         } catch (e) {
             console.error(`Failed to ${type} ${amount} from ID: ${id}.`, e);
+            throw new Error(`Inventory update failed for item ID: ${id}.`); 
         }
     };
 
     for (const item of order) {
-        const processMaterials = async (materials, itemQty) => {
-            for (const mat of materials || []) {
-                await updateInventoryItem(mat.id, (mat.qty || 1) * itemQty);
+        const itemQty = item.qty; // Quantity of the product ordered 
+        
+        const processInternalMaterials = async (componentId, itemQty) => {
+            const componentInv = getInv(componentId);
+            if (!componentInv) return;
+
+            const materials = [...(componentInv.ingredients || []), ...(componentInv.others || [])]; 
+            for (const mat of materials) {
+                const totalConsumption = (mat.qty || 1) * itemQty;
+                await updateInventoryItem(mat.id, totalConsumption);
             }
         };
 
-        // 1. BASE ingredients/others
-        await processMaterials(item.ingredients, item.qty);
-        await processMaterials(item.others, item.qty);
-        
-        // 2. SIZE item and its associated materials
-        if (item.sizeId) {
-            // Deduct the size item itself
-            const sizeData = (item.productSizes || []).find(s => s.id === item.sizeId);
-            const sizeQtyConsumed = sizeData?.qty || 1; // Use the size's quantity multiplier if available, otherwise 1
-            await updateInventoryItem(item.sizeId, item.qty * sizeQtyConsumed); 
-            
-            // Deduct materials linked to the size
-            if (sizeData) {
-                await processMaterials(sizeData.ingredients, item.qty);
-                await processMaterials(sizeData.others, item.qty);
+        const processMaterials = async (materials, itemQty) => {
+            for (const mat of materials || []) {
+                const totalConsumption = (mat.qty || 1) * itemQty;
+                await updateInventoryItem(mat.id, totalConsumption);
             }
+        };
+
+        await processMaterials(item.ingredients, itemQty);
+        await processMaterials(item.others, itemQty);
+        
+        if (item.sizeId) {
+            const sizeQtyConsumed = item.sizeQty || 1; 
+            // Deduct the size 
+            await updateInventoryItem(item.sizeId, itemQty * sizeQtyConsumed); 
+            // Deduct the ingredients/others 
+            await processInternalMaterials(item.sizeId, itemQty);
         }
         
-        // 3. ADD-ONS and their associated raw materials (requires extra lookup)
         for (const addon of item.addons || []) {
-            // Deduct the addon item itself
-            const addonData = (await getDoc(doc(db, "Inventory", addon.id))).data();
-            const addonQtyConsumed = addonData?.qty || 1; // Use the addon's quantity multiplier
-            await updateInventoryItem(addon.id, item.qty * addonQtyConsumed); 
-
-            // Deduct materials linked to the addon
-            if (addonData) {
-                await processMaterials(addonData.ingredients, item.qty);
-                await processMaterials(addonData.others, item.qty);
-            }
+            const addonQtyConsumed = addon.qty || 1; 
+            // Deduct the addon
+            await updateInventoryItem(addon.id, itemQty * addonQtyConsumed); 
+            // Deduct the ingredients/others 
+            await processInternalMaterials(addon.id, itemQty);
         }
     }
 }
@@ -555,18 +611,14 @@ async function manageInventory(order, type = 'deduct') {
 const deductInventory = (order) => manageInventory(order, 'deduct');
 const returnInventory = (order) => manageInventory(order, 'return');
 
-
-// ====================================================
-// ✅ SAVE ORDER LOGIC
-// ====================================================
 async function saveOrder(paymentMethod, cash = 0) {
     try {
       if (!currentOrder.length) return showMessage("No items in order.", "error");
       if (totalPrice <= 0) return showMessage("Invalid order total.", "error");
 
-      // Attempt to deduct inventory
       await deductInventory(currentOrder);
         
+      // Order History
       const queueNumber = await getNextQueueNumber();
       const sanitizedOrder = currentOrder.map(item => ({
         product: item.product,
@@ -575,11 +627,10 @@ async function saveOrder(paymentMethod, cash = 0) {
         sizeId: item.sizeId || null,
         qty: item.qty,
         basePrice: item.basePrice,
-        addons: item.addons.map(a => ({ name: a.name || null, price: a.price || 0, id: a.id || null })),
-        // Include raw material data for Canceled order recovery
+        addons: item.addons.map(a => ({ name: a.name || null, price: a.price || 0, id: a.id || null, qty: a.qty || 1 })),
+        sizeQty: item.sizeQty || 1,
         ingredients: item.ingredients || [],
         others: item.others || [],
-        productSizes: item.productSizes || [], 
         total: item.total
       }));
 
@@ -600,24 +651,22 @@ async function saveOrder(paymentMethod, cash = 0) {
       renderOrder();
       closeAllPopups();
 
-      // Reload products to reflect new stock levels immediately
       loadProducts(activeCategory);
 
     } catch (err) {
       console.error(err);
-      // Re-run inventory check in case of partial deduction/failure before save
+      // Return Stock
+      showMessage("Attempting to revert stock...", "error");
+      await returnInventory(currentOrder)
+          .then(() => showMessage("Failed to save order. Stock reverted successfully.", "error"))
+          .catch(e => console.error("CRITICAL: Failed to return stock after failed save:", e));
+          
       loadProducts(activeCategory);
-      showMessage("Failed to save order: " + err.message, "error");
     }
 }
 
-// ====================================================
-// ✅ BUTTON HANDLERS
-// ====================================================
-
-// --- Main Order Buttons ---
 doneOrderBtn.addEventListener("click", () => {
-    if (!currentOrder.length) return showMessage("No items in the order.", "error");
+    if (!currentOrder.length) return showMessage("No items in order.", "error");
     paymentPopup.style.display = "flex";
 });
 
@@ -626,7 +675,6 @@ cancelOrderBtn.addEventListener("click", () => {
     cancelConfirmPopup.style.display = "flex";
 });
 
-// --- Cancel Confirmation Popup ---
 cancelYesBtn.addEventListener("click", () => {
     currentOrder = [];
     renderOrder();
@@ -636,7 +684,6 @@ cancelYesBtn.addEventListener("click", () => {
 
 cancelNoBtn.addEventListener("click", () => cancelConfirmPopup.style.display = "none");
 
-// --- Cash Payment Flow ---
 cashBtn.addEventListener("click", () => {
     paymentPopup.style.display = "none";
     cashPopup.style.display = "flex";
@@ -671,11 +718,10 @@ cashDoneBtn.addEventListener("click", () => {
     saveOrder("Cash", cash);
 });
 
-// --- E-Payment Flow ---
+
 epaymentBtn.addEventListener("click", () => {
     paymentPopup.style.display = "none";
     epaymentPopup.style.display = "flex";
-    // Display total in e-payment popup (optional, but good for user confirmation)
     const epayTotal = epaymentPopup.querySelector("p#epayTotal");
     if(epayTotal) epayTotal.textContent = `Total: ₱${totalPrice.toFixed(2)}`;
 });
