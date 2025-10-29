@@ -3,8 +3,8 @@
 // Standalone Netlify Function for Admin Approval Flow
 // ===========================================
 
-const axios = require('axios');
-const { v4: uuidv4 } = require('uuid');
+const axios = require("axios");
+const { v4: uuidv4 } = require("uuid");
 
 // === PayMongo API Configuration ===
 const PAYMONGO_SECRET_KEY = process.env.PAYMONGO_SECRET_KEY;
@@ -89,17 +89,21 @@ exports.handler = async (event, context) => {
                 country: "PH",
               },
             },
-            // ✅ Use your real deployed Netlify domain
-            success_url: "https://amorex17.netlify.app/index.html",
-            cancel_url: "https://amorex17.netlify.app/cart.html",
+            // ✅ Update with your live domain
+            success_url: "https://trycafeamore.netlify.app/customer-status.html",
+            cancel_url: "https://trycafeamore.netlify.app/cart.html",
             send_email_receipt: true,
             description: description || "Order Payment (Admin Approved)",
             line_items: lineItems,
-            payment_method_types: ["gcash", "card", "paymaya", "grab_pay"],
+            payment_method_types: ["gcash"],
             metadata: {
-              orderId,
-              collectionName,
-              source: "admin_approval_link",
+              orderId, // 🔹 Required to locate Firestore document
+              collectionName, // 🔹 "DeliveryOrders" or "InStoreOrders"
+              source: "admin_approval_link", // 🔹 To identify the link type
+              userId: customerDetails.userId || "", // 🔹 For webhook lookup
+              queueNumber: customerDetails.queueNumber || "", // 🔹 Optional display ID
+              orderType: customerDetails.orderType || "Delivery", // 🔹 For record clarity
+              cartItemIds: JSON.stringify(customerDetails.cartItemIds || []), // 🔹 For cleanup after payment
             },
           },
         },
