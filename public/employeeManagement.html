@@ -5,11 +5,12 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Employee Management</title>
     <link rel="stylesheet" href="employeeManagement.css">
+        <link rel="stylesheet" href="AdminNotification.css">
+
     <link rel="stylesheet" href="admin-nav.css">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
 </head>
 <body>
-    <!-- Sidebar -->
     <aside class="sidebar" id="sidebar">
         <div class="logo">
             <img src="logo.png" alt="Café Amore Logo">
@@ -38,15 +39,12 @@
         <div class="logout"><i class="fas fa-sign-out-alt"></i> Log Out</div>
     </aside>
 
-    <!-- Hamburger -->
     <div class="hamburger" id="hamburger"><i class="fas fa-bars"></i></div>
 
-    <!-- Main content -->
     <div class="container">
         <h1>Employee Management</h1>
         <button id="addEmployeeBtn" class="add-btn"><i class="fas fa-plus"></i> Add Employee</button>
 
-        <!-- Modal Popup for Creating Employee -->
         <div id="employeeModal" class="modal">
             <div class="modal-content">
                 <span class="close-modal">&times;</span>
@@ -66,7 +64,6 @@
             </div>
         </div>
 
-        <!-- Modal for Confirmations -->
         <div id="confirmModal" class="modal">
             <div class="modal-content">
                 <p id="confirmMessage">Are you sure?</p>
@@ -95,6 +92,9 @@
     <script type="module" src="employeeManagement.js"></script>
       <script type="module" src="admin-nav.js"></script>
               <script type="module" src="AccessAdmin.js"></script>
+              <script type="module" src="AutoCancel.js"></script>
+  <script type="module" src="AdminNotification.js"></script>
+
 
 
 </body>
