@@ -5,11 +5,13 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Admin - Customer Feedback</title>
   <link rel="stylesheet" href="admin-feedback.css">
+      <link rel="stylesheet" href="AdminNotification.css">
+
   <link rel="stylesheet" href="admin-nav.css">
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
 </head>
 <body>
-  <!-- Sidebar -->
+
   <aside class="sidebar" id="sidebar">
     <div class="logo">
       <img src="logo.png" alt="Café Amore Logo">
@@ -23,7 +25,7 @@
         <li><i class="fas fa-utensils"></i> Menu Management</li>
         <li><i class="fas fa-clipboard-list"></i> Orders</li>
         <li><i class="fas fa-inbox"></i> Incoming Orders</li>
-        <li class="active" ><i class="fas fa-comment"></i> Feedback</li>
+        <li class="active"><i class="fas fa-comment"></i> Feedback</li>
         <li><i class="fas fa-boxes"></i> Inventory</li>
         <li><i class="fas fa-users"></i> Employee Management</li>
         <li><i class="fas fa-chart-line"></i> Sales</li>
@@ -41,18 +43,20 @@
     <div class="logout"><i class="fas fa-sign-out-alt"></i> Log Out</div>
   </aside>
 
-  <!-- Hamburger -->
   <div class="hamburger" id="hamburger"><i class="fas fa-bars"></i></div>
-  <div class="container">
-    <h1>Customer Feedback / Reviews</h1>
+
+  <div class="main-content">
+    <h1>Customer Feedback</h1>
     <div id="feedback-container">
-      <!-- Feedback cards will be added here -->
     </div>
   </div>
 
   <script type="module" src="admin-feedback.js"></script>
   <script type="module" src="admin-nav.js"></script>
-          <script type="module" src="AccessAdmin.js"></script>
+  <script type="module" src="AccessAdmin.js"></script>
+  <script type="module" src="AutoCancel.js"></script>
+  <script type="module" src="AdminNotification.js"></script>
+
 
 </body>
 </html>
