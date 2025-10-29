@@ -115,7 +115,6 @@
       <div class="sizes-container"></div>
       <div class="addons-container"></div>
 
-      <!-- Fixed Quantity Layout -->
       <div class="quantity-wrapper">
         <button class="decrease-qty">-</button>
         <input type="number" class="quantity-input" value="1" min="1">
@@ -146,9 +145,10 @@
   <script type="module" src="favorites.js"></script>
   <script type="module" src="customer-side.js"></script>
   <script type="module" src="OrderStatusNotif.js"></script>
+  <script type="module" src="AutoCancel.js"></script>
+
 
   <script>
-    // Terms popup script
     const openTermsBtn = document.getElementById('openTerms');
     const termsPopup = document.getElementById('termsPopup');
     const closeTermsBtn = termsPopup.querySelector('.close-terms');
@@ -168,7 +168,6 @@
       }
     });
 
-    // Reviews popup close script
     const reviewsPopup = document.getElementById('reviewsPopup');
     const closeReviewsBtn = reviewsPopup.querySelector('.close-btn');
 
