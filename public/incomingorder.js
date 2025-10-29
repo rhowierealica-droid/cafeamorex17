@@ -889,7 +889,7 @@ async function updateOrderStatus(orderId, collectionName, newStatus, eta = "") {
                 return;
             }
 
-            const endpoint = "http://localhost:3000/generate-paymongo-link";
+            const endpoint = "/.netlify/functions/generate-paymongo-link";
             customAlert("Generating secure payment link... Please wait. Do not navigate away.");
 
             await updateDoc(orderRef, { status: "Processing" });
@@ -965,3 +965,4 @@ function checkAdminAuth() {
 
 checkAdminAuth();
 renderOrders();
+
