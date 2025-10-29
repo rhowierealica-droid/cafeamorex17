@@ -1,4 +1,4 @@
-// netlify/functions/paymongo-webhook.js (FINAL STABLE VERSION)
+// netlify/functions/paymongo-webhook.js (FINAL UPDATED VERSION)
 
 require("dotenv").config();
 const admin = require("firebase-admin");
@@ -24,7 +24,7 @@ try {
 }
 
 // ---------------------
-// 2. Helper Functions (Inventory and Others)
+// 2. Helper Functions
 // ---------------------
 function safeParse(value, fallback = []) {
   if (Array.isArray(value) && value.length > 0) return value;
@@ -42,19 +42,6 @@ function safeParse(value, fallback = []) {
     : fallback;
 }
 
-async function fetchOrderItemsFromCart(userId, cartItemIds) {
-  if (!userId || !cartItemIds || cartItemIds.length === 0) return [];
-  const itemPromises = cartItemIds.map((id) =>
-    db.collection("users").doc(userId).collection("cart").doc(id).get()
-  );
-  const itemSnaps = await Promise.all(itemPromises);
-  return itemSnaps.filter((snap) => snap.exists).map((snap) => ({
-    id: snap.id,
-    ...snap.data(),
-  }));
-}
-
-// Inventory Helpers (MODIFIED to accept a transaction/batch object)
 async function deductInventory(orderItems, transaction) {
   if (!orderItems || !orderItems.length) return;
 
@@ -74,7 +61,6 @@ async function deductInventory(orderItems, transaction) {
       const invRef = db.collection("Inventory").doc(part.id);
       const qtyToDeduct = (part.qty || 1) * qtyMultiplier * -1;
 
-      // Use transaction for atomic deduction
       transaction.update(invRef, {
         quantity: admin.firestore.FieldValue.increment(qtyToDeduct),
       });
@@ -82,36 +68,8 @@ async function deductInventory(orderItems, transaction) {
   }
 }
 
-async function returnInventory(orderItems) {
-  if (!orderItems || !orderItems.length) return;
-  const batch = db.batch();
-
-  for (const item of orderItems) {
-    if (!item || !item.product) continue;
-    const qtyMultiplier = item.qty || 1;
-
-    const inventoryParts = [
-      ...(item.ingredients || []).map((ing) => ({ id: ing.id, qty: ing.qty || 1 })),
-      ...(item.others || []).map((other) => ({ id: other.id, qty: other.qty || 1 })),
-      ...(item.sizeId ? [{ id: item.sizeId, qty: 1 }] : []),
-      ...(item.addons || []).map((addon) => ({ id: addon.id, qty: 1 })),
-    ];
-
-    for (const part of inventoryParts) {
-      if (!part.id) continue;
-      const invRef = db.collection("Inventory").doc(part.id);
-      const qtyToReturn = (part.qty || 1) * qtyMultiplier;
-      batch.update(invRef, {
-        quantity: admin.firestore.FieldValue.increment(qtyToReturn),
-      });
-    }
-  }
-
-  await batch.commit();
-}
-
 // ---------------------
-// 3. Netlify Function Handler
+// 3. Webhook Handler
 // ---------------------
 exports.handler = async (event, context) => {
   console.log("--- Webhook Handler Started ---");
@@ -130,9 +88,9 @@ exports.handler = async (event, context) => {
     return { statusCode: 400, body: "Invalid JSON payload" };
   }
 
-  // ----------------------------------------------------
-  // ⭐ Signature Verification (Security Critical)
-  // ----------------------------------------------------
+  // -----------------------------
+  // Signature Verification
+  // -----------------------------
   if (WEBHOOK_SECRET) {
     try {
       const sigHeader = event.headers["paymongo-signature"] || "";
@@ -149,7 +107,7 @@ exports.handler = async (event, context) => {
         .digest("hex");
 
       if (receivedSignature !== expectedHash) {
-        console.error(`❌ Signature mismatch. Expected: ${expectedHash}, Received: ${receivedSignature}`);
+        console.error("❌ Signature mismatch.");
         return { statusCode: 401, body: "Signature Invalid" };
       }
 
@@ -158,173 +116,146 @@ exports.handler = async (event, context) => {
       console.error("❌ Signature verification error:", err.message);
       return { statusCode: 500, body: "Verification Error" };
     }
-  } else {
-    console.warn("⚠️ WEBHOOK_SECRET missing. Skipping signature check.");
-    if (process.env.NODE_ENV === "production") {
-      return { statusCode: 401, body: "Webhook Secret Missing" };
-    }
   }
 
   const eventType = payload?.data?.attributes?.type;
   const dataObject = payload?.data?.attributes?.data;
+  console.log(`--- Event Type: ${eventType} ---`);
 
-  console.log(`--- Event Type Received: ${eventType} ---`);
-
-  // ----------------------------------------------------
-  // Refund Handler (no change)
-  // ----------------------------------------------------
+  // -----------------------------
+  // Ignore Refunds
+  // -----------------------------
   if (eventType === "payment.refunded" || eventType === "payment.refund.updated") {
     return { statusCode: 200, body: JSON.stringify({ received: true }) };
   }
 
-  // ----------------------------------------------------
-  // Payment Success Handler
-  // ----------------------------------------------------
+  // -----------------------------
+  // Payment Success
+  // -----------------------------
   if (eventType === "payment.paid" || eventType === "checkout_session.payment.paid") {
     const metadata = dataObject?.attributes?.metadata || {};
+    const paymentId = dataObject.id;
+    const source = metadata.source || "customer_checkout";
+    const collectionName = metadata.collectionName || "DeliveryOrders";
+    const orderDocId = metadata.orderId;
     const userId = metadata.userId;
     const queueNumber = metadata.queueNumber;
-    const orderDocId = metadata.orderId;
-    const paymentId = dataObject.id;
-    const rawCartItemIds =
-      metadata.cartItemIds ?? metadata.CartItemIds ?? metadata.cartIds ?? [];
+    const rawCartItemIds = metadata.cartItemIds ?? metadata.CartItemIds ?? metadata.cartIds ?? [];
     const cartItemIds = safeParse(rawCartItemIds, []);
 
-    const orderType = metadata.orderType || "Delivery";
-    const collectionName =
-      metadata.collectionName ||
-      (orderType === "Delivery" ? "DeliveryOrders" : "InStoreOrders");
+    console.log(`📦 Metadata:`, metadata);
 
-    console.log(
-      `Received Payment Hook. Metadata: { orderId: ${orderDocId}, collection: ${collectionName}, userId: ${userId}, queueNumber: ${queueNumber} }`
-    );
+    // ✅ Handle Admin-Approved Payment (no userId or queue)
+    if (source === "admin_approval_link") {
+      console.log(`🧾 Admin-Approved Payment detected for Order ID: ${orderDocId}`);
 
-    if (!orderDocId && (!userId || !queueNumber)) {
-      console.error("❌ Missing metadata. Cannot proceed.");
-      return {
-        statusCode: 200,
-        body: JSON.stringify({ received: true, error: "Insufficient metadata" }),
-      };
+      try {
+        await db.runTransaction(async (transaction) => {
+          const orderRef = db.collection(collectionName).doc(orderDocId);
+          const orderSnap = await transaction.get(orderRef);
+          if (!orderSnap.exists) throw new Error("Order not found.");
+
+          const orderItems = orderSnap.data().items || orderSnap.data().products || [];
+          await deductInventory(orderItems, transaction);
+
+          transaction.update(orderRef, {
+            paymongoPaymentId: paymentId,
+            status: "Paid",
+            paymentMetadata: admin.firestore.FieldValue.delete(),
+          });
+
+          console.log(`✅ Admin-approved Order ${orderDocId} marked as 'Paid'.`);
+        });
+
+        // Auto change to Preparing
+        setTimeout(async () => {
+          try {
+            await db.collection(collectionName).doc(orderDocId).update({ status: "Preparing" });
+            console.log(`🔁 Order ${orderDocId} auto-updated to 'Preparing'`);
+          } catch (err) {
+            console.warn("⚠️ Auto-update failed:", err.message);
+          }
+        }, 5000);
+
+        return { statusCode: 200, body: JSON.stringify({ received: true }) };
+      } catch (err) {
+        console.error("❌ Admin-approved Payment Error:", err.message);
+        return { statusCode: 200, body: JSON.stringify({ received: true, error: err.message }) };
+      }
     }
 
+    // ✅ Regular Customer Checkout Flow
     try {
       const finalOrderRef = await db.runTransaction(async (transaction) => {
         let orderRef;
-        let orderItems;
-        let finalOrderRefId = null;
-        let orderSnap = null;
+        let orderSnap;
         let existingOrderFound = false;
 
-        // 1️⃣ Lookup by Document ID
+        // Lookup by orderId
         if (orderDocId) {
           orderRef = db.collection(collectionName).doc(orderDocId);
           orderSnap = await transaction.get(orderRef);
-          if (orderSnap.exists) {
-            existingOrderFound = true;
-            console.log(`🔍 Found existing order by ID: ${orderDocId}`);
-          } else {
-            console.warn(`⚠️ Not found by ID: ${orderDocId}`);
-          }
+          if (orderSnap.exists) existingOrderFound = true;
         }
 
-        // 2️⃣ Fallback by userId/queueNumber
+        // Fallback: userId + queueNumber
         if (!existingOrderFound && userId && queueNumber) {
-          console.log(`🔍 Fallback query by userId + queueNumber`);
           const query = await transaction.get(
-            db
-              .collection(collectionName)
+            db.collection(collectionName)
               .where("userId", "==", userId)
               .where("queueNumber", "==", queueNumber)
               .limit(1)
           );
-
           if (!query.empty) {
             orderSnap = query.docs[0];
             orderRef = orderSnap.ref;
             existingOrderFound = true;
-            console.log(`🔍 Found order by Query: ${orderRef.id}`);
           }
         }
 
-        // 3️⃣ If order found
-        if (orderSnap && existingOrderFound) {
-          finalOrderRefId = orderRef.id;
+        if (!existingOrderFound) throw new Error("Order not found.");
 
-          // Already paid check
-          if (orderSnap.data().paymongoPaymentId) {
-            console.warn(
-              `⚠️ Duplicate webhook: Order ${finalOrderRefId} already has payment ID.`
-            );
-            return null;
-          }
+        const orderItems = orderSnap.data().items || orderSnap.data().products || [];
+        await deductInventory(orderItems, transaction);
 
-          orderItems = orderSnap.data().items || orderSnap.data().products || [];
+        transaction.update(orderRef, {
+          paymongoPaymentId: paymentId,
+          status: "Paid",
+          paymentMetadata: admin.firestore.FieldValue.delete(),
+        });
 
-          await deductInventory(orderItems, transaction);
-          console.log(`✅ Inventory deducted for order ID ${finalOrderRefId}.`);
-
-          // ✅ FIXED: Mark order as PAID
-          transaction.update(orderRef, {
-            paymongoPaymentId: paymentId,
-            status: "Paid", // ✅ Updated from Pending to Paid
-            paymentMetadata: admin.firestore.FieldValue.delete(),
-          });
-          console.log(`✅ Order ${finalOrderRefId} updated to 'Paid'.`);
-        } else {
-          console.error("❌ Order not found.");
-          throw new Error("Order not found or insufficient metadata.");
-        }
-
+        console.log(`✅ Regular order ${orderRef.id} marked as 'Paid'.`);
         return orderRef;
       });
 
-      if (finalOrderRef) {
-        // Delete cart items (standard checkout)
+      // Clean cart
+      if (finalOrderRef && userId) {
         const batch = db.batch();
         for (const itemId of cartItemIds) {
-          if (userId) {
-            batch.delete(db.collection("users").doc(userId).collection("cart").doc(itemId));
-          }
+          batch.delete(db.collection("users").doc(userId).collection("cart").doc(itemId));
         }
         await batch.commit();
+      }
 
-        // ✅ Optional: Auto-change to "Preparing" after a short delay
+      // Auto-update to Preparing
+      if (finalOrderRef) {
         setTimeout(async () => {
           try {
             await db.collection(finalOrderRef.parent.id)
               .doc(finalOrderRef.id)
               .update({ status: "Preparing" });
-            console.log(`🔁 Auto-updated order ${finalOrderRef.id} to 'Preparing'`);
+            console.log(`🔁 Order ${finalOrderRef.id} auto-updated to 'Preparing'`);
           } catch (err) {
-            console.warn("⚠️ Auto-update to Preparing failed:", err.message);
+            console.warn("⚠️ Auto-update failed:", err.message);
           }
         }, 5000);
-
-        console.log("--- Webhook Handler Finished Successfully ---");
-        return {
-          statusCode: 200,
-          body: JSON.stringify({ received: true, orderId: finalOrderRef.id }),
-        };
-      } else {
-        console.log("--- Webhook Handler Finished (Duplicate Skipped) ---");
-        return {
-          statusCode: 200,
-          body: JSON.stringify({
-            received: true,
-            warning: "Duplicate webhook skipped",
-          }),
-        };
       }
+
+      console.log("--- Webhook Handler Finished Successfully ---");
+      return { statusCode: 200, body: JSON.stringify({ received: true }) };
     } catch (err) {
-      console.error("❌ TRANSACTION ERROR:", err.message);
-      return {
-        statusCode: 200,
-        body: JSON.stringify({
-          received: true,
-          error: "Internal error: " + err.message,
-          fatal: true,
-        }),
-      };
+      console.error("❌ Transaction Error:", err.message);
+      return { statusCode: 200, body: JSON.stringify({ received: true, error: err.message }) };
     }
   }
 
