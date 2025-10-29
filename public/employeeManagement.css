@@ -1,6 +1,3 @@
-/* ==========================
-   Global Styles
-========================== */
 body {
     font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
     background-color: #fdf6f0;
@@ -22,14 +19,12 @@ h1 {
     min-height: 100vh;
 }
 
-/* ==========================
-   Buttons
-========================== */
+
 .add-btn {
     display: flex;
     align-items: center;
     justify-content: center;
-    gap: 10px; /* space between icon and text */
+    gap: 10px; 
     margin: 0 auto 25px auto;
     padding: 12px 25px;
     font-size: 16px;
@@ -53,9 +48,6 @@ h1 {
     box-shadow: 0 8px 16px rgba(0,0,0,0.25);
 }
 
-/* ==========================
-   Modal Styles
-========================== */
 .modal {
     display: none;
     position: fixed;
@@ -129,7 +121,6 @@ button[type="submit"]:hover {
     background: #77482e;
 }
 
-/* Confirmation Modal Buttons */
 .modal-buttons {
     display: flex;
     justify-content: space-between;
@@ -155,9 +146,6 @@ button[type="submit"]:hover {
 }
 #confirmNo:hover { background-color: #bbb; }
 
-/* ==========================
-   Table Styles
-========================== */
 table {
     width: 95%;
     margin: 20px auto;
@@ -209,9 +197,6 @@ tr:hover {
 }
 .deleteBtn:hover { background-color: #d32f2f; }
 
-/* ==========================
-   Sidebar & Hamburger
-========================== */
 .sidebar {
     position: fixed;
     top: 0;
@@ -249,9 +234,6 @@ tr:hover {
     .hamburger { display: block; }
 }
 
-/* ==========================
-   Animations
-========================== */
 @keyframes fadeIn {
     from { opacity: 0; transform: scale(0.95); }
     to { opacity: 1; transform: scale(1); }
