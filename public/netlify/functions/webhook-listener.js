@@ -1,4 +1,4 @@
-// netlify/functions/paymongo-webhook.js (FINAL DEBUG VERSION)
+// netlify/functions/paymongo-webhook.js (FINAL STABLE VERSION)
 
 require("dotenv").config();
 const admin = require("firebase-admin");
@@ -57,7 +57,7 @@ async function fetchOrderItemsFromCart(userId, cartItemIds) {
 // Inventory Helpers (MODIFIED to accept a transaction/batch object)
 async function deductInventory(orderItems, transaction) {
   if (!orderItems || !orderItems.length) return;
-  
+
   for (const item of orderItems) {
     if (!item || !item.product) continue;
     const qtyMultiplier = item.qty || 1;
@@ -73,8 +73,8 @@ async function deductInventory(orderItems, transaction) {
       if (!part.id) continue;
       const invRef = db.collection("Inventory").doc(part.id);
       const qtyToDeduct = (part.qty || 1) * qtyMultiplier * -1;
-      
-      // Use the transaction object to ensure atomicity
+
+      // Use transaction for atomic deduction
       transaction.update(invRef, {
         quantity: admin.firestore.FieldValue.increment(qtyToDeduct),
       });
@@ -110,7 +110,6 @@ async function returnInventory(orderItems) {
   await batch.commit();
 }
 
-
 // ---------------------
 // 3. Netlify Function Handler
 // ---------------------
@@ -138,9 +137,9 @@ exports.handler = async (event, context) => {
     try {
       const sigHeader = event.headers["paymongo-signature"] || "";
       const receivedSignature = sigHeader.split(",").find((p) => p.startsWith("v1="))?.replace("v1=", "");
-      
+
       if (!receivedSignature) {
-        console.warn("⚠️ Signature verification failed: 'paymongo-signature' header missing 'v1=' part.");
+        console.warn("⚠️ Signature verification failed: missing v1=");
         return { statusCode: 401, body: "Signature Invalid" };
       }
 
@@ -148,71 +147,66 @@ exports.handler = async (event, context) => {
         .createHmac("sha256", WEBHOOK_SECRET)
         .update(rawBody)
         .digest("hex");
-      
+
       if (receivedSignature !== expectedHash) {
         console.error(`❌ Signature mismatch. Expected: ${expectedHash}, Received: ${receivedSignature}`);
         return { statusCode: 401, body: "Signature Invalid" };
       }
-      
+
       console.log("✅ Signature verified successfully.");
     } catch (err) {
       console.error("❌ Signature verification error:", err.message);
       return { statusCode: 500, body: "Verification Error" };
     }
   } else {
-      console.warn("⚠️ WEBHOOK_SECRET environment variable is missing. Skipping signature verification.");
-      if (process.env.NODE_ENV === 'production') {
-        return { statusCode: 401, body: "Webhook Secret Missing" };
-      }
+    console.warn("⚠️ WEBHOOK_SECRET missing. Skipping signature check.");
+    if (process.env.NODE_ENV === "production") {
+      return { statusCode: 401, body: "Webhook Secret Missing" };
+    }
   }
-  // ----------------------------------------------------
-  
+
   const eventType = payload?.data?.attributes?.type;
   const dataObject = payload?.data?.attributes?.data;
 
   console.log(`--- Event Type Received: ${eventType} ---`);
 
   // ----------------------------------------------------
-  // Refund Handler (UNCHANGED)
+  // Refund Handler (no change)
   // ----------------------------------------------------
-  if (
-    eventType === "payment.refunded" ||
-    eventType === "payment.refund.updated"
-  ) {
-    // Refund logic...
-    // (Omitted for brevity in this response, as it's unchanged)
-    // ...
+  if (eventType === "payment.refunded" || eventType === "payment.refund.updated") {
     return { statusCode: 200, body: JSON.stringify({ received: true }) };
   }
 
   // ----------------------------------------------------
-  // Payment Success Handler (Order Creation/Update)
+  // Payment Success Handler
   // ----------------------------------------------------
   if (eventType === "payment.paid" || eventType === "checkout_session.payment.paid") {
     const metadata = dataObject?.attributes?.metadata || {};
     const userId = metadata.userId;
     const queueNumber = metadata.queueNumber;
-    const orderDocId = metadata.orderId; // The document ID from the admin link flow
+    const orderDocId = metadata.orderId;
     const paymentId = dataObject.id;
     const rawCartItemIds =
-      metadata.cartItemIds ??
-      metadata.CartItemIds ??
-      metadata.cartIds ??
-      [];
+      metadata.cartItemIds ?? metadata.CartItemIds ?? metadata.cartIds ?? [];
     const cartItemIds = safeParse(rawCartItemIds, []);
-    
+
     const orderType = metadata.orderType || "Delivery";
-    const collectionName = metadata.collectionName || (orderType === "Delivery" ? "DeliveryOrders" : "InStoreOrders");
-    
-    console.log(`Received Payment Hook. Metadata: { orderId: ${orderDocId}, collection: ${collectionName}, userId: ${userId}, queueNumber: ${queueNumber} }`);
-    
-    // Check for minimum data required to search for an order
+    const collectionName =
+      metadata.collectionName ||
+      (orderType === "Delivery" ? "DeliveryOrders" : "InStoreOrders");
+
+    console.log(
+      `Received Payment Hook. Metadata: { orderId: ${orderDocId}, collection: ${collectionName}, userId: ${userId}, queueNumber: ${queueNumber} }`
+    );
+
     if (!orderDocId && (!userId || !queueNumber)) {
-        console.error("❌ Insufficient metadata (need orderId OR userId/queueNumber). Cannot proceed with payment hook.");
-        return { statusCode: 200, body: JSON.stringify({ received: true, error: "Insufficient metadata" }) };
+      console.error("❌ Missing metadata. Cannot proceed.");
+      return {
+        statusCode: 200,
+        body: JSON.stringify({ received: true, error: "Insufficient metadata" }),
+      };
     }
-    
-    // --- Start Transaction for Atomic Update ---
+
     try {
       const finalOrderRef = await db.runTransaction(async (transaction) => {
         let orderRef;
@@ -221,102 +215,115 @@ exports.handler = async (event, context) => {
         let orderSnap = null;
         let existingOrderFound = false;
 
-
-        // 1. Try to find the EXISTING order reference within the transaction
-        
-        // A. Lookup by Document ID (Covers Admin Link Flow)
+        // 1️⃣ Lookup by Document ID
         if (orderDocId) {
-            orderRef = db.collection(collectionName).doc(orderDocId);
-            orderSnap = await transaction.get(orderRef);
-            if (orderSnap.exists) {
-                existingOrderFound = true;
-                console.log(`🔍 Found existing order by Document ID: ${orderDocId}`);
-            } else {
-                console.warn(`⚠️ Lookup by Document ID failed: ${orderDocId} not found in ${collectionName}.`);
-                orderSnap = null;
-            }
+          orderRef = db.collection(collectionName).doc(orderDocId);
+          orderSnap = await transaction.get(orderRef);
+          if (orderSnap.exists) {
+            existingOrderFound = true;
+            console.log(`🔍 Found existing order by ID: ${orderDocId}`);
+          } else {
+            console.warn(`⚠️ Not found by ID: ${orderDocId}`);
+          }
         }
-        
-        // B. Fallback to Query by userId/queueNumber (Covers Standard Checkout Flow)
+
+        // 2️⃣ Fallback by userId/queueNumber
         if (!existingOrderFound && userId && queueNumber) {
-            console.log(`🔍 Falling back to query by userId/queueNumber...`);
-            const existingOrderQuery = await transaction.get(db.collection(collectionName)
-                .where("userId", "==", userId)
-                .where("queueNumber", "==", queueNumber)
-                .limit(1));
+          console.log(`🔍 Fallback query by userId + queueNumber`);
+          const query = await transaction.get(
+            db
+              .collection(collectionName)
+              .where("userId", "==", userId)
+              .where("queueNumber", "==", queueNumber)
+              .limit(1)
+          );
 
-            if (!existingOrderQuery.empty) {
-                orderSnap = existingOrderQuery.docs[0];
-                orderRef = orderSnap.ref;
-                existingOrderFound = true;
-                console.log(`🔍 Found existing order by Query: ${orderRef.id}`);
-            }
+          if (!query.empty) {
+            orderSnap = query.docs[0];
+            orderRef = orderSnap.ref;
+            existingOrderFound = true;
+            console.log(`🔍 Found order by Query: ${orderRef.id}`);
+          }
         }
 
-
+        // 3️⃣ If order found
         if (orderSnap && existingOrderFound) {
-            finalOrderRefId = orderRef.id;
+          finalOrderRefId = orderRef.id;
 
-            // 2. ⭐ CRITICAL CHECK: If already paid, skip. This is now atomic.
-            if (orderSnap.data().paymongoPaymentId) {
-                console.warn(`⚠️ DUPLICATE PAYMENT HOOK (Transaction): Order ID ${finalOrderRefId} already has Payment ID ${orderSnap.data().paymongoPaymentId}. Skipping transaction.`);
-                return null; // Signal that no further action is needed
-            }
-            
-            // Get items from the existing order
-            orderItems = orderSnap.data().items || orderSnap.data().products || [];
-            
-            // 3. Perform the deduction *within the Transaction*
-            await deductInventory(orderItems, transaction);
-            console.log(`✅ Inventory Deduction applied for order ID ${finalOrderRefId}.`);
-            
-            // 4. Update the Order document
-            transaction.update(orderRef, {
-                paymongoPaymentId: paymentId,
-                status: "Pending", // Set the final confirmed status
-                paymentMetadata: admin.firestore.FieldValue.delete(),
-            });
-            console.log(`✅ Existing Order ID ${finalOrderRefId} updated to 'Pending'.`);
+          // Already paid check
+          if (orderSnap.data().paymongoPaymentId) {
+            console.warn(
+              `⚠️ Duplicate webhook: Order ${finalOrderRefId} already has payment ID.`
+            );
+            return null;
+          }
 
+          orderItems = orderSnap.data().items || orderSnap.data().products || [];
+
+          await deductInventory(orderItems, transaction);
+          console.log(`✅ Inventory deducted for order ID ${finalOrderRefId}.`);
+
+          // ✅ FIXED: Mark order as PAID
+          transaction.update(orderRef, {
+            paymongoPaymentId: paymentId,
+            status: "Paid", // ✅ Updated from Pending to Paid
+            paymentMetadata: admin.firestore.FieldValue.delete(),
+          });
+          console.log(`✅ Order ${finalOrderRefId} updated to 'Paid'.`);
         } else {
-          // Case 3: Order not found by either method. This is an error state.
-          console.error("❌ FATAL: Order document was not found using any metadata provided.");
-          throw new Error("Order not found or fallback data is insufficient.");
+          console.error("❌ Order not found.");
+          throw new Error("Order not found or insufficient metadata.");
         }
-        
+
         return orderRef;
       });
 
-      // --- Post-Transaction Cleanup ---
       if (finalOrderRef) {
-        // Atomically delete cart items (Only applicable for standard checkout flow)
+        // Delete cart items (standard checkout)
         const batch = db.batch();
         for (const itemId of cartItemIds) {
-          if (userId) { // Ensure userId exists before trying to delete cart items
+          if (userId) {
             batch.delete(db.collection("users").doc(userId).collection("cart").doc(itemId));
           }
         }
         await batch.commit();
-      
+
+        // ✅ Optional: Auto-change to "Preparing" after a short delay
+        setTimeout(async () => {
+          try {
+            await db.collection(finalOrderRef.parent.id)
+              .doc(finalOrderRef.id)
+              .update({ status: "Preparing" });
+            console.log(`🔁 Auto-updated order ${finalOrderRef.id} to 'Preparing'`);
+          } catch (err) {
+            console.warn("⚠️ Auto-update to Preparing failed:", err.message);
+          }
+        }, 5000);
+
         console.log("--- Webhook Handler Finished Successfully ---");
         return {
           statusCode: 200,
           body: JSON.stringify({ received: true, orderId: finalOrderRef.id }),
         };
       } else {
-         // This is for the case where the transaction returned null (duplicate hook)
         console.log("--- Webhook Handler Finished (Duplicate Skipped) ---");
-        return { statusCode: 200, body: JSON.stringify({ received: true, warning: "Order already processed, duplicate webhook skipped." }) };
+        return {
+          statusCode: 200,
+          body: JSON.stringify({
+            received: true,
+            warning: "Duplicate webhook skipped",
+          }),
+        };
       }
-
     } catch (err) {
-      // Transaction failures (like contention or the manual error throw) end up here
       console.error("❌ TRANSACTION ERROR:", err.message);
-      
-      // Returning a 200 here prevents PayMongo from retrying repeatedly for a fatal error.
       return {
         statusCode: 200,
-        body: JSON.stringify({ received: true, error: "Internal processing error: " + err.message, fatal: true }),
+        body: JSON.stringify({
+          received: true,
+          error: "Internal error: " + err.message,
+          fatal: true,
+        }),
       };
     }
   }
