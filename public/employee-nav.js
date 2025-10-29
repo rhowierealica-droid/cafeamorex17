@@ -1,102 +1,44 @@
-// ==========================
-// Sidebar Elements
-// ==========================
-const sidebar = document.getElementById('sidebar');
-const hamburger = document.getElementById('hamburger');
-const closeBtn = document.getElementById('closeBtn');
+// employee-nav.js
 
-// Hide close button initially
-if (closeBtn) closeBtn.style.display = 'none';
+document.addEventListener('DOMContentLoaded', () => {
+    // 1. Get elements
+    const profileNameElement = document.querySelector('.profile-name');
+    const hamburgerButton = document.getElementById('hamburger');
+    const sidebar = document.getElementById('sidebar');
 
-// ==========================
-// Hamburger Toggle
-// ==========================
-hamburger.addEventListener('click', () => {
-  sidebar.classList.add('active');
-  hamburger.style.display = 'none';
-  if (closeBtn) closeBtn.style.display = 'block';
-});
+    // 2. Fetch data from localStorage
+    const employeeName = localStorage.getItem('employeeName') || 'Guest';
+    const employeeRole = localStorage.getItem('employeeRole') || 'User';
 
-if (closeBtn) {
-  closeBtn.addEventListener('click', () => {
-    sidebar.classList.remove('active');
-    hamburger.style.display = 'block';
-    closeBtn.style.display = 'none';
-  });
-}
+    // 3. Update the profile name display
+    if (profileNameElement) {
+        // Display the user's name
+        profileNameElement.textContent = employeeName;
+        
+        // Optionally update the 'Edit Profile' text to show the role
+        const editTextElement = document.querySelector('.edit-text');
+        if (editTextElement) {
+             editTextElement.textContent = employeeRole;
+        }
+    }
+    
+    // 4. Hamburger menu toggle logic
+    if (hamburgerButton && sidebar) {
+        hamburgerButton.addEventListener('click', () => {
+            sidebar.classList.toggle('open');
+        });
+    }
 
-// ==========================
-// Reset Sidebar on Resize
-// ==========================
-window.addEventListener('resize', () => {
-  if (window.innerWidth > 1024) {
-    sidebar.classList.remove('active');
-    hamburger.style.display = 'none';
-    if (closeBtn) closeBtn.style.display = 'none';
-  } else {
-    hamburger.style.display = 'block';
-    if (closeBtn) closeBtn.style.display = 'none';
-  }
-});
-
-// ==========================
-// Navigation Links
-// ==========================
-const navLinks = sidebar.querySelectorAll('nav ul li');
-
-// Assign click handlers
-if (navLinks.length >= 2) {
-  navLinks[0].addEventListener('click', () => window.location.href = "employee-order.html"); // Orders
-  navLinks[1].addEventListener('click', () => window.location.href = "employee-incomingorder.html"); // Incoming Orders
-  navLinks[2].addEventListener('click', () => window.location.href = "employee-feedback.html"); // Feedback
-}
-// ==========================
-// Profile Edit
-// ==========================
-const profileEdit = document.querySelector('.profile-card .edit-text');
-if (profileEdit) {
-  profileEdit.addEventListener('click', () => {
-    window.location.href = "editprofile.html";
-  });
-}
-
-// ==========================
-// Logout
-// ==========================
-const logout = document.querySelector('.logout');
-if (logout) {
-  logout.addEventListener('click', () => {
-    window.location.href = "login.html";
-  });
-}
-
-// ==========================
-// Logo Click → Home
-// ==========================
-const logo = document.querySelector('.logo');
-if (logo) {
-  logo.addEventListener('click', () => {
-    window.location.href = "adminpanel.html";
-  });
-}
-
-// ==========================
-// Highlight Current Page
-// ==========================
-const currentPage = window.location.pathname.split("/").pop();
-
-navLinks.forEach(link => {
-  link.classList.remove('active'); // Reset all
-
-  const text = link.textContent.trim().toLowerCase();
-  if (
-    (currentPage === "adminpanel.html" && text === "home") ||
-    (currentPage === "menumanagement.html" && text === "menu management") ||
-    (currentPage === "orders.html" && text === "orders") ||
-    (currentPage === "incomingorder.html" && text === "incoming orders") ||
-    (currentPage === "inventory.html" && text === "inventory") ||
-    (currentPage === "sales.html" && text === "sales")
-  ) {
-    link.classList.add('active');
-  }
+    // 5. Logout logic
+    const logoutBtn = document.querySelector('.logout');
+    if (logoutBtn) {
+        logoutBtn.addEventListener('click', () => {
+            // Clear all employee data from localStorage
+            localStorage.removeItem('employeeName');
+            localStorage.removeItem('employeeRole');
+            
+            // Redirect to login page
+            window.location.href = "login.html"; 
+        });
+    }
 });
