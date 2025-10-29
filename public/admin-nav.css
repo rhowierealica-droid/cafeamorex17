@@ -79,7 +79,6 @@
   transition: background 0.3s, color 0.3s;
 }
 
-/* ===== Hover effect for profile card ===== */
 .profile-card:hover {
   background: #6f4e37;
   color: #fff;
