@@ -7,6 +7,7 @@
 
     <link rel="stylesheet" href="incomingorder.css">
     <link rel="stylesheet" href="admin-nav.css">
+    <link rel="stylesheet" href="AdminNotification.css">
 
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
 </head>
@@ -48,13 +49,11 @@
     <main class="main-content">
         <header>
             <h1>Orders</h1>
-            <p>Track and update your café’s orders</p>
         </header>
 
         <div class="tabs">
-            <button class="tab-btn" data-status="Order Approval">Order Approval</button>
-            
-            <button class="tab-btn active" data-status="Pending">Pending</button>
+            <button class="tab-btn active" data-status="Order Approval">Order Approval</button>
+            <button class="tab-btn " data-status="Pending">Pending</button>
             <button class="tab-btn" data-status="Preparing">Preparing</button>
             <button class="tab-btn" data-status="Delivery">Delivery</button>
             <button class="tab-btn" data-status="Completed">Completed</button>
@@ -83,6 +82,10 @@
     <script type="module" src="incomingorder.js"></script> 
     <script type="module" src="admin-nav.js"></script>
     <script type="module" src="AccessAdmin.js"></script>
+    <script type="module" src="AutoCancel.js"></script>
+      <script type="module" src="AdminNotification.js"></script>
+      <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+
 
     <script type="module">
         import { initOrderNotifications } from './notification.js';
