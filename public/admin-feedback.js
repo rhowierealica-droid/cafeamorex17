@@ -1,19 +1,16 @@
-// ==========================
-// feedback.js (Admin Access Check Fixed)
-// ==========================
 import { db } from './firebase-config.js';
-import { 
-  collection, getDocs, query, orderBy, doc, getDoc 
+
+import {
+  collection, getDocs, query, orderBy, doc, getDoc
 } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
-import { 
-  getAuth, onAuthStateChanged 
+
+import {
+  getAuth, onAuthStateChanged
 } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
 
-// DOM
 const auth = getAuth();
 const feedbackContainer = document.getElementById('feedback-container');
 
-// ✅ Check if user is logged in and has Admin role
 onAuthStateChanged(auth, async (user) => {
   if (!user) {
     window.location.href = "login.html";
@@ -24,25 +21,44 @@ onAuthStateChanged(auth, async (user) => {
     const userDoc = await getDoc(doc(db, "users", user.uid));
 
     if (!userDoc.exists() || userDoc.data().role !== "Admin") {
-      alert("Access denied. Admins only.");
+      console.error("Access denied. User is not an Admin.");
       window.location.href = "login.html";
       return;
     }
 
-    // ✅ Admin verified, continue loading
     console.log("Admin verified, access granted.");
     loadFeedback();
 
   } catch (err) {
     console.error("Error verifying admin:", err);
-    alert("Error verifying access.");
     window.location.href = "login.html";
   }
 });
 
-// ==========================
-// FETCH FEEDBACK
-// ==========================
+function getStarHtml(rating) {
+  const maxStars = 5;
+  let starsHtml = '';
+  for (let i = 1; i <= maxStars; i++) {
+    starsHtml += i <= rating ? '★' : '☆';
+  }
+  return `<span class="rating-stars">${starsHtml}</span>`;
+}
+
+
+function maskEmail(email) {
+  if (typeof email !== 'string' || !email.includes('@') || email.length < 5) {
+    return "No Email Found";
+  }
+
+  const atIndex = email.indexOf('@');
+  const localPart = email.substring(0, atIndex);
+  const domainPart = email.substring(atIndex);
+
+  const firstThree = localPart.substring(0, Math.min(localPart.length, 3));
+
+  return `${firstThree}****${domainPart}`;
+}
+
 async function loadFeedback() {
   feedbackContainer.innerHTML = '';
   const ordersRef = collection(db, "DeliveryOrders");
@@ -53,20 +69,40 @@ async function loadFeedback() {
 
   snapshot.forEach(docSnap => {
     const order = docSnap.data();
+
     if (order.feedback && order.feedback.length > 0 && order.items?.length > 0) {
       hasFeedback = true;
 
+      let emailToMask = order.customerEmail;
+      let customerName = order.customerName || "Unknown Customer";
+
+      if ((!emailToMask || !emailToMask.includes('@')) && customerName.includes('@')) {
+        emailToMask = customerName;
+        customerName = "Customer";
+      }
+
+      const maskedEmail = maskEmail(emailToMask);
+
+      const ratings = order.feedbackRating || [];
+
       order.items.forEach((item, index) => {
         const feedbackText = order.feedback[index];
+        const itemRating = ratings[index] || 0;
+        const ratingHtml = getStarHtml(itemRating);
+
         if (feedbackText) {
           const card = document.createElement('div');
           card.className = 'feedback-card';
+
           card.innerHTML = `
             <div class="order-info">
-              Order #${order.queueNumber || docSnap.id} - ${order.customerName}
+              Order #${order.queueNumber || docSnap.id} - ${customerName} - ${maskedEmail}
+            </div>
+            <div class="item-rating-info">
+              <strong>${item.product}</strong> ${ratingHtml}
             </div>
             <div class="feedback-text">
-              <p>💬 <strong>${item.product}</strong>: ${feedbackText}</p>
+              <p>💬 ${feedbackText}</p>
             </div>
           `;
           feedbackContainer.appendChild(card);
