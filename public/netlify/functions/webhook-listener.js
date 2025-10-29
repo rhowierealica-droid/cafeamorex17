@@ -301,7 +301,7 @@ exports.handler = async (event, context) => {
           
           orderItems = await fetchOrderItemsFromCart(userId, cartItemIds);
           if (!orderItems.length && metadata.orderItems) {
-             orderItems = safeParse(metadata.orderItems, []);
+              orderItems = safeParse(metadata.orderItems, []);
           }
           
           if (!orderItems.length) {
@@ -378,8 +378,6 @@ exports.handler = async (event, context) => {
       // Transaction failures (like contention or the manual error throw) end up here
       console.error("❌ Transaction failed (Inventory or Order Update):", err.message);
       
-      // The error message from the provided logs "A critical error occurred while updating the order status: Failed to fetch"
-      // is likely happening because the client-side code is expecting a status update that never happens due to a server error.
       // Returning a 200 here prevents PayMongo from retrying repeatedly for a fatal error.
       return {
         statusCode: 200,
