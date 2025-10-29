@@ -4,7 +4,6 @@ import { db } from './firebase-config.js';
 
 const notifSound = new Audio('notification.mp3');
 
-// --- Inventory Thresholds ---
 const THRESHOLDS = {
     "volume": { low: 50, out: 0 },
     "count": { low: 10, out: 0 },
@@ -12,20 +11,16 @@ const THRESHOLDS = {
     "sizes": { low: 30, out: 0 }
 };
 
-// --- Global State ---
 let currentUser = null;
 let listenersAttached = false; 
 const displayedNotifs = new Set();
 const inventoryStatusMap = {};
-// processedDocIds tracks initial orders to prevent a flood of notifications on startup.
 const processedDocIds = new Set(); 
 let unreadCount = 0;
 
-// --- Create containers (Functional styles only kept inline) ---
 let bellContainer = document.getElementById("adminNotifBellContainer") || (() => {
     const el = document.createElement("div");
     el.id = "adminNotifBellContainer";
-    // Functional styles: positioning, z-index, initial display
     el.innerHTML = `<i class="fas fa-bell"></i><span class="badge" style="display:none;">0</span>`;
     el.style.cssText = `position:fixed; top:20px; right:20px; cursor:pointer; z-index:9999; display:none;`; 
     document.body.appendChild(el);
@@ -37,7 +32,6 @@ const adminBadge = bellContainer.querySelector(".badge");
 let notifDropdown = document.getElementById("adminNotifDropdown") || (() => {
     const el = document.createElement("div");
     el.id = "adminNotifDropdown";
-    // Functional styles: positioning, z-index, layout
     el.style.cssText = `
         display: none;
         position: fixed;
@@ -54,7 +48,6 @@ let notifDropdown = document.getElementById("adminNotifDropdown") || (() => {
     return el;
 })();
 
-// Control buttons 
 const controlContainer = document.createElement("div");
 controlContainer.className = "control-container";
 const readAllBtn = document.createElement("button");
@@ -69,7 +62,6 @@ if (notifDropdown.firstChild !== controlContainer) {
     notifDropdown.prepend(controlContainer);
 }
 
-// Empty message
 const emptyMessage = document.createElement("div");
 emptyMessage.id = "notifEmpty";
 emptyMessage.textContent = "No new admin notifications";
@@ -77,13 +69,10 @@ if (notifDropdown.lastChild !== emptyMessage) {
     notifDropdown.appendChild(emptyMessage);
 }
 
-
-// --- Toggle dropdown ---
 bellContainer.addEventListener("click", () => {
     notifDropdown.style.display = notifDropdown.style.display === "flex" ? "none" : "flex";
 });
 
-// --- Auth state ---
 const auth = getAuth();
 onAuthStateChanged(auth, async user => {
     currentUser = user;
@@ -110,16 +99,12 @@ onAuthStateChanged(auth, async user => {
     }
 });
 
-// -----------------------------------------------------------------
-// --- CRITICAL FIX: INITIALIZE DOCUMENT TRACKER (Orders only) ---
-// -----------------------------------------------------------------
 async function initializeProcessedTracker() {
     const trackedCollections = ["InStoreOrders", "DeliveryOrders"]; 
     
     for (const coll of trackedCollections) {
         const snapshot = await getDocs(collection(db, coll));
         snapshot.forEach(docSnap => {
-            // Use a combination of collection name and ID to ensure uniqueness across collections
             processedDocIds.add(`${coll}_${docSnap.id}`); 
         });
     }
@@ -127,20 +112,15 @@ async function initializeProcessedTracker() {
 }
 
 
-// --- Core Listener Function ---
 function listenAdminEvents() {
-    listenOrderChanges(); // Now handles NEW orders AND MODIFIED statuses (including refund)
+    listenOrderChanges(); 
     listenInventoryChanges();
 }
 
-// -----------------------------------------------------------------
-// --- 1. ORDER CHANGES LISTENER (NEW ORDERS & REFUND REQUESTS) ---
-// -----------------------------------------------------------------
 function listenOrderChanges() {
     const orderCollections = ["InStoreOrders", "DeliveryOrders"];
     
     orderCollections.forEach(coll => {
-        // Log to confirm listener attachment
         console.log(`Attaching listener to ${coll} for order/refund changes.`);
 
         onSnapshot(collection(db, coll), snapshot => {
@@ -152,23 +132,18 @@ function listenOrderChanges() {
 
                 let message = null;
                 let notifType = null;
-                
-                // --- A) NEW ORDER ---
+
                 if (change.type === "added" && !processedDocIds.has(docKey)) {
                     processedDocIds.add(docKey); 
                     message = `🚨 NEW ORDER: ${orderType} Order #${order.queueNumber || orderId} received.`;
                     notifType = 'order';
                 } 
                 
-                // --- B) REFUND REQUEST (STATUS MODIFIED) ---
                 else if (change.type === "modified") {
-                    // Check the previous state of the document
                     const oldOrder = change.oldDoc.data();
                     const currentRefundStatus = order.refundStatus;
-                    // Fallback to empty string if field is missing in old document
                     const previousRefundStatus = oldOrder.refundStatus || ""; 
 
-                    // CRITICAL CHECK: Refund status is currently "Requested" AND it was NOT "Requested" before
                     if (currentRefundStatus === "Requested" && previousRefundStatus !== "Requested") {
                         
                         console.log(`💸 REFUND DETECTED: Order ${orderId}. Old Status: ${previousRefundStatus}. New Status: ${currentRefundStatus}`); 
@@ -179,7 +154,6 @@ function listenOrderChanges() {
                 }
                 
                 if (message && currentUser) {
-                    // Create Notification Document for the Admin
                     const notifRef = doc(collection(db, "Notifications"));
                     await setDoc(notifRef, {
                         userId: currentUser.uid, 
@@ -192,21 +166,16 @@ function listenOrderChanges() {
                 }
             });
         }, (error) => {
-            // CRITICAL: Log errors to catch Security Rule issues
             console.error(`❌ Firestore listener error on ${coll}:`, error);
         });
     });
 }
 
-// -----------------------------------------------------------------
-// --- 2. INVENTORY CHANGE LISTENER ---
-// -----------------------------------------------------------------
 function getInventoryStatus(item){
     const qty = Number(item.quantity) || 0;
     const category = item.category;
     const unit = item.unit;
 
-    // Helper to get threshold based on item properties
     const getThreshold = (u) => {
         if (["g", "ml"].includes(u)) return THRESHOLDS.volume;
         if (["slice", "piece", "squeeze"].includes(u)) return THRESHOLDS.count;
@@ -233,7 +202,7 @@ function listenInventoryChanges() {
 
             inventoryStatusMap[itemId] = currentStatus;
 
-            // Only notify if status changes TO 'Low Stock' or 'Out of Stock'
+            // Stock
             if (previousStatus && previousStatus !== currentStatus) {
                 let message = "";
                 let shouldNotify = false;
@@ -264,11 +233,6 @@ function listenInventoryChanges() {
     });
 }
 
-// -----------------------------------------------------------------
-// --- GENERIC NOTIFICATION FUNCTIONS ---
-// -----------------------------------------------------------------
-
-// --- Load notifications (Admin filter) ---
 async function loadUserNotifications() {
     if (!currentUser) return;
     
@@ -290,7 +254,6 @@ async function loadUserNotifications() {
     updateBadge();
 }
 
-// --- Show notification (CSS cleanup: minimal functional inline styles kept) ---
 function showNotification(message, docId, isUnread = true) {
     if (displayedNotifs.has(docId)) return;
     displayedNotifs.add(docId);
@@ -299,16 +262,13 @@ function showNotification(message, docId, isUnread = true) {
     notifItem.className = "notifItem";
     notifItem.dataset.docId = docId; 
     
-    // Only essential layout styles remain inline
     notifItem.style.cssText = "display:flex; justify-content:space-between; align-items:center;";
 
     if (isUnread) {
         notifItem.classList.add("unread");
-        // Keep dynamic background color inline for simplicity
         notifItem.style.backgroundColor = "#fffde7"; 
     }
 
-    // Class names are added to inner elements for CSS styling
     notifItem.innerHTML = `<div class="notifText" tabindex="0">${message}</div><div class="notifClose">&times;</div>`;
     
     notifDropdown.insertBefore(notifItem, notifDropdown.children[1]); 
@@ -352,13 +312,11 @@ function showNotification(message, docId, isUnread = true) {
     }
 }
 
-// --- Empty message ---
 function updateEmptyMessage() {
     const hasNotifs = notifDropdown.querySelectorAll(".notifItem").length > 0;
     emptyMessage.style.display = hasNotifs ? "none" : "block";
 }
 
-// --- Read all ---
 readAllBtn.addEventListener("click", async () => {
     if (!currentUser) return;
     const notifDocs = await getDocs(query(collection(db, "Notifications"), where("userId", "==", currentUser.uid), where("read", "==", false)));
@@ -376,7 +334,6 @@ readAllBtn.addEventListener("click", async () => {
     updateBadge();
 });
 
-// --- Clear all ---
 clearAllBtn.addEventListener("click", async () => {
     if (!currentUser) return;
     const notifDocs = await getDocs(query(collection(db, "Notifications"), where("userId", "==", currentUser.uid)));
@@ -390,7 +347,6 @@ clearAllBtn.addEventListener("click", async () => {
     updateEmptyMessage();
 });
 
-// --- Update badge ---
 function updateBadge() {
     adminBadge.textContent = unreadCount;
     adminBadge.style.display = unreadCount > 0 ? "inline-block" : "none";
