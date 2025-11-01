@@ -18,6 +18,7 @@ try {
       });
     }
     db = admin.firestore();
+    console.log("✅ Firebase Admin SDK initialized.");
   }
 } catch (e) {
   console.error("⚠️ Firebase Admin SDK initialization failed:", e.message);
@@ -77,6 +78,7 @@ exports.handler = async (event, context) => {
     return { statusCode: 405, body: "Method Not Allowed" };
   if (!db) return { statusCode: 500, body: "Server not initialized" };
 
+  // ⚠️ Potential Issue: Ensure WEBHOOK_SECRET is set correctly in Netlify environment variables.
   const WEBHOOK_SECRET = process.env.WEBHOOK_SECRET;
   const rawBody = event.body;
   let payload;
@@ -89,25 +91,39 @@ exports.handler = async (event, context) => {
   }
 
   // -----------------------------
-  // Signature Verification
+  // Signature Verification (FIXED)
   // -----------------------------
   if (WEBHOOK_SECRET) {
     try {
-      const sigHeader = event.headers["paymongo-signature"] || "";
-      const receivedSignature = sigHeader.split(",").find((p) => p.startsWith("v1="))?.replace("v1=", "");
+      // 💡 PayMongo uses the header 'X-Paymongo-Signature' or 'paymongo-signature'
+      const sigHeader = event.headers["x-paymongo-signature"] || event.headers["paymongo-signature"] || "";
+      
+      const parts = sigHeader.split(",").reduce((acc, part) => {
+        const [key, value] = part.trim().split("=");
+        acc[key.trim()] = value.trim();
+        return acc;
+      }, {});
 
-      if (!receivedSignature) {
-        console.warn("⚠️ Signature verification failed: missing v1=");
+      const receivedTimestamp = parts.t;
+      const receivedSignature = parts.v1;
+
+      if (!receivedSignature || !receivedTimestamp) {
+        // Log the header to help debug if the format is unexpected
+        console.warn("⚠️ Signature verification failed: Missing timestamp (t) or signature (v1) in header. Header:", sigHeader); 
         return { statusCode: 401, body: "Signature Invalid" };
       }
 
+      // ✅ FIX: PayMongo signs the raw body prefixed with the timestamp. 
+      // Your original code was only hashing rawBody, which is incorrect.
+      const signedPayload = `${receivedTimestamp}.${rawBody}`;
+
       const expectedHash = crypto
         .createHmac("sha256", WEBHOOK_SECRET)
-        .update(rawBody)
+        .update(signedPayload)
         .digest("hex");
 
       if (receivedSignature !== expectedHash) {
-        console.error("❌ Signature mismatch.");
+        console.error("❌ Signature mismatch. Expected:", expectedHash, "Received:", receivedSignature);
         return { statusCode: 401, body: "Signature Invalid" };
       }
 
@@ -132,7 +148,7 @@ exports.handler = async (event, context) => {
   // -----------------------------
   // Payment Success
   // -----------------------------
-  if (eventType === "payment.paid" || eventType === "checkout_session.payment.paid") {
+  if (eventType === "payment.paid" || eventType === "checkout_session.paid") { // Note: using checkout_session.paid for consistency
     const metadata = dataObject?.attributes?.metadata || {};
     const paymentId = dataObject.id;
     const source = metadata.source || "customer_checkout";
@@ -145,6 +161,10 @@ exports.handler = async (event, context) => {
 
     console.log(`📦 Metadata:`, metadata);
 
+    // ❌ Potential Issue: You are using root-level collections. 
+    // If your security rules enforce the path /artifacts/{appId}/public/data/CollectionName, 
+    // the transaction will fail to find or update the document. If your app is simple and uses root collections, this is fine.
+    
     // ✅ Handle Admin-Approved Payment (no userId or queue)
     if (source === "admin_approval_link") {
       console.log(`🧾 Admin-Approved Payment detected for Order ID: ${orderDocId}`);
@@ -153,7 +173,7 @@ exports.handler = async (event, context) => {
         await db.runTransaction(async (transaction) => {
           const orderRef = db.collection(collectionName).doc(orderDocId);
           const orderSnap = await transaction.get(orderRef);
-          if (!orderSnap.exists) throw new Error("Order not found.");
+          if (!orderSnap.exists) throw new Error(`Order ${orderDocId} not found in ${collectionName}.`);
 
           const orderItems = orderSnap.data().items || orderSnap.data().products || [];
           await deductInventory(orderItems, transaction);
@@ -180,7 +200,9 @@ exports.handler = async (event, context) => {
         return { statusCode: 200, body: JSON.stringify({ received: true }) };
       } catch (err) {
         console.error("❌ Admin-approved Payment Error:", err.message);
-        return { statusCode: 200, body: JSON.stringify({ received: true, error: err.message }) };
+        // Returning 200 here tells PayMongo the webhook was received, preventing retries. 
+        // Log the error for internal debugging.
+        return { statusCode: 200, body: JSON.stringify({ received: true, error: err.message }) }; 
       }
     }
 
@@ -213,7 +235,7 @@ exports.handler = async (event, context) => {
           }
         }
 
-        if (!existingOrderFound) throw new Error("Order not found.");
+        if (!existingOrderFound) throw new Error(`Order not found by ID (${orderDocId}) or User/Queue (${userId}/${queueNumber}).`);
 
         const orderItems = orderSnap.data().items || orderSnap.data().products || [];
         await deductInventory(orderItems, transaction);
@@ -231,10 +253,13 @@ exports.handler = async (event, context) => {
       // Clean cart
       if (finalOrderRef && userId) {
         const batch = db.batch();
+        // ⚠️ Potential Issue: Cart is assumed to be at /users/{userId}/cart/{itemId}. 
+        // If your path is /artifacts/{appId}/users/{userId}/cart/{itemId}, this will also fail.
         for (const itemId of cartItemIds) {
           batch.delete(db.collection("users").doc(userId).collection("cart").doc(itemId));
         }
         await batch.commit();
+        console.log(`🗑️ Cart items cleaned for user ${userId}.`);
       }
 
       // Auto-update to Preparing
