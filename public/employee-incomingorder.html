@@ -1,89 +1,112 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>Café Amore - Orders</title>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Café Amore - Orders</title>
 
-    <link rel="stylesheet" href="incomingorder.css">
-    <link rel="stylesheet" href="admin-nav.css">
-    <link rel="stylesheet" href="AdminNotification.css">
-
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
+  <link rel="stylesheet" href="incomingorder.css">
+  <link rel="stylesheet" href="admin-nav.css">
+  <link rel="stylesheet" href="AdminNotification.css">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
 </head>
 <body>
+  <aside class="sidebar" id="sidebar">
+    <div class="logo">
+      <img src="logo.png" alt="Café Amore Logo">
+      <span class="brand">Café Amore</span>
+    </div>
 
-    <aside class="sidebar" id="sidebar">
-        <div class="logo">
-            <img src="logo.png" alt="Café Amore Logo">
-            <span class="brand">Café Amore</span>
-        </div>
+    <nav>
+      <div class="close-btn" id="closeBtn"><i class="fas fa-times"></i></div>
+      <ul>
+        <li><i class="fas fa-clipboard-list"></i> Orders</li>
+        <li><i class="fas fa-inbox"></i> Incoming Orders</li>
+        <li><i class="fas fa-comment"></i> Feedback</li>
+      </ul>
+    </nav>
 
-        <nav>
-            <div class="close-btn" id="closeBtn"><i class="fas fa-times"></i></div>
-            <ul>
-                <li><i class="fas fa-clipboard-list"></i> Orders</li>
-                <li><i class="fas fa-inbox"></i> Incoming Orders</li>
-                <li><i class="fas fa-comment"></i> Feedback</li>
-            </ul>
-        </nav>
+    <div class="profile-card" id="profileCard">
+      <div class="profile-avatar">
+        <i class="fas fa-user-circle"></i>
+      </div>
+      <div class="profile-info">
+        <p class="profile-name" id="profileName">Cashier</p>
+        <p class="edit-text">Edit Profile</p>
+      </div>
+    </div>
 
-        <div class="profile-card">
-            <div class="profile-avatar"><i class="fas fa-user-circle"></i></div>
-            <div class="profile-info">
-                <p class="profile-name">Admin</p>
-                <p class="edit-text">Edit Profile</p>
-            </div>
-        </div>
+    <div class="logout">
+      <i class="fas fa-sign-out-alt"></i> Log Out
+    </div>
+  </aside>
 
-        <div class="logout"><i class="fas fa-sign-out-alt"></i> Log Out</div>
-    </aside>
+  <div class="hamburger" id="hamburger">
+    <i class="fas fa-bars"></i>
+  </div>
 
-    <div class="hamburger" id="hamburger"><i class="fas fa-bars"></i></div>
+  <main class="main-content">
+    <header>
+      <h1>Orders</h1>
+    </header>
 
-    <main class="main-content">
-        <header>
-            <h1>Orders</h1>
-        </header>
+    <div class="tabs">
+      <button class="tab-btn active" data-status="Order Approval">Order Approval</button>
+      <button class="tab-btn" data-status="Pending">Pending</button>
+      <button class="tab-btn" data-status="Preparing">Preparing</button>
+      <button class="tab-btn" data-status="Delivery">Delivery</button>
+      <button class="tab-btn" data-status="Completed">Completed</button>
+      <button class="tab-btn" data-status="Canceled">Canceled</button>
+    </div>
 
-        <div class="tabs">
-            <button class="tab-btn active" data-status="Order Approval">Order Approval</button>
-            <button class="tab-btn " data-status="Pending">Pending</button>
-            <button class="tab-btn" data-status="Preparing">Preparing</button>
-            <button class="tab-btn" data-status="Delivery">Delivery</button>
-            <button class="tab-btn" data-status="Completed">Completed</button>
-            <button class="tab-btn" data-status="Canceled">Canceled</button>
-        </div>
+    <div class="filter-section" id="filterContainer" style="display: none;">
+      <select id="orderTypeFilter">
+        <option value="All">All</option>
+        <option value="In-Store">In-Store</option>
+        <option value="Delivery">Delivery</option>
+      </select>
 
-        <section class="orders-section">
-            <div class="table-container">
-                <table id="ordersTable">
-                    <thead>
-                        <tr>
-                            <th>Order Queue ID</th>
-                            <th>Order Type</th>
-                            <th>Order</th>
-                            <th>Status</th>
-                            <th>Update Status</th>
-                        </tr>
-                    </thead>
-                    <tbody id="ordersBody">
-                        </tbody>
-                </table>
-            </div>
-        </section>
-    </main>
+      <select id="dateFilter">
+        <option value="all">All Dates</option>
+        <option value="today">Today</option>
+        <option value="week">This Week</option>
+        <option value="month">This Month</option>
+        <option value="custom">Custom Range</option>
+      </select>
 
-    <script type="module" src="incomingorder.js"></script> 
-    <script type="module" src="admin-nav.js"></script>
-    <script type="module" src="AccessAdmin.js"></script>
-    <script type="module" src="AutoCancel.js"></script>
-      <script type="module" src="AdminNotification.js"></script>
+      <input type="text" id="customRange" placeholder="Select custom date range">
+      <input type="text" id="productSearch" placeholder="Search product name...">
+    </div>
 
+    <section class="orders-section">
+      <div class="table-container">
+        <table id="ordersTable">
+          <thead>
+            <tr>
+              <th>Order Queue ID</th>
+              <th>Order Type</th>
+              <th>Order</th>
+              <th>Status</th>
+              <th>Update Status</th>
+            </tr>
+          </thead>
+          <tbody id="ordersBody">
+          </tbody>
+        </table>
+      </div>
+    </section>
+  </main>
 
-    <script type="module">
-        import { initOrderNotifications } from './notification.js';
-        initOrderNotifications();
-    </script>
+  <script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
+  <script type="module" src="employee-incomingorder.js"></script>
+  <script type="module" src="AutoCancel.js"></script>
+  <script type="module" src="AdminNotification.js"></script>
+  <script src="Cashier-nav.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+
+  <script type="module">
+    import { initOrderNotifications } from './notification.js';
+  </script>
 </body>
 </html>
