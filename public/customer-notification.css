@@ -1,4 +1,3 @@
-/* Base styling */
 body {
   font-family: Arial, sans-serif;
   background-color: #f9f9f9;
@@ -6,7 +5,6 @@ body {
   padding: 0;
 }
 
-/* Notifications container */
 .notifications-container {
   position: fixed;
   top: 20px;
@@ -15,7 +13,6 @@ body {
   z-index: 1000;
 }
 
-/* Individual notification */
 .notification {
   color: white;
   padding: 15px;
@@ -27,26 +24,24 @@ body {
   opacity: 0;
 }
 
-/* Status-specific colors */
 .notification.pending,
 .notification.preparing {
-  background-color: #2196f3; /* Blue */
+  background-color: #2196f3; 
 }
 
 .notification.delivery {
-  background-color: #ff9800; /* Orange */
+  background-color: #ff9800; 
 }
 
 .notification.completed {
-  background-color: #4caf50; /* Green */
+  background-color: #4caf50; 
 }
 
 .notification.canceled,
 .notification.cancelled {
-  background-color: #f44336; /* Red */
+  background-color: #f44336; 
 }
 
-/* Slide-in animation */
 @keyframes slide-in {
   0% { opacity: 0; transform: translateX(100%); }
   100% { opacity: 1; transform: translateX(0); }
