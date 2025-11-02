@@ -1,15 +1,12 @@
-// notification.js
 import { db } from './firebase-config.js';
 import { collection, onSnapshot } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 
 export function initOrderBadge() {
   const orderCollections = ["InStoreOrders", "DeliveryOrders"];
 
-  // Find the Orders menu item in your sidebar
   const ordersMenuItem = document.querySelector('aside.sidebar nav ul li:nth-child(4)'); 
-  ordersMenuItem.style.position = 'relative'; // for badge absolute positioning
+  ordersMenuItem.style.position = 'relative';
 
-  // Create badge
   let badge = ordersMenuItem.querySelector('.badge');
   if (!badge) {
     badge = document.createElement('span');
@@ -33,7 +30,6 @@ export function initOrderBadge() {
     ordersMenuItem.appendChild(badge);
   }
 
-  // Count all pending orders
   async function countPendingOrders() {
     let total = 0;
     await Promise.all(orderCollections.map(async col => {
@@ -47,7 +43,6 @@ export function initOrderBadge() {
     return total;
   }
 
-  // Update badge
   async function updateBadge() {
     const count = await countPendingOrders();
     if (count > 0) {
@@ -58,10 +53,8 @@ export function initOrderBadge() {
     }
   }
 
-  // Initial update
   updateBadge();
 
-  // Real-time listener
   orderCollections.forEach(col => {
     const ordersRef = collection(db, col);
     onSnapshot(ordersRef, snapshot => {
@@ -71,7 +64,5 @@ export function initOrderBadge() {
       });
     }, { includeMetadataChanges: true });
   });
-
-  // Refresh every 30 seconds
   setInterval(updateBadge, 30000);
 }
