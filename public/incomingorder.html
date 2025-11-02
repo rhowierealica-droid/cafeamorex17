@@ -8,7 +8,7 @@
     <link rel="stylesheet" href="incomingorder.css">
     <link rel="stylesheet" href="admin-nav.css">
     <link rel="stylesheet" href="AdminNotification.css">
-
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
 </head>
 <body>
@@ -22,7 +22,7 @@
         <nav>
             <div class="close-btn" id="closeBtn"><i class="fas fa-times"></i></div>
             <ul>
-                <li class="active"><i class="fa-duotone fa-light fa-house"></i> Home</li>
+                <li><i class="fas fa-house"></i> Home</li>
                 <li><i class="fas fa-utensils"></i> Menu Management</li>
                 <li><i class="fas fa-clipboard-list"></i> Orders</li>
                 <li><i class="fas fa-inbox"></i> Incoming Orders</li>
@@ -60,6 +60,22 @@
             <button class="tab-btn" data-status="Canceled">Canceled</button>
         </div>
 
+        <div class="filter-section" id="filterContainer" style="display: none;">
+            <select id="orderTypeFilter">
+                <option value="All">All</option>  
+                <option value="In-Store">In-Store</option>  
+                <option value="Delivery">Delivery</option>
+            </select>
+            <select id="dateFilter">
+                <option value="all">All Dates</option>
+                <option value="today">Today</option>
+                <option value="week">This Week</option>
+                <option value="month">This Month</option>
+                <option value="custom">Custom Range</option>
+            </select>
+            <input type="text" id="customRange" placeholder="Select custom date range">
+            <input type="text" id="productSearch" placeholder="Search product name...">
+        </div>
         <section class="orders-section">
             <div class="table-container">
                 <table id="ordersTable">
@@ -73,23 +89,24 @@
                         </tr>
                     </thead>
                     <tbody id="ordersBody">
-                        </tbody>
+                    </tbody>
                 </table>
             </div>
         </section>
     </main>
 
+    <script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
+
     <script type="module" src="incomingorder.js"></script> 
     <script type="module" src="admin-nav.js"></script>
     <script type="module" src="AccessAdmin.js"></script>
     <script type="module" src="AutoCancel.js"></script>
-      <script type="module" src="AdminNotification.js"></script>
-      <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+    <script type="module" src="AdminNotification.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
 
 
     <script type="module">
         import { initOrderNotifications } from './notification.js';
-        initOrderNotifications();
     </script>
 </body>
 </html>
