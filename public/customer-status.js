@@ -2,20 +2,34 @@ import { db } from './firebase-config.js';
 import { collection, onSnapshot, doc, updateDoc, arrayUnion, getDoc, writeBatch } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 import { getAuth, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
 
-// NOTE: FOR PDF GENERATION TO WORK, YOU MUST INCLUDE THE LIBRARY IN YOUR HTML:
-// <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
-// The code below assumes 'html2pdf' is globally available.
-
 const orderItemsDiv = document.getElementById("order-items");
 const tabs = document.querySelectorAll(".tabs .tab-btn");
+
+const dateFilterSelect = document.getElementById("dateFilter");
+const customRangeInput = document.getElementById("customRange");
+const productFilterInput = document.getElementById("productFilter");
+const filterSection = document.querySelector(".filter-section");
+
 let currentTab = "Waiting for Payment";
 
 const auth = getAuth();
 let currentUser = null;
 let currentUserEmail = null;
 let unsubscribeOrders = null;
+let dateRangeInstance = null; 
 
-// --- POPUP/MODAL ELEMENTS ---
+function timestampToDate(timestamp) {
+    if (!timestamp || !timestamp.seconds) return null;
+    return new Date(timestamp.seconds * 1000);
+}
+
+// Filter
+function isDateInRange(date, start, end) {
+    if (!date) return true;
+    const time = date.getTime();
+    return time >= start.getTime() && time <= end.getTime();
+}
+
 let popup = null;
 let popupTitle = null;
 let popupButtonsContainer = null;
@@ -97,6 +111,48 @@ function injectPopupStyles() {
     #downloadReceiptBtn:hover { background-color: #1e7e34; }
     #closeAlertBtn, #closeReceiptBtn { background-color: #6c757d; }
     #closeAlertBtn:hover, #closeReceiptBtn:hover { background-color: #5a6268; }
+
+    /* --- Feedback Modal Styles (Ensure .feedback-item styles are defined) --- */
+    .modal {
+        position: fixed; inset: 0; background-color: rgba(0, 0, 0, 0.7); display: none;
+        justify-content: center; align-items: center; z-index: 10000;
+    }
+    .modal-content {
+        background: white; padding: 25px; border-radius: 8px; max-width: 90%; max-height: 90vh; overflow-y: auto; position: relative;
+    }
+    .close-btn { position: absolute; top: 10px; right: 20px; font-size: 24px; cursor: pointer; }
+    .feedback-item { 
+        border: 1px solid #ddd; 
+        padding: 15px; 
+        margin-bottom: 15px; 
+        border-radius: 8px;
+        background-color: #f9f9f9;
+        text-align: left;
+    }
+    .feedback-item h4 { margin-top: 0; }
+    .star-rating { 
+        font-size: 24px; 
+        color: gold; 
+        margin-bottom: 10px;
+    }
+    .star { 
+        cursor: pointer; 
+        transition: color 0.2s; 
+        margin-right: 5px;
+        color: #ccc; /* Default color before selection */
+    }
+    .star[data-selected="1"] { 
+        color: gold;
+    }
+    .feedback-item textarea {
+        width: 100%;
+        padding: 10px;
+        border: 1px solid #ccc;
+        border-radius: 4px;
+        box-sizing: border-box;
+        resize: vertical;
+    }
+    /* ------------------------------------------------------------------- */
     `;
     document.head.appendChild(style);
 }
@@ -142,277 +198,380 @@ function formatQueueNumber(num) {
     return typeof num === 'string' ? num : (num ? num.toString().padStart(4, "0") : "----");
 }
 
-// --- END POPUP/MODAL ELEMENTS ---
+-
 
+// Filter
+function calculateDateRange(filterValue, customRange) {
+    const now = new Date();
+    let start = new Date(0); 
+    let end = new Date(8640000000000000); // Max Date
+
+    if (filterValue === 'today') {
+        start = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+        end = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 23, 59, 59, 999);
+    } else if (filterValue === 'week') {
+        const dayOfWeek = now.getDay() === 0 ? 6 : now.getDay() - 1; // Mon=0, Sun=6
+        start = new Date(now.getFullYear(), now.getMonth(), now.getDate() - dayOfWeek);
+        start.setHours(0, 0, 0, 0);
+        end = new Date(now.getFullYear(), now.getMonth(), now.getDate() + (6 - dayOfWeek));
+        end.setHours(23, 59, 59, 999);
+    } else if (filterValue === 'month') {
+        start = new Date(now.getFullYear(), now.getMonth(), 1);
+        start.setHours(0, 0, 0, 0);
+        end = new Date(now.getFullYear(), now.getMonth() + 1, 0); // Last day of month
+        end.setHours(23, 59, 59, 999);
+    } else if (filterValue === 'year') {
+        start = new Date(now.getFullYear(), 0, 1);
+        end = new Date(now.getFullYear(), 11, 31, 23, 59, 59, 999);
+    } else if (filterValue === 'custom' && customRange) {
+        const [startDateStr, endDateStr] = customRange.split(" to ");
+        if (startDateStr) start = new Date(startDateStr);
+        if (endDateStr) end = new Date(endDateStr);
+        if (end && !endDateStr) end.setHours(23, 59, 59, 999);
+    }
+
+    return { start, end };
+}
+
+
+// custom date range
+function initializeDateRange() {
+    if (typeof flatpickr !== 'undefined' && customRangeInput) {
+        if (dateRangeInstance) {
+            dateRangeInstance.destroy();
+        }
+        dateRangeInstance = flatpickr(customRangeInput, {
+            mode: "range",
+            dateFormat: "Y-m-d",
+            onClose: listenOrders,
+            altInput: true,
+            altFormat: "F j, Y",
+            placeholder: "Select date range"
+        });
+        //hide the Flatpickr input elements until "Custom" is selected
+        customRangeInput.style.display = "none";
+        if (dateRangeInstance.altInput) dateRangeInstance.altInput.style.display = "none";
+    }
+}
+initializeDateRange();
+
+if (dateFilterSelect) {
+    dateFilterSelect.addEventListener("change", () => {
+        if (dateFilterSelect.value === "custom") {
+            if (dateRangeInstance && dateRangeInstance.altInput) dateRangeInstance.altInput.style.display = "inline-block";
+        } else {
+            // Hide input when not custom
+            if (dateRangeInstance && dateRangeInstance.altInput) dateRangeInstance.altInput.style.display = "none";
+            listenOrders();
+        }
+    });
+}
+
+if (productFilterInput) {
+    productFilterInput.addEventListener("input", listenOrders);
+}
 
 onAuthStateChanged(auth, user => {
-  currentUser = user;
-  if (user) {
-    currentUserEmail = user.email?.toLowerCase();
-    tabs.forEach(t => {
-      if (t.dataset.status === currentTab) {
-        t.classList.add("active");
-      } else {
-        t.classList.remove("active");
-      }
-    });
-    listenOrders();
-  } else {
-    window.location.href = "login.html"; 
-  }
+    currentUser = user;
+    if (user) {
+        currentUserEmail = user.email?.toLowerCase();
+        tabs.forEach(t => {
+            if (t.dataset.status === currentTab) {
+                t.classList.add("active");
+            } else {
+                t.classList.remove("active");
+            }
+        });
+        
+        const filterableTabs = ["To Receive", "To Rate", "Completed", "Canceled", "Refund"];
+        if (filterSection && !filterableTabs.includes(currentTab)) filterSection.style.display = "none";
+
+        listenOrders();
+    } else {
+        window.location.href = "login.html"; 
+    }
 });
 
 tabs.forEach(tab => {
-  tab.addEventListener("click", () => {
-    tabs.forEach(t => t.classList.remove("active"));
-    tab.classList.add("active");
-    currentTab = tab.dataset.status;
-    listenOrders();
-  });
+    tab.addEventListener("click", () => {
+        tabs.forEach(t => t.classList.remove("active"));
+        tab.classList.add("active");
+        currentTab = tab.dataset.status;
+        listenOrders();
+    });
 });
 
 function listenOrders() {
-  if (!currentUser) return;
-  if (unsubscribeOrders) unsubscribeOrders();
+    if (!currentUser) return;
+    if (unsubscribeOrders) unsubscribeOrders();
 
-  console.log("Listening for orders for:", currentUser.uid, "Email:", currentUserEmail);
+    console.log("Listening for orders for:", currentUser.uid, "Email:", currentUserEmail);
 
-  // Only listening to DeliveryOrders based on your provided code structure
-  unsubscribeOrders = onSnapshot(collection(db, "DeliveryOrders"), snapshot => {
-    const userOrders = [];
+    const filterableTabs = ["To Receive", "To Rate", "Completed", "Canceled", "Refund"];
+    if (filterSection) {
+        if (filterableTabs.includes(currentTab)) {
+            filterSection.style.display = "flex";
+        } else {
+            filterSection.style.display = "none";
+        }
+    }
+    
+    const dateFilterValue = dateFilterSelect ? dateFilterSelect.value : 'all';
+    const customRangeValue = dateFilterValue === 'custom' ? (customRangeInput ? customRangeInput.value : '') : '';
+    const dateRange = calculateDateRange(dateFilterValue, customRangeValue);
+    const productSearchTerm = productFilterInput ? productFilterInput.value.trim().toLowerCase() : '';
 
-    snapshot.forEach(docSnap => {
-      const order = docSnap.data();
-      const isMatch = order.userId === currentUser.uid;
+    unsubscribeOrders = onSnapshot(collection(db, "DeliveryOrders"), snapshot => {
+        const userOrders = [];
 
-      // Check for orders tied to the user ID
-      if (isMatch) {
-        userOrders.push({ id: docSnap.id, ...order });
-      }
-    });
+        snapshot.forEach(docSnap => {
+            const order = docSnap.data();
+            const isMatch = order.userId === currentUser.uid;
 
-    orderItemsDiv.innerHTML = "";
+            if (isMatch) {
+                userOrders.push({ id: docSnap.id, ...order });
+            }
+        });
 
-    const filteredOrders = userOrders.filter(order => {
-      const status = (order.status || "").toLowerCase();
-      const refundStatus = (order.refundStatus || "").toLowerCase();
-      const tab = (currentTab || "").toLowerCase();
-      const finalRefundStatus = (order.finalRefundStatus || "").toLowerCase();
+        orderItemsDiv.innerHTML = "";
 
+        const filteredOrders = userOrders.filter(order => {
+            const status = (order.status || "").toLowerCase();
+            const tab = (currentTab || "").toLowerCase();
+            const finalRefundStatus = (order.finalRefundStatus || "").toLowerCase();
 
-      if (tab === "waiting for payment") return status === "waiting for payment";
-      if (tab === "to rate") return status === "completed by customer" && !order.feedback;
-      if (tab === "to receive") return status === "completed" && !order.feedback;
-      if (tab === "completed") return ["completed", "completed by customer"].includes(status) || ["succeeded", "manual"].includes(finalRefundStatus);
-      if (tab === "refund") return order.refundRequest || ["succeeded", "manual", "failed", "denied"].includes(finalRefundStatus);
-      
-      return status === tab;
-    });
+            let statusMatch = false;
+            if (tab === "waiting for payment") statusMatch = status === "waiting for payment";
+            else if (tab === "to rate") statusMatch = status === "completed by customer" && !order.feedback;
+            else if (tab === "to receive") statusMatch = status === "completed" && !order.refundRequest; 
+            else if (tab === "completed") statusMatch = status === "completed by customer" && order.feedback; 
+            else if (tab === "refund") statusMatch = order.refundRequest || ["succeeded", "manual", "failed", "denied"].includes(finalRefundStatus);
+            else statusMatch = status === tab;
+            
+            if (!statusMatch) return false;
 
-    if (filteredOrders.length === 0) {
-      orderItemsDiv.innerHTML = "<p>No orders found in this category.</p>";
-      return;
-    }
+            // Filter by Date 
+            if (filterableTabs.includes(currentTab) && dateFilterValue !== 'all') {
+                const orderDate = timestampToDate(order.createdAt);
+                if (!isDateInRange(orderDate, dateRange.start, dateRange.end)) {
+                    return false;
+                }
+            }
+            // 3. Filter by Product Name 
+            if (filterableTabs.includes(currentTab) && productSearchTerm) {
+                const itemMatch = order.items?.some(p => {
+                    const productName = (p.product || p.name || "").toLowerCase();
+                    return productName.includes(productSearchTerm);
+                });
+                if (!itemMatch) return false;
+            }
 
-    filteredOrders.sort((a, b) => (b.createdAt?.seconds || 0) - (a.createdAt?.seconds || 0));
+            return true;
+        });
 
-    filteredOrders.forEach(order => {
-      const orderContainer = document.createElement("div");
-      orderContainer.className = "user-order-card";
+        if (filteredOrders.length === 0) {
+            orderItemsDiv.innerHTML = "<p>No orders found in this category.</p>";
+            return;
+        }
 
-      const orderHeader = document.createElement("div");
-      orderHeader.className = "order-header";
+        filteredOrders.sort((a, b) => (b.createdAt?.seconds || 0) - (a.createdAt?.seconds || 0));
 
-      const orderTitle = document.createElement("h3");
-      let titleText = `Order #${formatQueueNumber(order.queueNumber || order.queueNumberNumeric || "N/A")} - Status: ${order.status || "Unknown"}`;
-      if (order.estimatedTime) titleText += ` | ETA: ${order.estimatedTime}`;
-      if (currentTab === "Refund" || order.finalRefundStatus) titleText += ` | Refund: ${order.finalRefundStatus || order.refundStatus || "Requested"}`;
-      orderTitle.textContent = titleText;
+        filteredOrders.forEach(order => {
+            const orderContainer = document.createElement("div");
+            orderContainer.className = "user-order-card";
 
-      orderHeader.appendChild(orderTitle);
-      orderContainer.appendChild(orderHeader);
+            const orderHeader = document.createElement("div");
+            orderHeader.className = "order-header";
 
-      const itemsContainer = document.createElement("div");
-      itemsContainer.className = "order-items-container";
+            const orderTitle = document.createElement("h3");
+            let titleText = `Order #${formatQueueNumber(order.queueNumber || order.queueNumberNumeric || "N/A")} - Status: ${order.status || "Unknown"}`;
+            if (order.estimatedTime) titleText += ` | ETA: ${order.estimatedTime}`;
+            if (currentTab === "Refund" || order.finalRefundStatus) titleText += ` | Refund: ${order.finalRefundStatus || order.refundStatus || "Requested"}`;
+            orderTitle.textContent = titleText;
 
-      // Display the actual ordered items
-      order.items?.forEach(p => {
-        if (!p) return;
-        const qty = p.qty || p.quantity || 1;
-        const productName = p.product || p.name || "Unknown Product";
-        const size = p.size || "Medium";
-        const sizePrice = p.sizePrice || 0;
-        const addonsText = (p.addons && p.addons.length > 0)
-          ? p.addons.map(a => `${a.name}: ₱${(a.price || 0).toFixed(2)}`).join(", ")
-          : "No add-ons";
-        const addonsPrice = p.addonsPrice || 0;
-        const totalPrice = (p.total || ((p.basePrice || 0) + (sizePrice || 0) + (addonsPrice || 0)) * qty) || 0;
+            orderHeader.appendChild(orderTitle);
+            orderContainer.appendChild(orderHeader);
 
-        const div = document.createElement("div");
-        div.classList.add("order-item-card");
-        div.innerHTML = `
-          ${p.image ? `<img src="${p.image}" alt="${productName}" style="width:60px;height:60px;object-fit:cover;margin-right:10px;border-radius:6px;">` : ""}
-          <h4>${productName} (${size}) x${qty} - ₱${totalPrice.toFixed(2)}</h4>
-          <p>Add-ons: ${addonsText} (₱${addonsPrice.toFixed(2)})</p>
-        `;
-        itemsContainer.appendChild(div);
-      });
-      
-      // Display Delivery Fee
-      const deliveryFee = Number(order.deliveryFee || 0);
-      if (deliveryFee > 0) {
-          const feeDiv = document.createElement("div");
-          feeDiv.classList.add("order-fee");
-          feeDiv.innerHTML = `<p style="text-align:right; font-weight:bold;">Delivery Fee: ₱${deliveryFee.toFixed(2)}</p>`;
-          itemsContainer.appendChild(feeDiv);
-      }
+            const itemsContainer = document.createElement("div");
+            itemsContainer.className = "order-items-container";
 
-      // Calculate and display Grand Total
-      const orderTotal = Number(order.total || 0); 
-      const calculatedTotal = order.items?.reduce((sum, p) => sum + (p.total || 0), 0) + deliveryFee;
-      const finalTotal = orderTotal > 0 ? orderTotal : calculatedTotal; 
-      
-      const totalDiv = document.createElement("div");
-      totalDiv.classList.add("order-total");
-      totalDiv.innerHTML = `<h3>Grand Total: ₱${finalTotal.toFixed(2)}</h3>`;
-      itemsContainer.appendChild(totalDiv);
+            order.items?.forEach(p => {
+                if (!p) return;
+                const qty = p.qty || p.quantity || 1;
+                const productName = p.product || p.name || "Unknown Product";
+                const size = p.size || "Medium";
+                const sizePrice = p.sizePrice || 0;
+                const addonsText = (p.addons && p.addons.length > 0)
+                    ? p.addons.map(a => `${a.name}: ₱${(a.price || 0).toFixed(2)}`).join(", ")
+                    : "No add-ons";
+                const addonsPrice = p.addonsPrice || 0;
+                const totalPrice = (p.total || ((p.basePrice || 0) + (sizePrice || 0) + (addonsPrice || 0)) * qty) || 0;
 
-      const paymentMethod = (order.paymentMethod || "").toLowerCase();
-      
-      const isFinalState = ["Completed", "Completed by Customer", "Canceled", "Refunded", "Refund Denied", "Refund Failed"].includes(order.status);
+                const div = document.createElement("div");
+                div.classList.add("order-item-card");
+                div.innerHTML = `
+                    ${p.image ? `<img src="${p.image}" alt="${productName}" style="width:60px;height:60px;object-fit:cover;margin-right:10px;border-radius:6px;">` : ""}
+                    <div>
+                        <h4>${productName} (${size}) x${qty} - ₱${totalPrice.toFixed(2)}</h4>
+                        <p>Add-ons: ${addonsText} (₱${addonsPrice.toFixed(2)})</p>
+                    </div>
+                `;
+                itemsContainer.appendChild(div);
+            });
 
+            // Display Delivery Fee
+            const deliveryFee = Number(order.deliveryFee || 0);
+            if (deliveryFee > 0) {
+                const feeDiv = document.createElement("div");
+                feeDiv.classList.add("order-fee");
+                feeDiv.innerHTML = `<p style="text-align:right; font-weight:bold;">Delivery Fee: ₱${deliveryFee.toFixed(2)}</p>`;
+                itemsContainer.appendChild(feeDiv);
+            }
 
-      if (currentTab === "Waiting for Payment") {
-          if (order.checkoutUrl) {
-              const paymentBtn = document.createElement("button");
-              paymentBtn.textContent = "Complete Payment (Gcash)";
-              paymentBtn.className = "action-btn paymongo-btn";
-              paymentBtn.style.backgroundColor = "#28a745";
-              
-              paymentBtn.addEventListener("click", () => {
-                console.log(`Redirecting to PayMongo Checkout: ${order.checkoutUrl}`);
-                window.location.href = order.checkoutUrl; 
-              });
-              itemsContainer.appendChild(paymentBtn);
-          } else {
-              const statusDiv = document.createElement("div");
-              statusDiv.innerHTML = "<p style='color:#dc3545; font-weight:bold;'>Error: No payment URL found. Contact support.</p>";
-              itemsContainer.appendChild(statusDiv);
-          }
+            // Calculate and display Grand Total
+            const orderTotal = Number(order.total || 0); 
+            const calculatedTotal = (order.items?.reduce((sum, p) => sum + (p.total || 0), 0) || 0) + deliveryFee;
+            const finalTotal = orderTotal > 0 ? orderTotal : calculatedTotal; 
 
-          const cancelBtn = document.createElement("button");
-          cancelBtn.textContent = "Cancel Order";
-          cancelBtn.className = "action-btn cancel-refund-btn";
-          cancelBtn.addEventListener("click", () => handleCancelOrder(order.id, order.items));
-          itemsContainer.appendChild(cancelBtn);
-      }
-      
-      if (currentTab === "Pending") {
+            const totalDiv = document.createElement("div");
+            totalDiv.classList.add("order-total");
+            totalDiv.innerHTML = `<h3>Grand Total: ₱${finalTotal.toFixed(2)}</h3>`;
+            itemsContainer.appendChild(totalDiv);
 
-        if (paymentMethod.includes("e-payment") || paymentMethod === "g" || paymentMethod === "gcash") {
-          const btn = document.createElement("button");
-          btn.textContent = order.refundRequest ? `Refund: ${order.refundStatus || "Requested"}` : "Request Refund";
-          btn.disabled = !!order.refundRequest;
-          btn.className = "action-btn";
-          btn.style.backgroundColor = order.refundRequest ? "#ccc" : "";
-          btn.style.cursor = order.refundRequest ? "not-allowed" : "pointer";
-          btn.addEventListener("click", () => openRefundModal(order.id, order.items));
-          itemsContainer.appendChild(btn);
-        } else if (paymentMethod === "cash" || paymentMethod === "c") {
-          const btn = document.createElement("button");
-          btn.textContent = "Cancel";
-          btn.className = "action-btn cancel-refund-btn";
-          btn.addEventListener("click", () => handleCancelOrder(order.id, order.items));
-          itemsContainer.appendChild(btn);
-        }
-      }
+            const paymentMethod = (order.paymentMethod || "").toLowerCase();
 
-      if (currentTab === "To Receive") {
-        if (paymentMethod.includes("e-payment") || paymentMethod === "g" || paymentMethod === "gcash") {
-          const refundBtn = document.createElement("button");
-          refundBtn.textContent = order.refundRequest ? `Refund: ${order.refundStatus || "Requested"}` : "Request Refund";
-          refundBtn.disabled = !!order.refundRequest;
-          refundBtn.className = "action-btn cancel-refund-btn"; 
-          refundBtn.style.backgroundColor = order.refundRequest ? "#ccc" : "";
-          refundBtn.style.cursor = order.refundRequest ? "not-allowed" : "pointer";
-          refundBtn.addEventListener("click", () => openRefundModal(order.id, order.items));
-          itemsContainer.appendChild(refundBtn);
-        }
-
-        if (order.status === "Completed" && !order.feedback) {
-          const receivedBtn = document.createElement("button");
-          receivedBtn.textContent = "Received Order";
-          receivedBtn.className = "action-btn";
-          receivedBtn.addEventListener("click", () => showConfirmModal(order.id));
-          itemsContainer.appendChild(receivedBtn);
-        }
-      }
-
-      if (currentTab === "Refund") {
-        const refundBtn = document.createElement("button");
-        refundBtn.textContent = order.finalRefundStatus || order.refundStatus || "Requested";
-        refundBtn.disabled = true;
-        refundBtn.className = "action-btn";
-        refundBtn.style.cursor = "not-allowed";
-
-        if (order.finalRefundStatus === "Pending" || order.refundStatus === "Requested") refundBtn.style.backgroundColor = "orange";
-        else if (order.finalRefundStatus === "Succeeded" || order.finalRefundStatus === "Manual") refundBtn.style.backgroundColor = "green";
-        else if (order.finalRefundStatus === "Denied" || order.finalRefundStatus === "Failed" || order.finalRefundStatus === "API Failed") refundBtn.style.backgroundColor = "red";
-        else refundBtn.style.backgroundColor = "#ccc"; 
-
-        itemsContainer.appendChild(refundBtn);
-      }
-
-      if (order.status === "Completed by Customer" && !order.feedback && currentTab === "To Rate") {
-        const btn = document.createElement("button");
-        btn.textContent = "To Rate";
-        btn.className = "action-btn";
-        btn.addEventListener("click", () => openFeedbackModal(order.id, order.items));
-        itemsContainer.appendChild(btn);
-      }
-      
-      // Add Print Receipt button to completed/final states
-      if (isFinalState) {
-          const printButton = document.createElement("button");
-          printButton.textContent = "View/Download Receipt";
-          printButton.className = "print-receipt-btn";
-          printButton.dataset.id = order.id;
-          printButton.dataset.collection = "DeliveryOrders"; // Hardcoded for this file's context
-          printButton.addEventListener("click", () => showReceiptPopup(order.id, "DeliveryOrders"));
-          itemsContainer.appendChild(printButton);
-      }
+            const isFinalState = ["Completed", "Completed by Customer", "Canceled", "Refunded", "Refund Denied", "Refund Failed"].includes(order.status);
 
 
-      orderContainer.appendChild(itemsContainer);
-      orderItemsDiv.appendChild(orderContainer);
-    });
-  });
+            if (currentTab === "Waiting for Payment") {
+                if (order.checkoutUrl) {
+                    const paymentBtn = document.createElement("button");
+                    paymentBtn.textContent = "Complete Payment (Gcash)";
+                    paymentBtn.className = "action-btn paymongo-btn";
+                    paymentBtn.style.backgroundColor = "#28a745";
+
+                    paymentBtn.addEventListener("click", () => {
+                        console.log(`Redirecting to PayMongo Checkout: ${order.checkoutUrl}`);
+                        window.location.href = order.checkoutUrl; 
+                    });
+                    itemsContainer.appendChild(paymentBtn);
+                } else {
+                    const statusDiv = document.createElement("div");
+                    statusDiv.innerHTML = "<p style='color:#dc3545; font-weight:bold;'>Error: No payment URL found. Contact support.</p>";
+                    itemsContainer.appendChild(statusDiv);
+                }
+
+                const cancelBtn = document.createElement("button");
+                cancelBtn.textContent = "Cancel Order";
+                cancelBtn.className = "action-btn cancel-refund-btn";
+                cancelBtn.addEventListener("click", () => handleCancelOrder(order.id, order.items));
+                itemsContainer.appendChild(cancelBtn);
+            }
+
+            if (currentTab === "Pending") {
+                // If payment is e-payment allow refund request
+                if (paymentMethod.includes("e-payment") || paymentMethod === "g" || paymentMethod === "gcash") {
+                    const btn = document.createElement("button");
+                    btn.textContent = order.refundRequest ? `Refund: ${order.refundStatus || "Requested"}` : "Request Refund";
+                    btn.disabled = !!order.refundRequest;
+                    btn.className = "action-btn cancel-refund-btn";
+                    btn.style.backgroundColor = order.refundRequest ? "#ccc" : "#dc3545"; // Red for refund, unless requested
+                    btn.style.cursor = order.refundRequest ? "not-allowed" : "pointer";
+                    if (!order.refundRequest) {
+                        btn.addEventListener("click", () => openRefundModal(order.id, order.items));
+                    }
+                    itemsContainer.appendChild(btn);
+                } else if (paymentMethod === "cash" || paymentMethod === "c") {
+                    const btn = document.createElement("button");
+                    btn.textContent = "Cancel";
+                    btn.className = "action-btn cancel-refund-btn";
+                    btn.addEventListener("click", () => handleCancelOrder(order.id, order.items));
+                    itemsContainer.appendChild(btn);
+                }
+            }
+
+            if (currentTab === "To Receive") {
+                // Refund request logic for "To Receive"
+                if (paymentMethod.includes("e-payment") || paymentMethod === "g" || paymentMethod === "gcash") {
+                    const refundBtn = document.createElement("button");
+                    refundBtn.textContent = order.refundRequest ? `Refund: ${order.refundStatus || "Requested"}` : "Request Refund";
+                    refundBtn.disabled = !!order.refundRequest;
+                    refundBtn.className = "action-btn cancel-refund-btn";
+                    refundBtn.style.backgroundColor = order.refundRequest ? "#ccc" : "#dc3545";
+                    refundBtn.style.cursor = order.refundRequest ? "not-allowed" : "pointer";
+                    if (!order.refundRequest) {
+                        refundBtn.addEventListener("click", () => openRefundModal(order.id, order.items));
+                    }
+                    itemsContainer.appendChild(refundBtn);
+                }
+
+                const receivedBtn = document.createElement("button");
+                receivedBtn.textContent = "Received Order";
+                receivedBtn.className = "action-btn";
+                receivedBtn.addEventListener("click", () => showConfirmModal(order.id));
+                itemsContainer.appendChild(receivedBtn);
+            }
+
+            if (currentTab === "To Rate") {
+                if (order.status === "Completed by Customer" && !order.feedback) {
+                    const btn = document.createElement("button");
+                    btn.textContent = "Leave Feedback";
+                    btn.className = "action-btn";
+                    btn.addEventListener("click", () => openFeedbackModal(order.id, order.items));
+                    itemsContainer.appendChild(btn);
+                }
+            }
+
+            if (currentTab === "Refund") {
+                const refundBtn = document.createElement("button");
+                refundBtn.textContent = order.finalRefundStatus || order.refundStatus || "Requested";
+                refundBtn.disabled = true;
+                refundBtn.className = "action-btn";
+                refundBtn.style.cursor = "not-allowed";
+
+                if (order.finalRefundStatus === "Pending" || order.refundStatus === "Requested") refundBtn.style.backgroundColor = "orange";
+                else if (order.finalRefundStatus === "Succeeded" || order.finalRefundStatus === "Manual") refundBtn.style.backgroundColor = "green";
+                else if (order.finalRefundStatus === "Denied" || order.finalRefundStatus === "Failed" || order.finalRefundStatus === "API Failed") refundBtn.style.backgroundColor = "red";
+                else refundBtn.style.backgroundColor = "#ccc";
+
+                itemsContainer.appendChild(refundBtn);
+            }
+            
+            // Print Receipt button to completed
+            if (isFinalState || order.status === "Completed by Customer" || (order.status === "Completed" && order.feedback) ) {
+                const printButton = document.createElement("button");
+                printButton.textContent = "View/Download Receipt";
+                printButton.className = "print-receipt-btn";
+                printButton.dataset.id = order.id;
+                printButton.dataset.collection = "DeliveryOrders";
+                printButton.addEventListener("click", () => showReceiptPopup(order.id, "DeliveryOrders"));
+                itemsContainer.appendChild(printButton);
+            }
+
+
+            orderContainer.appendChild(itemsContainer);
+            orderItemsDiv.appendChild(orderContainer);
+        });
+    });
 }
 
-// --- RECEIPT FUNCTIONS (COPIED/MODIFIED FROM ADMIN FILE) ---
+// RECEIPT FUNCTIONS
 
 function generateReceiptHTML(order) {
-    const date = order.timestamp ? new Date(order.timestamp).toLocaleString() : new Date().toLocaleString();
-    
-    // Check both product fields (though your customer code uses 'items')
-    const orderItems = order.products || order.items || []; 
-    
-    // Calculate the product-only subtotal for clarity
-    const productSubtotal = orderItems.reduce((sum, p) => 
+    const date = order.createdAt ? timestampToDate(order.createdAt).toLocaleString() : (order.timestamp ? new Date(order.timestamp).toLocaleString() : new Date().toLocaleString());
+    const orderItems = order.products || order.items || [];
+    const productSubtotal = orderItems.reduce((sum, p) =>
         sum + (p.total || ((p.sizePrice || 0) + (p.addonsPrice || 0)) * (p.qty || p.quantity || 1))
     , 0);
-
-    // Get Grand Total from the top-level 'total' field
-    const grandTotal = order.total || 0; 
+    const grandTotal = order.total || 0;
     const deliveryFee = order.deliveryFee || 0;
 
     let itemsHtml = orderItems.map(p => {
         const addons = p.addons?.length ? ` (+${p.addons.map(a => a.name).join(", ")})` : "";
         const sizeText = p.size ? (typeof p.size === "string" ? ` (${p.size})` : ` (${p.size.name})`) : "";
         const qty = p.qty || p.quantity || 1;
-        // The individual item total calculation
-        const total = p.total || ((p.sizePrice || 0) + (p.addonsPrice || 0)) * qty; 
-        
+        const total = p.total || ((p.sizePrice || 0) + (p.addonsPrice || 0)) * qty;
+
         return `
             <div style="display: flex; justify-content: space-between; font-size: 14px; margin-bottom: 2px;">
                 <span style="flex-grow: 1;">${qty} x ${p.product || p.name}${sizeText}${addons}</span>
@@ -421,7 +580,7 @@ function generateReceiptHTML(order) {
         `;
     }).join('');
 
-    // Add Delivery Fee section only if applicable
+    // Delivery Fee
     if (deliveryFee > 0) {
         itemsHtml += `
             <div style="font-weight: bold; font-size: 15px; margin-top: 10px; border-top: 1px dashed #aaa; padding-top: 5px;">
@@ -438,7 +597,7 @@ function generateReceiptHTML(order) {
         <div style="width: 300px; padding: 20px; font-family: monospace; border: 1px solid #000; margin: 0 auto;">
             <h2 style="text-align: center; margin-bottom: 5px; font-size: 18px;">--- OFFICIAL RECEIPT ---</h2>
             <p style="text-align: center; font-size: 12px; margin-bottom: 15px;">Cafe Amore x17</p>
-            
+
             <div style="font-size: 13px; border-bottom: 1px dashed #aaa; padding-bottom: 10px; margin-bottom: 10px;">
                 <p>Order ID: ${order.id}</p>
                 <p>Queue #: ${formatQueueNumber(order.queueNumber || order.queueNumberNumeric)}</p>
@@ -461,7 +620,7 @@ function generateReceiptHTML(order) {
                 <span>GRAND TOTAL:</span>
                 <span>₱${grandTotal.toFixed(2)}</span>
             </div>
-            
+
             <div style="text-align: center; font-size: 12px; margin-top: 20px;">
                 <p>Thank you for your order!</p>
                 <p>Please come again.</p>
@@ -470,7 +629,7 @@ function generateReceiptHTML(order) {
     `;
 }
 
-// Helper to handle the actual PDF generation logic
+// PDF generation
 async function generateAndDownloadPDF(orderId, collectionName, orderData) {
     if (typeof html2pdf === 'undefined') {
         customAlert("PDF Library Missing: Please include 'html2pdf.bundle.min.js' in your HTML file to enable PDF printing.");
@@ -480,7 +639,7 @@ async function generateAndDownloadPDF(orderId, collectionName, orderData) {
     const content = generateReceiptHTML({ id: orderId, type: "Delivery", ...orderData });
     const element = document.createElement('div');
     element.innerHTML = content;
-    
+
     const options = {
         margin: 10,
         filename: `receipt_Order_${formatQueueNumber(orderData.queueNumber || orderData.queueNumberNumeric)}.pdf`,
@@ -491,7 +650,7 @@ async function generateAndDownloadPDF(orderId, collectionName, orderData) {
 
     customAlert("Generating PDF receipt... Please wait.");
     await html2pdf().set(options).from(element).save();
-    
+
     setTimeout(() => closePopup(), 1500);
 }
 
@@ -510,7 +669,7 @@ async function showReceiptPopup(orderId, collectionName) {
 
         if (!popup) createPopup();
         popupTitle.textContent = `Receipt for Queue #${formatQueueNumber(orderData.queueNumber || orderData.queueNumberNumeric)}`;
-        
+
         popupReceiptContent.innerHTML = receiptHtml;
 
         popupButtonsContainer.innerHTML = `
@@ -520,7 +679,7 @@ async function showReceiptPopup(orderId, collectionName) {
         popup.style.display = "flex";
 
         document.getElementById("downloadReceiptBtn").onclick = () => {
-            generateAndDownloadPDF(orderId, collectionName, orderData); 
+            generateAndDownloadPDF(orderId, collectionName, orderData);
         };
 
         document.getElementById("closeReceiptBtn").onclick = closePopup;
@@ -531,248 +690,296 @@ async function showReceiptPopup(orderId, collectionName) {
     }
 }
 
-// --- END RECEIPT FUNCTIONS ---
 
 async function returnItemsToInventory(orderItems) {
-  if (!orderItems || orderItems.length === 0) return;
-  const inventoryUpdates = {};
+    if (!orderItems || orderItems.length === 0) return;
+    const inventoryUpdates = {};
 
-  for (const item of orderItems) {
-    if (!item) continue;
-    const productQtyOrdered = item.qty || item.quantity || 1;
-    if (productQtyOrdered <= 0) continue;
+    for (const item of orderItems) {
+        if (!item) continue;
+        const productQtyOrdered = item.qty || item.quantity || 1;
+        if (productQtyOrdered <= 0) continue;
 
-    const aggregateItem = (id, consumptionPerProduct) => {
-      if (!id) return;
-      const totalConsumption = (consumptionPerProduct || 1) * productQtyOrdered;
-      inventoryUpdates[id] = (inventoryUpdates[id] || 0) + totalConsumption;
-    };
+        const aggregateItem = (id, consumptionPerProduct) => {
+            if (!id) return;
+            const totalConsumption = (consumptionPerProduct || 1) * productQtyOrdered;
+            inventoryUpdates[id] = (inventoryUpdates[id] || 0) + totalConsumption;
+        };
 
-    aggregateItem(item.sizeId, item.sizeQty || 1);
-    item.ingredients?.forEach(ing => aggregateItem(ing.id, ing.qty || 1));
-    item.addons?.forEach(addon => aggregateItem(addon.id, addon.qty || 1));
-    item.others?.forEach(other => aggregateItem(other.id, other.qty || 1));
-  }
+        aggregateItem(item.sizeId, item.sizeQty || 1);
+        item.ingredients?.forEach(ing => aggregateItem(ing.id, ing.qty || 1));
+        item.addons?.forEach(addon => aggregateItem(addon.id, addon.qty || 1));
+        item.others?.forEach(other => aggregateItem(other.id, other.qty || 1));
+    }
 
-  const batch = writeBatch(db);
-  const inventoryCollection = collection(db, "Inventory");
+    const batch = writeBatch(db);
+    const inventoryCollection = collection(db, "Inventory");
 
-  for (const [inventoryId, qtyToReturn] of Object.entries(inventoryUpdates)) {
-    const inventoryRef = doc(inventoryCollection, inventoryId);
-    try {
-      const inventorySnap = await getDoc(inventoryRef);
-      if (inventorySnap.exists()) {
-        const currentQuantity = inventorySnap.data().quantity || 0;
-        batch.update(inventoryRef, { quantity: currentQuantity + qtyToReturn });
-        console.log(`Returned ${qtyToReturn} units to Inventory ID: ${inventoryId}`);
-      } else {
-        console.warn(`Inventory item ${inventoryId} not found. Skipping stock return.`);
-      }
-    } catch (error) {
-      console.error(`Error fetching inventory item ${inventoryId}:`, error);
-    }
-  }
+    for (const [inventoryId, qtyToReturn] of Object.entries(inventoryUpdates)) {
+        const inventoryRef = doc(inventoryCollection, inventoryId);
+        try {
+            const inventorySnap = await getDoc(inventoryRef);
+            if (inventorySnap.exists()) {
+                const currentQuantity = inventorySnap.data().quantity || 0;
+                batch.update(inventoryRef, { quantity: currentQuantity + qtyToReturn });
+                console.log(`Returned ${qtyToReturn} units to Inventory ID: ${inventoryId}`);
+            } else {
+                console.warn(`Inventory item ${inventoryId} not found. Skipping stock return.`);
+            }
+        } catch (error) {
+            console.error(`Error fetching inventory item ${inventoryId}:`, error);
+        }
+    }
 
-  await batch.commit();
-  console.log("✅ All items returned to inventory successfully.");
+    await batch.commit();
+    console.log("✅ All items returned to inventory successfully.");
 }
 
 async function handleCancelOrder(orderId, orderItems) {
-  if (!confirm("Are you sure you want to cancel this order? Stock will be returned.")) return;
+    if (!confirm("Are you sure you want to cancel this order? Stock will be returned.")) return;
 
-  try {
-    await returnItemsToInventory(orderItems);
-    await updateDoc(doc(db, "DeliveryOrders", orderId), { status: "Canceled" });
-    
-    alert("✅ Order canceled successfully and stock returned.");
-    listenOrders();
-  } catch (err) {
-    console.error("Error canceling order:", err);
-    alert("❌ Failed to cancel order. Please try again.");
-  }
+    try {
+        await returnItemsToInventory(orderItems);
+        await updateDoc(doc(db, "DeliveryOrders", orderId), { status: "Canceled" });
+
+        alert("✅ Order canceled successfully and stock returned.");
+        listenOrders();
+    } catch (err) {
+        console.error("Error canceling order:", err);
+        alert("❌ Failed to cancel order. Please try again.");
+    }
 }
 
 function showConfirmModal(orderId) {
-  const confirmModal = document.createElement("div");
-  confirmModal.className = "modal";
-  confirmModal.style.display = "flex";
+    const existingModal = document.querySelector(".modal");
+    if(existingModal) existingModal.remove(); 
 
-  const modalContent = document.createElement("div");
-  modalContent.className = "modal-content";
-  modalContent.innerHTML = `
-    <h2>Confirm Order Received</h2>
-    <p>If you accept this, there is no refund.</p>
-    <div style="margin-top:20px; display:flex; justify-content:center; gap:15px;">
-      <button id="confirm-yes" class="action-btn">Yes</button>
-      <button id="confirm-no" class="action-btn" style="background:#ccc;color:#333;">No</button>
-    </div>
-  `;
-  confirmModal.appendChild(modalContent);
-  document.body.appendChild(confirmModal);
+    const confirmModal = document.createElement("div");
+    confirmModal.className = "modal";
+    confirmModal.style.display = "flex";
 
-  const closeModal = () => confirmModal.remove();
+    const modalContent = document.createElement("div");
+    modalContent.className = "modal-content";
+    modalContent.innerHTML = `
+        <h2>Confirm Order Received</h2>
+        <p>This action is irreversible and marks the order as complete. You will then be able to leave feedback.</p>
+        <div style="margin-top:20px; display:flex; justify-content:center; gap:15px;">
+            <button id="confirm-yes" class="action-btn">Yes, I Received It</button>
+            <button id="confirm-no" class="action-btn" style="background:#ccc;color:#333;">Not Yet</button>
+        </div>
+    `;
+    confirmModal.appendChild(modalContent);
+    document.body.appendChild(confirmModal);
 
-  modalContent.querySelector("#confirm-yes").onclick = async () => {
-    await updateDoc(doc(db, "DeliveryOrders", orderId), { status: "Completed by Customer" });
-    closeModal();
-    currentTab = "To Rate";
-    tabs.forEach(t => t.classList.remove("active"));
-    document.querySelector(`.tab-btn[data-status="To Rate"]`).classList.add("active");
-    listenOrders();
-  };
+    const closeModal = () => confirmModal.remove();
 
-  modalContent.querySelector("#confirm-no").onclick = closeModal;
-  confirmModal.addEventListener("click", e => { if (e.target === confirmModal) closeModal(); });
+    modalContent.querySelector("#confirm-yes").onclick = async () => {
+        try {
+            await updateDoc(doc(db, "DeliveryOrders", orderId), { status: "Completed by Customer" });
+            closeModal();
+            currentTab = "To Rate";
+            tabs.forEach(t => t.classList.remove("active"));
+            document.querySelector(`.tab-btn[data-status="To Rate"]`).classList.add("active");
+            listenOrders();
+        } catch (error) {
+            console.error("Error confirming order:", error);
+            alert("Failed to confirm order receipt. Please try again.");
+        }
+    };
+
+    modalContent.querySelector("#confirm-no").onclick = closeModal;
+    confirmModal.addEventListener("click", e => { if (e.target === confirmModal) closeModal(); });
 }
 
 function openRefundModal(orderId, orderItems) {
-  const modal = document.getElementById("refund-modal");
-  const refundForm = modal.querySelector("#refund-form");
-  const refundItemsDiv = modal.querySelector("#refund-items");
+    const modal = document.getElementById("refund-modal"); // Assumes a pre-existing modal in your HTML
+    if (!modal) {
+        alert("Refund modal structure (id='refund-modal') not found in HTML. Check your HTML file.");
+        return;
+    }
+    const refundForm = modal.querySelector("#refund-form");
+    const refundItemsDiv = modal.querySelector("#refund-items");
 
-  refundItemsDiv.innerHTML = "";
-  let totalRefundable = 0;
+    refundItemsDiv.innerHTML = "";
+    let totalRefundable = 0;
 
-  orderItems.forEach((item, index) => {
-    if (!item) return;
-    const productName = item.product || item.name || "Unknown Product";
-    const qty = item.qty || item.quantity || 1;
-    const size = item.size || "Medium";
-    // Use the 'total' field if available, otherwise calculate it
-    const totalPrice = item.total || (((item.sizePrice || 0) + (item.addonsPrice || 0)) * qty); 
-    totalRefundable += totalPrice;
+    orderItems.forEach((item, index) => {
+        if (!item) return;
+        const productName = item.product || item.name || "Unknown Product";
+        const qty = item.qty || item.quantity || 1;
+        const size = item.size || "Medium";
+        const totalPrice = item.total || (((item.sizePrice || 0) + (item.addonsPrice || 0)) * qty); 
+        totalRefundable += totalPrice;
 
-    const div = document.createElement("div");
-    div.className = "refund-item";
-    div.innerHTML = `
-      <label>
-        <input type="checkbox" name="refund" value="${index}">
-        ${productName} (${size}) x${qty} - ₱${totalPrice.toFixed(2)}
-      </label>
-    `;
-    refundItemsDiv.appendChild(div);
-  });
-  
-  modal.querySelector("#total-refundable").textContent = `Total Refundable: ₱${totalRefundable.toFixed(2)}`;
+        const div = document.createElement("div");
+        div.className = "refund-item";
+        div.innerHTML = `
+            <label>
+                <input type="checkbox" name="refund" value="${index}">
+                ${productName} (${size}) x${qty} - ₱${totalPrice.toFixed(2)}
+            </label>
+        `;
+        refundItemsDiv.appendChild(div);
+    });
 
-  modal.style.display = "flex";
+    modal.querySelector("#total-refundable").textContent = `Total Refundable: ₱${totalRefundable.toFixed(2)}`;
 
-  modal.querySelector(".close-btn").onclick = () => modal.style.display = "none";
-  modal.onclick = e => { if (e.target === modal) modal.style.display = "none"; }
+    modal.style.display = "flex";
 
-  refundForm.onsubmit = async (e) => {
-    e.preventDefault();
-    const selectedIndexes = Array.from(refundForm.querySelectorAll('input[name="refund"]:checked')).map(input => parseInt(input.value));
-    if (selectedIndexes.length === 0) {
-      alert("Please select at least one product to refund.");
-      return;
-    }
-    const selectedItems = selectedIndexes.map(i => orderItems[i]);
-    try {
-      await updateDoc(doc(db, "DeliveryOrders", orderId), {
-        refundRequest: true,
-        refundStatus: "Requested",
-        refundItems: selectedItems
-      });
-      alert("Refund request submitted. Waiting for admin approval.");
-      modal.style.display = "none";
-      listenOrders();
-    } catch (err) {
-      console.error("Error submitting refund:", err);
-      alert("Failed to submit refund. Please try again.");
-    }
-  };
+    modal.querySelector(".close-btn").onclick = () => modal.style.display = "none";
+    modal.onclick = e => { if (e.target === modal) modal.style.display = "none"; }
+
+    refundForm.onsubmit = async (e) => {
+        e.preventDefault();
+        const selectedIndexes = Array.from(refundForm.querySelectorAll('input[name="refund"]:checked')).map(input => parseInt(input.value));
+        if (selectedIndexes.length === 0) {
+            alert("Please select at least one product to refund.");
+            return;
+        }
+        const selectedItems = selectedIndexes.map(i => orderItems[i]);
+
+        const refundAmount = selectedItems.reduce((sum, item) => 
+            sum + (item.total || (((item.sizePrice || 0) + (item.addonsPrice || 0)) * (item.qty || item.quantity || 1)))
+        , 0);
+
+        try {
+            await updateDoc(doc(db, "DeliveryOrders", orderId), {
+                refundRequest: true,
+                refundStatus: "Requested",
+                refundAmount: refundAmount,
+                refundItems: selectedItems
+            });
+            alert("Refund request submitted. Waiting for admin approval.");
+            modal.style.display = "none";
+            listenOrders();
+        } catch (err) {
+            console.error("Error submitting refund:", err);
+            alert("Failed to submit refund. Please try again.");
+        }
+    };
 }
 
 function openFeedbackModal(orderId, items) {
-  const modal = document.createElement("div");
-  modal.className = "modal";
-  modal.style.display = "flex";
+    const existingModal = document.querySelector("#feedback-dynamic-modal");
+    if(existingModal) existingModal.remove();
 
-  const modalContent = document.createElement("div");
-  modalContent.className = "modal-content";
+    const modal = document.createElement("div");
+    modal.className = "modal";
+    modal.id = "feedback-dynamic-modal";
+    modal.style.display = "flex";
 
-  const closeBtn = document.createElement("span");
-  closeBtn.className = "close-btn";
-  closeBtn.innerHTML = "&times;";
-  closeBtn.onclick = () => modal.remove();
+    const modalContent = document.createElement("div");
+    modalContent.className = "modal-content";
+    
+    const closeBtn = document.createElement("span");
+    closeBtn.className = "close-btn";
+    closeBtn.innerHTML = "&times;";
+    closeBtn.onclick = () => modal.remove();
 
-  const form = document.createElement("form");
-  form.id = "feedback-form";
+    const form = document.createElement("form");
+    form.id = "feedback-form";
 
-  items.forEach((item) => {
-    if (!item) return;
-    const productName = item.product || item.name || "Unknown Product";
+    const feedbackItemsDiv = document.createElement("div");
+    feedbackItemsDiv.id = "feedback-items-container";
+    
+    form.onsubmit = null; 
 
-    const itemDiv = document.createElement("div");
-    itemDiv.className = "feedback-item";
+    items.forEach((item) => {
+        if (!item) return;
+        const productName = item.product || item.name || "Unknown Product";
 
-    const stars = Array.from({ length: 5 }, (_, i) => `<span class="star" data-value="${i + 1}">&#9734;</span>`).join('');
+        const itemDiv = document.createElement("div");
+        itemDiv.className = "feedback-item";
 
-    itemDiv.innerHTML = `
-      <h4>${productName}</h4>
-      <div class="star-rating">${stars}</div>
-      <textarea placeholder="Write your feedback..." required></textarea>
-    `;
-    form.appendChild(itemDiv);
-  });
+        const stars = Array.from({ length: 5 }, (_, i) => `<span class="star" data-value="${i + 1}" data-selected="0">&#9734;</span>`).join('');
 
-  const submitBtn = document.createElement("button");
-  submitBtn.type = "submit";
-  submitBtn.className = "action-btn";
-  submitBtn.textContent = "Submit Feedback";
-  form.appendChild(submitBtn);
+        itemDiv.innerHTML = `
+            <h4>${productName}</h4>
+            <div class="star-rating">${stars}</div>
+            <textarea placeholder="Write your feedback..." required></textarea>
+        `;
+        feedbackItemsDiv.appendChild(itemDiv);
+    });
 
-  modalContent.appendChild(closeBtn);
-  modalContent.appendChild(form);
-  modal.appendChild(modalContent);
-  document.body.appendChild(modal);
+    const submitBtn = document.createElement("button");
+    submitBtn.type = "submit";
+    submitBtn.className = "action-btn";
+    submitBtn.textContent = "Submit Feedback";
 
-  form.querySelectorAll(".star-rating").forEach(starContainer => {
-    const stars = starContainer.querySelectorAll(".star");
-    stars.forEach(star => {
-      star.addEventListener("mouseover", () => {
-        stars.forEach(s => s.innerHTML = "☆");
-        for (let i = 0; i < star.dataset.value; i++) stars[i].innerHTML = "★";
-      });
-      star.addEventListener("click", () => {
-        stars.forEach(s => s.dataset.selected = 0);
-        for (let i = 0; i < star.dataset.value; i++) stars[i].dataset.selected = 1;
-      });
-      starContainer.addEventListener("mouseout", () => {
-        stars.forEach(s => s.innerHTML = s.dataset.selected == 1 ? "★" : "☆");
-      });
-    });
-  });
+    form.appendChild(feedbackItemsDiv);
+    form.appendChild(submitBtn);
 
-  form.onsubmit = async (e) => {
-    e.preventDefault();
-    const feedbacks = [];
-    const ratings = [];
+    modalContent.appendChild(closeBtn);
+    modalContent.appendChild(form);
+    modal.appendChild(modalContent);
+    document.body.appendChild(modal);
 
-    form.querySelectorAll(".feedback-item").forEach((itemDiv) => {
-      const text = itemDiv.querySelector("textarea").value;
-      feedbacks.push(text);
 
-      const stars = itemDiv.querySelectorAll(".star");
-      let starValue = 0;
-      stars.forEach((s, i) => {
-        if (s.dataset.selected == 1) starValue = i + 1;
-      });
-      ratings.push(starValue);
-    });
+    feedbackItemsDiv.querySelectorAll(".star-rating").forEach(starContainer => {
+        const stars = starContainer.querySelectorAll(".star");
+        stars.forEach(star => {
+            star.addEventListener("mouseover", () => {
+                stars.forEach(s => s.innerHTML = "☆");
+                for (let i = 0; i < star.dataset.value; i++) stars[i].innerHTML = "★";
+            });
+            star.addEventListener("click", () => {
+                stars.forEach(s => {
+                    s.dataset.selected = 0;
+                    s.innerHTML = "☆";
+                });
+                for (let i = 0; i < star.dataset.value; i++) {
+                    stars[i].dataset.selected = 1;
+                    stars[i].innerHTML = "★";
+                }
+            });
+            starContainer.addEventListener("mouseout", () => {
+                stars.forEach(s => s.innerHTML = s.dataset.selected == 1 ? "★" : "☆");
+            });
+        });
+    });
 
-    try {
-      await updateDoc(doc(db, "DeliveryOrders", orderId), { 
-        feedback: arrayUnion(...feedbacks),
-        feedbackRating: arrayUnion(...ratings)
-      });
-      alert("Thank you for your feedback!");
-      modal.remove();
-      listenOrders();
-    } catch (err) {
-      console.error("Error saving feedback:", err);
-      alert("Failed to save feedback. Please try again.");
-    }
-  };
+    form.onsubmit = async (e) => {
+        e.preventDefault();
+        const feedbacks = [];
+        const ratings = [];
+
+        feedbackItemsDiv.querySelectorAll(".feedback-item").forEach((itemDiv, index) => {
+            const text = itemDiv.querySelector("textarea").value;
+            const productName = items[index].product || items[index].name || "Unknown Product";
+
+            const stars = itemDiv.querySelectorAll(".star");
+            let starValue = 0;
+            stars.forEach((s) => {
+                if (s.dataset.selected == 1) starValue = parseInt(s.dataset.value);
+            });
+
+            feedbacks.push({
+                productName: productName,
+                rating: starValue,
+                comment: text,
+                productId: items[index].id,
+                timestamp: new Date().getTime() 
+            });
+            ratings.push(starValue); // For validation
+        });
+
+        if (ratings.some(r => r === 0)) {
+            alert("Please provide a star rating for all products before submitting.");
+            return;
+        }
+
+        try {
+            await updateDoc(doc(db, "DeliveryOrders", orderId), {
+                feedback: arrayUnion(...feedbacks),
+                status: "Completed" 
+            });
+
+            alert("Thank you for your feedback! The order is now marked as Completed.");
+            modal.remove();
+            listenOrders();
+        } catch (err) {
+            console.error("Error saving feedback:", err);
+            alert("Failed to save feedback. Please try again.");
+        }
+    };
 }
