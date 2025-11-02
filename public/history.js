@@ -1,6 +1,3 @@
-// ==========================
-// history.js (Receipt-Style + Dropdown Filter + Real-Time + Pagination + Auth)
-// ==========================
 import { db } from './firebase-config.js';
 import {
   collection,
@@ -10,13 +7,10 @@ import {
 } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 import { getAuth, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
 
-// ==========================
-// DOM Elements
-// ==========================
 const historyContainer = document.querySelector('.history-container');
 const loginPopup = document.getElementById('loginPopup');
 const loginRedirect = document.getElementById('loginRedirect');
-const filterContainer = document.getElementById('filterContainer'); // container for dropdown
+const filterContainer = document.getElementById('filterContainer'); 
 
 loginRedirect.addEventListener('click', () => {
   window.location.href = 'login.html';
@@ -30,9 +24,6 @@ let currentPage = 1;
 const itemsPerPage = 10;
 let selectedStatus = "All";
 
-// ==========================
-// Wait for Auth State
-// ==========================
 onAuthStateChanged(auth, async (user) => {
   if (user) {
     currentUser = user;
@@ -47,9 +38,7 @@ onAuthStateChanged(auth, async (user) => {
   }
 });
 
-// ==========================
-// Real-time listener for user's order history
-// ==========================
+
 function listenToHistory() {
   const ordersRef = collection(db, "DeliveryOrders");
   const q = query(ordersRef, orderBy("createdAt", "desc"));
@@ -72,9 +61,6 @@ function listenToHistory() {
   });
 }
 
-// ==========================
-// Create dropdown filter (combine Completed + Completed by Customer)
-// ==========================
 function createFilterDropdown() {
   if (!filterContainer) return;
 
@@ -95,9 +81,6 @@ function createFilterDropdown() {
   });
 }
 
-// ==========================
-// Apply dropdown filter (combine completed statuses)
-// ==========================
 function applyFilter() {
   if (selectedStatus === "All") {
     filteredOrders = allOrders;
@@ -113,9 +96,6 @@ function applyFilter() {
   renderPaginatedHistory();
 }
 
-// ==========================
-// Pagination + Render
-// ==========================
 function renderPaginatedHistory() {
   historyContainer.innerHTML = '';
 
@@ -132,9 +112,6 @@ function renderPaginatedHistory() {
   renderPaginationControls();
 }
 
-// ==========================
-// Render orders (Receipt-Style Layout)
-// ==========================
 function renderHistory(orders) {
   orders.forEach(order => {
     const date = order.createdAt?.toDate?.()?.toLocaleDateString('en-US', {
@@ -144,7 +121,6 @@ function renderHistory(orders) {
     const card = document.createElement('div');
     card.className = 'order-card';
 
-    // Header
     const header = `
       <div class="order-header">
         <span>Queue #: ${order.queueNumber || "N/A"}</span>
@@ -156,7 +132,7 @@ function renderHistory(orders) {
       <div class="order-divider"></div>
     `;
 
-    // Items
+
     let itemsHTML = '';
     const items = order.items || [];
     items.forEach(item => {
@@ -169,7 +145,6 @@ function renderHistory(orders) {
       `;
     });
 
-    // Summary
     const summary = `
       <div class="order-divider"></div>
       <div class="order-summary">
@@ -191,9 +166,6 @@ function renderHistory(orders) {
   });
 }
 
-// ==========================
-// Render Pagination Controls
-// ==========================
 function renderPaginationControls() {
   const totalPages = Math.ceil(filteredOrders.length / itemsPerPage);
   if (totalPages <= 1) return;
@@ -231,9 +203,6 @@ function renderPaginationControls() {
   historyContainer.appendChild(paginationDiv);
 }
 
-// ==========================
-// Close login popup when clicking outside
-// ==========================
 window.addEventListener('click', e => {
   if (e.target === loginPopup) {
     loginPopup.style.display = 'none';
