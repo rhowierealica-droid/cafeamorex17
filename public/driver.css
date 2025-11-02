@@ -20,6 +20,45 @@ body {
     padding-bottom: 10px;
 }
 
+.filter-section {
+    display: flex;
+    justify-content: center;
+    gap: 15px;
+    margin: 0 auto 30px auto;
+    max-width: 800px; 
+    flex-wrap: wrap; 
+    padding: 10px;
+}
+
+.filter-section select,
+.filter-section input[type="text"] {
+    padding: 10px 15px;
+    border: 1px solid #d0c4b6;
+    border-radius: 8px;
+    background-color: #fffaf0;
+    color: #4b3621;
+    font-size: 1rem;
+    outline: none;
+    transition: border-color 0.3s, box-shadow 0.3s;
+    flex-grow: 1; 
+    min-width: 150px;
+}
+
+.filter-section select:focus,
+.filter-section input[type="text"]:focus {
+    border-color: #6f4e37;
+    box-shadow: 0 0 5px rgba(111, 78, 55, 0.3);
+}
+
+.filter-section input[type="text"][data-alt-input][style*="inline-block"] {
+    display: inline-block !important;
+}
+
+.filter-section input[type="text"][data-alt-input][style*="none"] {
+    display: none !important;
+}
+
+
 .tabs {
     display: flex;
     justify-content: center;
@@ -210,4 +249,32 @@ body {
 
 .cancel-btn:hover {
     background-color: #c82333; 
+}
+
+@media (max-width: 768px) {
+    .main-content {
+        margin-left: 0; 
+        padding: 15px;
+    }
+    
+    .filter-section {
+        flex-direction: column; 
+        gap: 10px;
+    }
+    
+    .filter-section select,
+    .filter-section input[type="text"] {
+        min-width: 100%; 
+        box-sizing: border-box;
+    }
+
+    .tabs {
+        flex-wrap: wrap;
+        gap: 10px;
+    }
+
+    .tab-btn {
+        flex-grow: 1;
+        margin: 0;
+    }
 }
