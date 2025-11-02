@@ -5,39 +5,27 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Order History | Café Amore</title>
 
-  <!-- CSS Files -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css"/>
+
   <link rel="stylesheet" href="history.css" />
   <link rel="stylesheet" href="customer-side.css" />
   <link rel="stylesheet" href="OrderStatusNotif.css" />
 
-  <!-- Font Awesome -->
-  <link
-    rel="stylesheet"
-    href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css"
-  />
 </head>
 
 <body>
 
-  <!-- ========================= -->
-  <!-- Notification Bell -->
-  <!-- ========================= -->
   <div id="notifBellContainer">
     <i class="fas fa-bell"></i>
     <span class="badge">0</span>
   </div>
   <div id="notifDropdown"></div>
 
-  <!-- ========================= -->
-  <!-- Hamburger (for small screens) -->
-  <!-- ========================= -->
+
   <div class="hamburger hidden" id="hamburger">
     <i class="fas fa-bars"></i>
   </div>
 
-  <!-- ========================= -->
-  <!-- Sidebar Navigation -->
-  <!-- ========================= -->
   <aside class="sidebar" id="sidebar">
     <div class="close-btn hidden" id="closeBtn">&times;</div>
 
@@ -71,11 +59,7 @@
     <div class="logout"><i class="fas fa-sign-out-alt"></i> Log Out</div>
   </aside>
 
-  <!-- ========================= -->
-  <!-- Main Content -->
-  <!-- ========================= -->
   <main class="history-main">
-    <!-- Login Popup -->
     <div id="loginPopup" class="popup">
       <div class="popup-content">
         <p>You must login to view your order history.</p>
@@ -87,27 +71,19 @@
       <h1>Order History</h1>
     </header>
 
-    <!-- ========================= -->
-    <!-- Filter Dropdown -->
-    <!-- ========================= -->
     <div id="filterContainer" class="filter-container">
-      <!-- The dropdown is injected dynamically by history.js -->
+
     </div>
 
-    <!-- ========================= -->
-    <!-- Order History Container -->
-    <!-- ========================= -->
     <div class="history-container">
-      <!-- Orders load dynamically here -->
     </div>
   </main>
 
-  <!-- ========================= -->
-  <!-- Scripts -->
-  <!-- ========================= -->
   <script type="module" src="history.js"></script>
   <script type="module" src="customer-side.js"></script>
   <script type="module" src="OrderStatusNotif.js"></script>
+  <script type="module" src="AutoCancel.js"></script>
+
 
 </body>
 </html>
