@@ -121,6 +121,8 @@ button[type="submit"]:hover {
     background: #77482e;
 }
 
+
+
 .modal-buttons {
     display: flex;
     justify-content: space-between;
@@ -160,6 +162,7 @@ th, td {
     padding: 14px 12px;
     text-align: left;
     font-size: 14px;
+    white-space: normal; 
 }
 
 th {
@@ -176,7 +179,17 @@ tr:hover {
     background-color: #f5e8dc;
 }
 
-.resetBtn, .deleteBtn {
+.disabled-employee {
+    background-color: #f7f7f7 !important; 
+    color: #999; 
+    font-style: italic;
+}
+.disabled-employee td {
+    color: #999; 
+}
+
+
+.resetBtn, .deleteBtn, .disableBtn, .enableBtn {
     padding: 6px 10px;
     border-radius: 6px;
     border: none;
@@ -184,18 +197,34 @@ tr:hover {
     cursor: pointer;
     transition: 0.2s;
     margin-right: 5px;
+    margin-bottom: 5px; 
+    white-space: nowrap; 
 }
+
 .resetBtn {
-    background-color: brown;
+    background-color: #8B4513; 
     color: #fff;
 }
-.resetBtn:hover { background-color: red; }
+.resetBtn:hover { background-color: #A0522D; }
 
 .deleteBtn {
-    background-color: red;
+    background-color: #cc3333; 
     color: #fff;
 }
 .deleteBtn:hover { background-color: #d32f2f; }
+
+.disableBtn {
+    background-color: #4b3621; 
+    color: #fff;
+}
+.disableBtn:hover { background-color: #3e2d1c; }
+
+.enableBtn {
+    background-color: #38761d; 
+    color: #fff;
+}
+.enableBtn:hover { background-color: #45812b; }
+
 
 .sidebar {
     position: fixed;
@@ -209,6 +238,7 @@ tr:hover {
     display: flex;
     flex-direction: column;
     box-shadow: 2px 0 8px rgba(0,0,0,0.1);
+    transition: transform 0.3s ease;
 }
 .hamburger {
     position: fixed;
@@ -232,6 +262,18 @@ tr:hover {
     }
     .sidebar.active { transform: translateX(0); }
     .hamburger { display: block; }
+
+    table {
+        width: 100%;
+        display: block;
+        overflow-x: auto;
+    }
+    th, td {
+        min-width: 120px;
+    }
+    td:last-child {
+        min-width: 280px; 
+    }
 }
 
 @keyframes fadeIn {
