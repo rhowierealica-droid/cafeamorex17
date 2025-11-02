@@ -15,9 +15,12 @@
             <img src="logo.png" alt="Café Amore Logo"> Café Amore
         </a>
         <ul>
-            <li id="homeLink"><a href="index.html"><i class="fas fa-home"></i> <span>Home</span></a></li>     <!-- landing page -->
-
-            <li id="menuLink"><a href="menu.html"><i class="fas fa-utensils"></i> <span>Menu</span></a></li>
+            <li id="homeLink">
+                <a href="index.html"><i class="fas fa-home"></i> <span>Home</span></a>
+            </li>
+            <li id="menuLink">
+                <a href="menu.html"><i class="fas fa-utensils"></i> <span>Menu</span></a>
+            </li>
         </ul>
     </nav>
 
@@ -69,7 +72,7 @@
         <div class="otp-content">
             <span id="closeOtpBtn" class="close-btn">&times;</span>
             <h3>Enter OTP</h3>
-            <p>We sent a code to your phone number ending in <span id="maskedPhone"></span></p>
+            <p>We sent a code to your phone number: <span id="maskedPhone"></span></p>
             <input type="text" id="otpCode" placeholder="Enter OTP" required>
             <p id="otpError" class="otp-error" style="color: red; display: none; margin-top: 5px;"></p>
             <button id="verifyOtpBtn">Verify OTP</button>
@@ -79,6 +82,6 @@
     <div id="recaptcha-container"></div>
 
     <script type="module" src="login.js"></script>
-    
+
 </body>
 </html>
