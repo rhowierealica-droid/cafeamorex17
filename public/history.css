@@ -1,6 +1,3 @@
-/* =========================
-   General Body & Main
-========================= */
 body {
   font-family: 'Poppins', sans-serif;
   margin: 0;
@@ -16,14 +13,10 @@ main.history-main {
   transition: margin-left 0.3s ease;
 }
 
-/* When sidebar hidden */
 .sidebar-hidden main.history-main {
   margin-left: 0;
 }
 
-/* =========================
-   Header
-========================= */
 header {
   text-align: center;
   font-size: 1.8em;
@@ -33,9 +26,6 @@ header {
   letter-spacing: 1px;
 }
 
-/* =========================
-   Filter Dropdown Section
-========================= */
 .filter-container {
   max-width: 750px;
   margin: 0 auto 20px auto;
@@ -68,9 +58,6 @@ header {
   border-color: #8b5e3c;
 }
 
-/* =========================
-   History Container
-========================= */
 .history-container {
   max-width: 750px;
   margin: 0 auto;
@@ -87,9 +74,6 @@ header {
   font-weight: 500;
 }
 
-/* =========================
-   Order Receipt Style
-========================= */
 .order-card {
   background-color: #fff;
   border: 1px dashed #a07855;
@@ -102,7 +86,6 @@ header {
   box-shadow: 0 2px 6px rgba(0,0,0,0.05);
 }
 
-/* Header line (Queue # + Date) */
 .order-header {
   display: flex;
   justify-content: space-between;
@@ -115,7 +98,6 @@ header {
   font-size: 0.95em;
 }
 
-/* Status Line */
 .order-status {
   font-weight: 600;
   margin-bottom: 10px;
@@ -126,7 +108,6 @@ header {
 .order-status.Pending { color: #f0a500; }
 .order-status.Refunded { color: #795548; }
 
-/* Dropdown (view-only) */
 .status-dropdown {
   border: 1px solid #a07855;
   border-radius: 6px;
@@ -145,13 +126,11 @@ header {
   cursor: not-allowed;
 }
 
-/* Divider line (top & bottom) */
 .order-divider {
   border-top: 1px dashed #a07855;
   margin: 8px 0;
 }
 
-/* Items Section */
 .order-items {
   width: 100%;
 }
@@ -177,7 +156,6 @@ header {
   text-align: right;
 }
 
-/* Delivery Fee, Address, Total */
 .order-summary {
   margin-top: 10px;
   font-size: 0.95em;
@@ -206,9 +184,6 @@ header {
   margin-top: 8px;
 }
 
-/* =========================
-   Pagination Controls
-========================= */
 .pagination-controls {
   display: flex;
   justify-content: center;
@@ -243,9 +218,6 @@ header {
   font-size: 0.95em;
 }
 
-/* =========================
-   Login Popup
-========================= */
 #loginPopup .popup-content {
   max-width: 400px;
   background: #fff;
@@ -275,9 +247,6 @@ header {
   background-color: #4b2c0f;
 }
 
-/* =========================
-   Responsive Design
-========================= */
 @media (max-width: 768px) {
   main.history-main {
     margin-left: 0;
