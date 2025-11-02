@@ -12,17 +12,16 @@
 
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.6.1/cropper.min.css" />
     <style>
-        /* Minimal CSS for the new image popup to function */
         #ingredientsImagePopup {
-            display: none; /* Hidden by default */
+            display: none; 
             position: fixed;
-            z-index: 10001; /* Must be higher than other popups/modals */
+            z-index: 10001;
             left: 0;
             top: 0;
             width: 100%;
             height: 100%;
             overflow: auto;
-            background-color: rgba(0,0,0,0.8); /* Dark overlay */
+            background-color: rgba(0,0,0,0.8); 
             align-items: center;
             justify-content: center;
         }
@@ -35,7 +34,7 @@
             padding: 20px;
             border-radius: 8px;
             width: 90%;
-            max-width: 800px; /* Limit the max size of the popup content */
+            max-width: 800px; 
             position: relative;
         }
         #ingredientsImagePopup img {
@@ -43,9 +42,8 @@
             height: auto;
             display: block;
         }
-        /* Custom Close Button Style (Red as requested) */
         #closeIngredientsPopupBtn {
-            background-color: #f44336; /* Red color */
+            background-color: #f44336; 
             color: white;
             padding: 10px 15px;
             border: none;
@@ -202,7 +200,7 @@
         <div class="modal-content-image">
             <button type="button" id="closeIngredientsPopupBtn" class="close-btn">&times; Close</button>
             <h3 style="text-align: center;">Required Ingredients Reference</h3>
-            <img src="ingredients.png" alt="Admin Ingredient Reference Sheet">
+            <img src="ingredient.png" alt="Admin Ingredient Reference Sheet">
         </div>
     </div>
     <div id="cropperModal" class="popup">
