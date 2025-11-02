@@ -36,10 +36,9 @@ const D = {
     addFoodBtn: document.getElementById("addFoodBtn"),
     addOthersBtn: document.getElementById("addOthersBtn"),
     
-    // 💡 NEW ELEMENTS FOR INGREDIENTS IMAGE POPUP
-    viewIngredientsBtn: document.getElementById("viewIngredientsBtn"), // The button in the main popup
-    ingredientsImagePopup: document.getElementById("ingredientsImagePopup"), // The image popup container
-    closeIngredientsPopupBtn: document.getElementById("closeIngredientsPopupBtn"), // The close button for the image popup
+    viewIngredientsBtn: document.getElementById("viewIngredientsBtn"), 
+    ingredientsImagePopup: document.getElementById("ingredientsImagePopup"), 
+    closeIngredientsPopupBtn: document.getElementById("closeIngredientsPopupBtn"), 
 };
 
 const perSizeContainer = document.getElementById("perSizeContainer");
@@ -101,19 +100,18 @@ function normalizeCategory(cat) {
 const openPopup = () => D.popup.classList.add("show");
 const closePopup = () => D.popup.classList.remove("show");
 
-// 💡 NEW FUNCTIONS TO MANAGE INGREDIENTS IMAGE POPUP
+//  MANAGE INGREDIENTS IMAGE 
 const openIngredientsPopup = () => D.ingredientsImagePopup.classList.add("show");
 const closeIngredientsPopup = () => D.ingredientsImagePopup.classList.remove("show");
 
 D.cancelBtn?.addEventListener("click", closePopup);
 window.addEventListener("click", e => { 
     if (e.target === D.popup) closePopup(); 
-    // Close ingredients image popup if background is clicked
+    // Close ingredients image popup 
     if (e.target === D.ingredientsImagePopup) closeIngredientsPopup(); 
 });
 D.productSubCategory?.addEventListener("change", () => { currentSubCategory = D.productSubCategory.value; });
 
-// 💡 EVENT LISTENERS FOR THE NEW INGREDIENTS IMAGE POPUP
 D.viewIngredientsBtn?.addEventListener("click", openIngredientsPopup);
 D.closeIngredientsPopupBtn?.addEventListener("click", closeIngredientsPopup);
 
