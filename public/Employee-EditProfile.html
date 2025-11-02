@@ -1,0 +1,109 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Café Amore | Driver Profile</title>
+
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css" />
+    <link rel="stylesheet" href="Employee-EditProfile.css" />
+    <link rel="stylesheet" href="driver-nav.css" />
+        <link rel="stylesheet" href="admin-nav.css" />
+
+</head>
+
+<body>
+
+    <div class="hamburger" id="hamburger"><i class="fas fa-bars"></i></div>
+    </div>
+
+
+    <aside class="sidebar" id="sidebar">
+        <div class="logo">
+            <img src="logo.png" alt="Café Amore Logo" />
+            <span class="brand">Café Amore</span>
+        </div>
+
+        <nav>
+            <ul>
+                <li class="active"><i class="fas fa-motorcycle"></i> Deliveries</li>
+                <li><i class="fas fa-history"></i> Delivery History</li>
+            </ul>
+        </nav>
+
+        <div class="profile-card">
+            <div class="profile-avatar"><i class="fas fa-user-circle"></i></div>
+            <div class="profile-info">
+                <p class="profile-name">Driver Name</p>
+                <p class="edit-text">Edit Profile</p>
+            </div>
+        </div>
+
+        <div class="logout"><i class="fas fa-sign-out-alt"></i> Log Out</div>
+        <div class="close-btn hidden" id="closeBtn">&times;</div>
+    </aside>
+
+    <div class="profile-wrapper">
+        <div class="profile-container">
+            <h2>Edit Profile</h2>
+
+            <div class="tabs">
+                <button class="tab-btn active" data-tab="infoTab">Information</button>
+            </div>
+
+            <div class="tab-content" id="infoTab" style="display: block;">
+
+                <h3>Change Password</h3>
+                <form id="passwordForm">
+                    <div class="input-group">
+                        <label>Password Status</label>
+                        <input type="text" value="********" disabled />
+                    </div>
+
+                    <div class="password-edit-fields" id="passwordEditFields" style="display:none;">
+                        <div class="input-group">
+                            <label for="currentPasswordForChange">Enter Current Password</label>
+                            <input type="password" id="currentPasswordForChange" placeholder="Enter current password"
+                                required />
+                        </div>
+                        <div class="input-group">
+                            <label for="password">New Password</label>
+                            <input type="password" id="password" placeholder="Enter new password" required />
+                        </div>
+                        <div class="input-group">
+                            <label for="confirmPassword">Confirm Password</label>
+                            <input type="password" id="confirmPassword" placeholder="Confirm new password" required />
+                        </div>
+                    </div>
+
+                    <div class="button-group">
+                        <button type="button" class="edit-btn" id="editPasswordBtn">Edit</button>
+                        <button type="submit" class="save-btn" id="savePasswordBtn" style="display:none;">Save</button>
+                        <button type="button" class="cancel-btn" id="cancelPasswordBtn"
+                            style="display:none;">Cancel</button>
+                    </div>
+                </form>
+
+            </div>
+        </div>
+    </div>
+
+    <div id="recaptcha-container"></div>
+
+    <div id="otpPopup">
+        <div class="otp-container">
+            <h3>Enter OTP</h3>
+            <input type="text" id="otpCode" placeholder="Enter OTP" />
+            <div id="otpError"></div>
+            <button type="button" id="verifyOtpBtn">Verify OTP</button>
+            <button type="button" id="closeOtpBtn" style="margin-top: 10px; background: #6c757d;">Cancel</button>
+        </div>
+    </div>
+
+
+    <script type="module" src="Employee-EditProfile.js"></script>
+    <script type="module" src="driver-nav.js"></script>
+</body>
+
+</html>
