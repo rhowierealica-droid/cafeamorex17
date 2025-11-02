@@ -1,7 +1,3 @@
-/* ==========================
-   Sidebar Base
-========================== */
-
 .sidebar {
   position: fixed;
   top: 0;
@@ -9,7 +5,7 @@
   width: 240px;
   height: 100%;
   background: #f3e9dc;
-  padding-top: 0; /* removed extra padding */
+  padding-top: 0;
   padding-bottom: 20px;
   z-index: 2000;
   display: flex;
@@ -21,19 +17,17 @@
   box-shadow: 2px 0 8px rgba(0,0,0,0.1);
 }
 
-/* Logo */
 .sidebar .logo {
   display: flex;
   align-items: center;
   gap: 10px;
-  padding: 20px 18px; /* small padding for spacing from top */
+  padding: 20px 18px; 
   margin: 0;
   cursor: pointer;
 }
 .sidebar .logo img { width: 40px; height: 40px; }
 .sidebar .brand { font-weight: bold; font-size: 1.3em; color: #4b3621; }
 
-/* Navigation */
 .sidebar nav ul {
   list-style: none;
   padding: 0;
@@ -60,7 +54,6 @@
   transform: scale(1.02);
 }
 
-/* Profile Card */
 .profile-card {
   margin-top: auto;
   padding: 15px 18px;
@@ -75,7 +68,6 @@
   background: #552915; 
 }
 
-/* Profile Avatar & Info */
 .profile-avatar i { 
   font-size: 2em; 
   color: #552915; 
@@ -93,14 +85,12 @@
 }
 .profile-info .edit-text:hover { color: #552915; }
 
-/* Make avatar icon and text white on hover */
 .profile-card:hover .profile-avatar i,
 .profile-card:hover .profile-info .profile-name,
 .profile-card:hover .profile-info .edit-text {
   color: #fff;
 }
 
-/* === NEW: Active Profile Card === */
 .profile-card.active {
   background: #552915;
 }
@@ -110,7 +100,6 @@
   color: #fff;
 }
 
-/* Logout */
 .logout {
   padding: 14px 18px;
   display: none;
@@ -124,7 +113,6 @@
 }
 .logout:hover { background: #6f4e37; color: #fff; }
 
-/* Login Link */
 .login-link {
   margin-top: auto;
   padding: 14px 18px;
@@ -139,7 +127,6 @@
 }
 .login-link:hover { background: #6f4e37; color: #fff; }
 
-/* Hamburger */
 .hamburger {
   position: fixed;
   top: 20px;
@@ -151,7 +138,6 @@
   display: none;
 }
 
-/* Close button (mobile) */
 .sidebar .close-btn {
   position: absolute;
   top: 10px;
@@ -165,21 +151,17 @@
 }
 .sidebar .close-btn:hover { color: #fff; }
 
-/* Scrollbar */
 .sidebar::-webkit-scrollbar { width: 6px; }
 .sidebar::-webkit-scrollbar-thumb { background: #c8b7a1; border-radius: 3px; }
 .sidebar::-webkit-scrollbar-thumb:hover { background: #b39c82; }
 
-/* ==========================
-   Top Bar (Mobile)
-========================== */
 .top-bar {
   display: none;
   width: 100%;
   padding: 10px 20px;
   display: flex;
   align-items: center;
-  justify-content: center; /* center logo */
+  justify-content: center;
   position: fixed;
   top: 0;
   left: 0;
@@ -189,16 +171,15 @@
   box-sizing: border-box;
 }
 
-/* Place hamburger on left within top bar */
+
 .top-bar .hamburger {
-  position: absolute; /* move left without affecting center logo */
+  position: absolute; 
   left: 15px;
   font-size: 1.8em;
   color: #552915;
   cursor: pointer;
 }
 
-/* Logo inside top bar */
 .top-bar .mobile-logo {
   display: flex;
   align-items: center;
@@ -209,9 +190,6 @@
   height: 40px;
 }
 
-/* ==========================
-   Overlay for sidebar
-========================== */
 #overlay {
   position: fixed;
   top: 0;
@@ -227,9 +205,6 @@
   display: block;
 }
 
-/* ==========================
-   Responsive
-========================== */
 @media (max-width: 1024px) {
   .hamburger { display: block; }
   .sidebar { transform: translateX(-240px); padding-top: 20px; }
