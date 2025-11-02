@@ -198,7 +198,7 @@ function formatQueueNumber(num) {
     return typeof num === 'string' ? num : (num ? num.toString().padStart(4, "0") : "----");
 }
 
--
+
 
 // Filter
 function calculateDateRange(filterValue, customRange) {
@@ -540,7 +540,7 @@ function listenOrders() {
             // Print Receipt button to completed
             if (isFinalState || order.status === "Completed by Customer" || (order.status === "Completed" && order.feedback) ) {
                 const printButton = document.createElement("button");
-                printButton.textContent = "View/Download Receipt";
+                printButton.textContent = "View Receipt";
                 printButton.className = "print-receipt-btn";
                 printButton.dataset.id = order.id;
                 printButton.dataset.collection = "DeliveryOrders";
