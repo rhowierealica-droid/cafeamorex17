@@ -379,10 +379,18 @@ async function getTop5BestsellersLast7Days() {
             });
         });
     }
+    
+    const allSortedSales = Object.values(productSales)
+        .sort((a, b) => b.total - a.total);
+        
+    // Assign rank to each product
+    const rankedSales = allSortedSales.map((product, index) => ({
+        ...product,
+        rank: index + 1 // 1-based ranking
+    }));
 
-    return Object.values(productSales)
-        .sort((a, b) => b.total - a.total) 
-        .slice(0, 5);
+
+    return rankedSales.slice(0, 5); // Return only the top 5
 }
 
 
@@ -391,7 +399,6 @@ function formatCurrency(amount) {
         minimumFractionDigits: 2,
         maximumFractionDigits: 2,
     }).format(amount);
-    // Use the currency symbol '₱'
     return `₱${formatted.replace(/[^\d,.,-]/g, "")}`;
 }
 
@@ -409,19 +416,23 @@ window.generateLowStockPDF = async () => {
         const topSellers = await getTop5BestsellersLast7Days(); 
 
         const lowStockItems = [];
+        const affectedProductNames = new Set(); // To track all affected product
 
         inventorySnapshot.forEach(docSnap => {
             const item = docSnap.data();
             const status = getStockStatus(item);
             // Only include items that are low or out of stock
             if (status === "Low Stock" || status === "Out of Stock") {
+                const usedIn = productUsageMap[docSnap.id] || [];
                 lowStockItems.push({
                     ...item,
                     quantity: Number(item.quantity) || 0,
                     status: status,
                     id: docSnap.id,
-                    usedIn: productUsageMap[docSnap.id] || [], 
+                    usedIn: usedIn, 
                 });
+                // Add affected products to the set
+                usedIn.forEach(name => affectedProductNames.add(name));
             }
         });
 
@@ -433,6 +444,12 @@ window.generateLowStockPDF = async () => {
             });
         }
         
+        // Filter top sellers affected by low/out-of-stock items top 5
+        const affectedTopSellers = topSellers
+            .filter(seller => affectedProductNames.has(seller.name))
+            .slice(0, 5); // Ensure only the top 5 are shown for priority
+
+
         // PDF Design
         const { jsPDF } = window.jspdf;
         
@@ -565,34 +582,46 @@ window.generateLowStockPDF = async () => {
             finalY = 20;
         }
 
-        const ingredientImpactMap = new Map();
+        const allImpactMap = new Map();
 
         lowStockItems.forEach(item => {
-            if (item.status === "Out of Stock" && item.usedIn.length > 0) {
+            if (item.usedIn.length > 0) { 
                 const ingredientName = item.name;
                 const affectedProductsList = item.usedIn;
                 
-                if (!ingredientImpactMap.has(ingredientName)) {
-                    ingredientImpactMap.set(ingredientName, new Set());
+                const mapKey = `${ingredientName} (${item.status})`; 
+
+                if (!allImpactMap.has(mapKey)) {
+                    allImpactMap.set(mapKey, new Set());
                 }
                 affectedProductsList.forEach(productName => {
-                    ingredientImpactMap.get(ingredientName).add(productName);
+                    allImpactMap.get(mapKey).add(productName);
                 });
             }
         });
 
-        if (ingredientImpactMap.size > 0) {
+        if (allImpactMap.size > 0) {
             doc.setFont("helvetica", "bold");
             doc.setFontSize(16);
-            doc.setTextColor(192, 57, 43); // Red/Orange for warning
-            doc.text(" Product Impact Analysis (Out of Stock)", 14, finalY);
+            doc.setTextColor(192, 57, 43); 
+            doc.text(" Product Impact Analysis (Low Stock & Out of Stock)", 14, finalY);
             finalY += 8;
             
             doc.setTextColor(0, 0, 0); 
             doc.setFontSize(9); 
             doc.setFont("helvetica", "normal");
             
-            ingredientImpactMap.forEach((productNames, ingredientName) => {
+            const sortedImpactKeys = Array.from(allImpactMap.keys()).sort((a, b) => {
+                const isAOut = a.includes("Out of Stock");
+                const isBOut = b.includes("Out of Stock");
+                if (isAOut && !isBOut) return -1;
+                if (!isAOut && isBOut) return 1;
+                return a.localeCompare(b);
+            });
+
+            sortedImpactKeys.forEach(mapKey => {
+                const productNames = allImpactMap.get(mapKey);
+                const [ingredientName, status] = mapKey.match(/^(.*) \((.*)\)$/).slice(1);
                 
                 if (finalY > 260) { 
                     doc.addPage();
@@ -600,7 +629,7 @@ window.generateLowStockPDF = async () => {
                 }
                 
                 doc.setFont("helvetica", "bold");
-                const titleText = `${ingredientName} ${productNames.size > 1 ? 'Affect' : 'can affect'}`;
+                const titleText = `${ingredientName} (${status}) can affect:`;
                 doc.text(titleText, 14, finalY);
                 doc.setFont("helvetica", "normal");
                 finalY += 5;
@@ -613,7 +642,6 @@ window.generateLowStockPDF = async () => {
                     const lines = doc.splitTextToSize(text, 180); 
                     lines.forEach(line => {
                         doc.text(line, 18, finalY); 
-                        // ALIGNMENT/SPACING 
                         finalY += 4; 
                     });
                 });
@@ -626,21 +654,20 @@ window.generateLowStockPDF = async () => {
             finalY = 20;
         }
 
-        //Sales Trend
-        if (topSellers.length > 0) {
+        if (affectedTopSellers.length > 0) {
             doc.setFont("helvetica", "bold");
             doc.setFontSize(16);
             doc.setTextColor(75, 54, 33); 
             
-            doc.text(`Sales Trend Affect the top ${topSellers.length} products (Last 7 Days)`, 14, finalY);
+            doc.text(`High-Priority Products Affected by Stock Status (Top 5 Last 7 Days)`, 14, finalY);
             finalY += 8;
             
             doc.setFontSize(9); 
             doc.setFont("helvetica", "normal");
             
-            topSellers.forEach((seller, index) => {
-                const formattedSales = formatCurrency(seller.total);
-                const text = `${index + 1}. ${seller.name} (${seller.qty} sold) - ${formattedSales} Sales`; 
+            affectedTopSellers.forEach((seller) => { 
+                const formattedSales = (seller.total);
+                const text = `Top ${seller.rank}. ${seller.name} (${seller.qty} sold) - ${formattedSales} Sales`; 
                 
                 doc.text(text, 14, finalY);
                 finalY += 4.5;
