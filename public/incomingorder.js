@@ -7,10 +7,20 @@ import { getAuth, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/
 
 const auth = getAuth();
 const ordersBody = document.getElementById("ordersBody");
-const tabButtons = document.querySelectorAll(".tab-btn");
+const tabButtons = document.querySelectorAll(".tab-btn"); 
+const filterContainer = document.getElementById("filterContainer"); 
+const orderTypeFilterSelect = document.getElementById("orderTypeFilter");
+const dateFilterSelect = document.getElementById("dateFilter");
+const customRangeInput = document.getElementById("customRange");
+const productSearchInput = document.getElementById("productSearch");
 
 let ordersData = [];
-let selectedTab = "Wait for Admin to Accept";
+let selectedTab = "Order Approval"; 
+let currentOrderType = "All"; 
+let dateRangeFilter = "all";
+let productSearchTerm = "";
+let customDateStart = null;
+let customDateEnd = null;
 const pendingTimers = {};
 
 let popup = null;
@@ -18,118 +28,45 @@ let popupTitle = null;
 let popupButtonsContainer = null;
 let popupReceiptContent = null; 
 
+const dateRangePicker = flatpickr(customRangeInput, {
+    mode: "range",
+    dateFormat: "Y-m-d",
+    onChange: function(selectedDates, dateStr, instance) {
+        if (selectedDates.length === 2) {
+            customDateStart = selectedDates[0];
+            customDateEnd = selectedDates[1];
+            renderOrders();
+        } else {
+            customDateStart = null;
+            customDateEnd = null;
+        }
+    }
+});
+customRangeInput.style.display = 'none'; 
+
 function injectPopupStyles() {
     const style = document.createElement("style");
     style.textContent = `
-    .popup {
-      display: none;
-      position: fixed;
-      inset: 0;
-      background-color: rgba(0, 0, 0, 0.55);
-      z-index: 9999;
-      justify-content: center;
-      align-items: center;
-      padding: 20px;
-    }
-    .popup-content {
-      background: #fff8f0;
-      color: #552915;
-      border-radius: 12px;
-      padding: 25px;
-      width: 90%;
-      max-width: 420px;
-      text-align: center;
-      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.25);
-      max-height: 90vh; /* Allow scrolling for tall content */
-      overflow-y: auto; /* Allow scrolling */
-    }
-    .popup-content h3 {
-      margin-bottom: 15px;
-      font-size: 1.2rem;
-      color: #6f4e37; /* Match main content h1 color */
-    }
-    #popupButtonsContainer {
-      display: flex;
-      flex-direction: column;
-      gap: 10px;
-      align-items: center;
-    }
-    #popupButtonsContainer button {
-      background-color: #8b5e3c;
-      color: #fff;
-      border: none;
-      padding: 10px 15px;
-      border-radius: 8px;
-      cursor: pointer;
-      transition: 0.2s ease;
-      width: 80%;
-      font-weight: bold;
-    }
-    #popupButtonsContainer button:hover {
-      background-color: #6d4428;
-    }
-    #popupButtonsContainer input {
-      padding: 8px;
-      width: 80%;
-      border-radius: 6px;
-      border: 1px solid #ccc;
-      font-size: 1rem;
-      text-align: center;
-    }
-
-    #popupReceiptContent {
-        text-align: left;
-        margin-top: 15px;
-        padding-top: 15px;
-        border-top: 1px dashed #ccc;
-        max-height: 300px; 
-        overflow-y: auto;
-    }
-
-    #acceptRefundBtn { background-color: #4caf50; } 
-    #acceptRefundBtn:hover { background-color: #3e8e41; }
-
-    #declineRefundBtn { background-color: #f44336; } 
-    #declineRefundBtn:hover { background-color: #d32f2f; }
-
-    #confirmRefundBtn { background-color: #6f4e37; } 
-    #confirmRefundBtn:hover { background-color: #50382b; }
-
-    #cancelRefundBtn { background-color: #6c757d; } 
-    #cancelRefundBtn:hover { background-color: #5a6268; }
-
-    .refund-badge {
-      display: inline-block;
-      padding: 2px 6px;
-      border-radius: 6px; /* Matched the 6px in CSS */
-      font-size: 0.8em;
-      font-weight: bold;
-      margin-left: 5px;
-      color: white;
-    }
+    .popup { display: none; position: fixed; inset: 0; background-color: rgba(0, 0, 0, 0.55); z-index: 9999; justify-content: center; align-items: center; padding: 20px; }
+    .popup-content { background: #fff8f0; color: #552915; border-radius: 12px; padding: 25px; width: 90%; max-width: 420px; text-align: center; box-shadow: 0 4px 12px rgba(0, 0, 0, 0.25); max-height: 90vh; overflow-y: auto; }
+    .popup-content h3 { margin-bottom: 15px; font-size: 1.2rem; color: #6f4e37; }
+    #popupButtonsContainer { display: flex; flex-direction: column; gap: 10px; align-items: center; }
+    #popupButtonsContainer button { background-color: #8b5e3c; color: #fff; border: none; padding: 10px 15px; border-radius: 8px; cursor: pointer; transition: 0.2s ease; width: 80%; font-weight: bold; }
+    #popupButtonsContainer button:hover { background-color: #6d4428; }
+    #popupReceiptContent { text-align: left; margin-top: 15px; padding-top: 15px; border-top: 1px dashed #ccc; max-height: 300px; overflow-y: auto; }
+    .refund-badge { display: inline-block; padding: 2px 6px; border-radius: 6px; font-size: 0.8em; font-weight: bold; margin-left: 5px; color: white; }
     .refund-refunded, .refund-manual { background-color: #4caf50; } 
     .refund-denied, .refund-failed, .refund-api-failed { background-color: #f44336; } 
     .refund-pending { background-color: #ff9800; color: white; } 
     .refund-error { background-color: #6c757d; } 
-
-
-    .view-refund-btn { 
-      background-color: #795548; 
-      color: white; 
-    }
-    .view-refund-btn:hover { 
-      background-color: #5d4037; 
-    }
-    
+    .view-refund-btn { background-color: #795548; color: white; }
+    .view-refund-btn:hover { background-color: #5d4037; }
     .admin-accept-btn { background-color: #4CAF50; }
     .admin-accept-btn:hover { background-color: #45a049; }
     .admin-decline-btn { background-color: #f44336; }
     .admin-decline-btn:hover { background-color: #d32f2f; }
-
     .print-receipt-btn { background-color: #007bff; color: white; margin-top: 5px;}
     .print-receipt-btn:hover { background-color: #0056b3; }
-    #downloadReceiptBtn { background-color: #28a745; color: white; }
-    #downloadReceiptBtn:hover { background-color: #1e7e34; }
     `;
     document.head.appendChild(style);
 }
@@ -154,16 +91,13 @@ function createPopup() {
         if (e.target === popup) closePopup();
     });
 }
-
 function showETPopup(title, callback) {
     if (!popup) createPopup();
     popupReceiptContent.innerHTML = ""; 
     popup.style.display = "flex";
     popupTitle.textContent = title;
-
     const timeOptions = ["10–20 mins", "20–30 mins", "30–40 mins", "40–50 mins", "50–60 mins"];
     popupButtonsContainer.innerHTML = timeOptions.map(t => `<button>${t}</button>`).join("");
-
     Array.from(popupButtonsContainer.children).forEach(btn => {
         btn.onclick = () => {
             callback(btn.textContent);
@@ -171,7 +105,6 @@ function showETPopup(title, callback) {
         };
     });
 }
-
 function customAlert(message) {
     if (!popup) createPopup();
     popupReceiptContent.innerHTML = ""; 
@@ -180,15 +113,34 @@ function customAlert(message) {
     popupButtonsContainer.innerHTML = `<p style="margin-bottom: 10px;">${message}</p><button id="closeAlertBtn">Close</button>`;
     document.getElementById("closeAlertBtn").onclick = closePopup;
 }
-
 function closePopup() {
     if (popup) {
         popup.style.display = "none";
     }
 }
-
 function formatQueueNumber(num) {
     return typeof num === 'string' ? num : (num ? num.toString().padStart(4, "0") : "----");
+}
+
+function toggleFilterVisibility() {
+    const isVisible = selectedTab === "Completed" || selectedTab === "Canceled" ;
+    
+    if (isVisible) {
+        filterContainer.style.display = 'flex'; 
+    } else {
+        filterContainer.style.display = 'none';
+        
+        orderTypeFilterSelect.value = 'All';
+        dateFilterSelect.value = 'all';
+        productSearchInput.value = '';
+        customRangeInput.style.display = 'none';
+        
+        currentOrderType = 'All';
+        dateRangeFilter = 'all';
+        productSearchTerm = '';
+        customDateStart = null;
+        customDateEnd = null;
+    }
 }
 
 tabButtons.forEach(btn => {
@@ -196,9 +148,71 @@ tabButtons.forEach(btn => {
         tabButtons.forEach(b => b.classList.remove("active"));
         btn.classList.add("active");
         selectedTab = btn.dataset.status;
+        
+        toggleFilterVisibility(); 
+        
         renderOrders();
     });
 });
+
+orderTypeFilterSelect.addEventListener("change", () => {
+    currentOrderType = orderTypeFilterSelect.value;
+    renderOrders();
+});
+
+productSearchInput.addEventListener("input", () => {
+    productSearchTerm = productSearchInput.value.toLowerCase().trim();
+    renderOrders();
+});
+
+dateFilterSelect.addEventListener("change", () => {
+    dateRangeFilter = dateFilterSelect.value;
+    
+    if (dateRangeFilter === 'custom') {
+        customRangeInput.style.display = 'inline-block';
+        dateRangePicker.open(); 
+    } else {
+        customRangeInput.style.display = 'none';
+        customDateStart = null;
+        customDateEnd = null;
+        renderOrders();
+    }
+});
+
+function isDateInFilter(timestamp) {
+    if (!timestamp) return true; 
+    
+    const orderDate = new Date(timestamp.seconds ? timestamp.seconds * 1000 : timestamp);
+
+    switch (dateRangeFilter) {
+        case 'all':
+            return true;
+        case 'today':
+            const today = new Date();
+            today.setHours(0, 0, 0, 0);
+            return orderDate >= today;
+        case 'week':
+            const startOfWeek = new Date();
+            startOfWeek.setDate(startOfWeek.getDate() - startOfWeek.getDay()); 
+            startOfWeek.setHours(0, 0, 0, 0);
+            return orderDate >= startOfWeek;
+        case 'month':
+            const startOfMonth = new Date();
+            startOfMonth.setDate(1);
+            startOfMonth.setHours(0, 0, 0, 0);
+            return orderDate >= startOfMonth;
+        case 'custom':
+            if (customDateStart && customDateEnd) {
+                const endOfDay = new Date(customDateEnd);
+                endOfDay.setHours(23, 59, 59, 999);
+                return orderDate >= customDateStart && orderDate <= endOfDay;
+            }
+            return true; 
+        default:
+            return true;
+    }
+}
+
 
 onSnapshot(collection(db, "InStoreOrders"), s => handleOrderSnapshot(s, "In-Store", "InStoreOrders"));
 onSnapshot(collection(db, "DeliveryOrders"), s => handleOrderSnapshot(s, "Delivery", "DeliveryOrders"));
@@ -208,9 +222,13 @@ function handleOrderSnapshot(snapshot, type, collectionName) {
         const docSnap = change.doc;
         const order = {
             id: docSnap.id,
-            type,
+            type: type, 
             collection: collectionName,
-            data: { status: docSnap.data().status || "Pending", ...docSnap.data() }
+            data: { 
+                status: docSnap.data().status || "Pending", 
+                timestamp: docSnap.data().timestamp || new Date().toISOString(), 
+                ...docSnap.data() 
+            }
         };
 
         const existingIndex = ordersData.findIndex(o => o.id === docSnap.id);
@@ -226,6 +244,7 @@ function handleOrderSnapshot(snapshot, type, collectionName) {
             ordersData.push(order);
         }
 
+        // auto-cancelling Pending orders after 60s
         if (order.data.status === "Pending" && !order.data.refundRequest && !pendingTimers[order.id]) {
             pendingTimers[order.id] = setTimeout(async () => {
             
@@ -252,34 +271,71 @@ function handleOrderSnapshot(snapshot, type, collectionName) {
 function renderOrders() {
     ordersBody.innerHTML = "";
 
-    ordersData
+    toggleFilterVisibility(); 
+
+    const isFilteredTab = selectedTab === "Completed" || selectedTab === "Canceled" ;
+
+    const filteredOrders = ordersData
         .filter(o => {
             const status = o.data.status;
             const finalRefundStatus = o.data.finalRefundStatus;
-
+            
+            let tabMatch = false;
             switch (selectedTab) {
                 case "Order Approval":
-                    return status === "Wait for Admin to Accept";
+                    tabMatch = status === "Wait for Admin to Accept";
+                    break;
                 case "Pending":
-                    return status === "Pending" || o.data.refundRequest;
+                    tabMatch = status === "Pending" || status === "Waiting for Payment" || o.data.refundRequest || status === "Refund Pending";
+                    break;
+                case "Preparing":
+                    tabMatch = status === "Preparing";
+                    break;
+                case "Delivery":
+                    tabMatch = status === "Delivery";
+                    break;
                 case "Completed":
-                    return status === "Completed" || ["Succeeded", "Manual", "Refunded"].includes(status) || ["Succeeded", "Manual"].includes(finalRefundStatus);
+                    tabMatch = status === "Completed" || ["Succeeded", "Manual", "Refunded"].includes(finalRefundStatus) || status === "Refunded";
+                    break;
                 case "Canceled":
-                    return ["Canceled", "Refund Failed", "Refund Denied"].includes(status) ||
-                        ["Failed", "API Failed", "Denied", "Canceled"].includes(finalRefundStatus);
+                    tabMatch = status === "Canceled" || ["Failed", "API Failed", "Denied", "Canceled"].includes(finalRefundStatus) || status === "Refund Failed" || status === "Refund Denied";
+                    break;
                 default:
-                    return status === selectedTab;
+                    tabMatch = false; 
             }
+
+            if (!tabMatch) return false;
+
+            if (isFilteredTab) {
+                if (currentOrderType !== 'All') {
+                    if (currentOrderType !== o.type) return false;
+                }
+
+                if (productSearchTerm) {
+                    const search = productSearchTerm;
+                    const products = o.data.products || o.data.items || [];
+                    const productMatch = products.some(p => (p.product || '').toLowerCase().includes(search));
+                    if (!productMatch) return false;
+                }
+
+                if (!isDateInFilter(o.data.timestamp)) return false;
+            }
+
+            return true;
         })
         .sort((a, b) => {
+            // Sort by refundRequest first
             if (a.data.refundRequest && !b.data.refundRequest) return -1;
             if (!a.data.refundRequest && b.data.refundRequest) return 1;
             
+            // newest/highest number 
             const queueA = a.data.queueNumberNumeric || 0;
             const queueB = b.data.queueNumberNumeric || 0;
             return queueB - queueA;
-        })
-        .forEach(orderItem => {
+        });
+
+
+    filteredOrders.forEach(orderItem => {
             const order = orderItem.data;
             const orderId = orderItem.id;
 
@@ -294,9 +350,15 @@ function renderOrders() {
                 const total = p.total || ((p.sizePrice || 0) + (p.addonsPrice || 0)) * qty; 
                 return `<div>${qty} × ${p.product}${sizeText}${addons} — ₱${total.toFixed(2)}</div>`;
             }).join("");
+            
+            // Dlivery fee show
+            const deliveryFee = order.deliveryFee || 0;
+            const deliveryFeeHtml = deliveryFee > 0 
+                ? `<div style="margin-top: 5px; border-top: 1px dashed #ccc; padding-top: 5px;">Delivery Fee: ₱${deliveryFee.toFixed(2)}</div>` 
+                : '';
 
             const grandTotal = order.total;
-            const totalDisplay = grandTotal.toFixed(2);
+            const totalDisplay = grandTotal ? grandTotal.toFixed(2) : "0.00";
 
             const queue = formatQueueNumber(order.queueNumber || order.queueNumberNumeric);
             const etaText = order.estimatedTime ? `<div>ETA: ${order.estimatedTime}</div>` : "";
@@ -311,7 +373,7 @@ function renderOrders() {
                 let badgeClass = 'refund-error';
 
                 switch (badgeText) {
-                    case "Succeeded": case "Manual":
+                    case "Succeeded": case "Manual": case "Refunded":
                         badgeClass = 'refund-refunded';
                         mainStatusDisplay = "Refunded"; 
                         break;
@@ -375,6 +437,7 @@ function renderOrders() {
                 }
             }
             
+            // Add Print Receipt button
             if (["Completed", "Canceled", "Refund Denied", "Refund Failed", "Refunded"].includes(order.status) && !actionBtnHtml.includes("Print Receipt")) {
                     actionBtnHtml += printButton;
             }
@@ -382,7 +445,7 @@ function renderOrders() {
             tr.innerHTML = `
                 <td>${queue}</td>
                 <td>${orderItem.type}</td>
-                <td>${orderHtml || "No products"}${etaText}<div><strong>Total: ₱${totalDisplay}</strong></div></td>
+                <td>${orderHtml}${deliveryFeeHtml}${etaText}<div><strong>Total: ₱${totalDisplay}</strong></div></td>
                 ${statusBadge}
                 <td>${actionBtnHtml}</td>
             `;
@@ -391,12 +454,11 @@ function renderOrders() {
 
     attachActionHandlers();
 }
+//  Receipt/Refund Functions
 
 function generateReceiptHTML(order) {
-    const date = order.timestamp ? new Date(order.timestamp).toLocaleString() : new Date().toLocaleString();
-    
+    const date = order.timestamp ? new Date(order.timestamp.seconds ? order.timestamp.seconds * 1000 : order.timestamp).toLocaleString() : new Date().toLocaleString();
     const orderItems = order.products || order.items || []; 
-    
     const productSubtotal = orderItems.reduce((sum, p) => 
         sum + (p.total || ((p.sizePrice || 0) + (p.addonsPrice || 0)) * (p.qty || p.quantity || 1))
     , 0);
@@ -418,6 +480,7 @@ function generateReceiptHTML(order) {
         `;
     }).join('');
 
+    // Delivery Fee is not kasali
     if (deliveryFee > 0) {
         itemsHtml += `
             <div style="font-weight: bold; font-size: 15px; margin-top: 10px; border-top: 1px dashed #aaa; padding-top: 5px;">
@@ -466,14 +529,13 @@ function generateReceiptHTML(order) {
     `;
 }
 
-async function generateAndDownloadPDF(orderId, collectionName, orderData) {
+async function generateAndDownloadPDF(orderId, collectionName, orderData, orderType) {
     if (typeof html2pdf === 'undefined') {
         customAlert("PDF Library Missing: Please include 'html2pdf.bundle.min.js' in your HTML file to enable PDF printing.");
         return;
     }
 
-    const type = collectionName.replace('Orders', '');
-    const content = generateReceiptHTML({ id: orderId, type, ...orderData });
+    const content = generateReceiptHTML({ id: orderId, type: orderType, ...orderData });
     
     const element = document.createElement('div');
     element.innerHTML = content;
@@ -501,9 +563,9 @@ async function showReceiptPopup(orderId, collectionName) {
             return;
         }
         const orderData = orderSnap.data();
-        const type = collectionName.replace('Orders', '');
+        const orderType = collectionName === "InStoreOrders" ? "In-Store" : "Delivery";
 
-        const receiptHtml = generateReceiptHTML({ id: orderId, type, ...orderData });
+        const receiptHtml = generateReceiptHTML({ id: orderId, type: orderType, ...orderData });
 
         if (!popup) createPopup();
         popupTitle.textContent = `Receipt for Queue #${formatQueueNumber(orderData.queueNumber || orderData.queueNumberNumeric)}`;
@@ -511,13 +573,14 @@ async function showReceiptPopup(orderId, collectionName) {
         popupReceiptContent.innerHTML = receiptHtml;
 
         popupButtonsContainer.innerHTML = `
-            <button id="downloadReceiptBtn" data-id="${orderId}" data-collection="${collectionName}">Download Receipt (PDF)</button>
+            <button id="downloadReceiptBtn" data-id="${orderId}" data-collection="${collectionName}" data-type="${orderType}">Download Receipt (PDF)</button>
             <button id="closeReceiptBtn">Close</button>
         `;
         popup.style.display = "flex";
 
-        document.getElementById("downloadReceiptBtn").onclick = () => {
-            generateAndDownloadPDF(orderId, collectionName, orderData); 
+        document.getElementById("downloadReceiptBtn").onclick = (e) => {
+            const btn = e.target;
+            generateAndDownloadPDF(btn.dataset.id, btn.dataset.collection, orderData, btn.dataset.type); 
         };
 
         document.getElementById("closeReceiptBtn").onclick = closePopup;
@@ -595,6 +658,12 @@ function attachActionHandlers() {
                 sum + (p.total || ((p.sizePrice || 0) + (p.addonsPrice || 0)) * (p.qty || p.quantity || 1))
             , 0);
 
+            const grandTotal = orderData.total || 0;
+            const deliveryFee = orderData.deliveryFee || 0;
+            const deliveryFeeHtml = deliveryFee > 0 
+                ? `<div style="font-weight: bold; margin-top: 10px; border-top: 1px dashed #ccc; padding-top: 5px;">Delivery Fee: ₱${deliveryFee.toFixed(2)}</div>` 
+                : '';
+
             let productsHtml = orderProducts.map(p => {
                 const addons = p.addons?.length ? ` (Add-ons: ${p.addons.map(a => `${a.name}:₱${(a.price || 0).toFixed(2)}`).join(", ")})` : "";
                 const sizeText = p.size ? (typeof p.size === "string" ? ` [${p.size}]` : ` [${p.size.name}]`) : "";
@@ -603,24 +672,23 @@ function attachActionHandlers() {
                 return `<div>${qty} x ${p.product}${sizeText}${addons} - ₱${totalPrice}</div>`;
             }).join("");
 
-            const deliveryFee = orderData.deliveryFee || 0;
-            if (deliveryFee > 0) {
-                productsHtml += `<div style="margin-top:5px; border-top: 1px dashed #ccc; padding-top: 5px;">1 x Delivery Fee - ₱${deliveryFee.toFixed(2)}</div>`;
-            }
 
             if (!popup) createPopup();
             popupTitle.textContent = "Order Details";
             popupReceiptContent.innerHTML = ""; 
 
+            // **FIX/UPDATE 2: Display Grand Total and Products Total/Max Refundable separately for clarity**
             popupButtonsContainer.innerHTML = `
                 <h3>Refund Request for Queue #${formatQueueNumber(orderData.queueNumber || orderData.queueNumberNumeric)}</h3>
-                <div style="text-align: left; margin-bottom: 15px; width: 90%; max-width: 350px;">${productsHtml}</div>
-                <div style="font-weight: bold; margin-bottom: 5px;">Products Total: ₱${maxRefundable.toFixed(2)}</div>
-                <div style="font-weight: bold; margin-bottom: 15px; color: #dc3545;">(Delivery Fee: ₱${deliveryFee.toFixed(2)} - NOT REFUNDABLE)</div>
-                <div>
-                    <button id="acceptRefundBtn">Accept Refund</button>
-                    <button id="declineRefundBtn">Deny Refund</button>
+                <div style="text-align: left; margin-bottom: 15px; width: 90%; max-width: 350px;">
+                    ${productsHtml}
+                    ${deliveryFeeHtml} 
                 </div>
+                <div style="font-weight: bold; margin-bottom: 5px; border-top: 1px solid #ccc; padding-top: 5px;">Grand Total: ₱${grandTotal.toFixed(2)}</div>
+                <div style="font-weight: bold; color: #dc3545; margin-bottom: 15px;">Max Refundable (Products Only): ₱${maxRefundable.toFixed(2)}</div>
+                <button class="admin-accept-btn" id="acceptRefundBtn">Accept Refund</button>
+                <button class="admin-decline-btn" id="denyRefundBtn">Deny Refund</button>
+                <button id="closeDetailsBtn">Close</button>
             `;
             popup.style.display = "flex";
 
@@ -628,14 +696,14 @@ function attachActionHandlers() {
                 closePopup();
                 showRefundAmountPopup(orderId, collectionName, maxRefundable, orderData.paymongoPaymentId);
             };
-
-            document.getElementById("declineRefundBtn").onclick = () => {
+            document.getElementById("denyRefundBtn").onclick = () => {
                 closePopup();
                 handleRefundAction(orderId, collectionName, "Denied");
             };
-        });
-    });
-}
+            document.getElementById("closeDetailsBtn").onclick = closePopup;
+        }); 
+    }); 
+} 
 
 function showRefundAmountPopup(orderId, collectionName, maxRefundable, paymongoPaymentId) {
     if (!popup) createPopup();
@@ -686,7 +754,7 @@ async function handleRefundAction(orderId, collectionName, action, refundAmount 
         if (action === "Accepted") {
             const orderProducts = orderData.products || orderData.items;
 
-            if (originalStatus === "Pending" || originalStatus === "Wait for Admin to Accept" || originalStatus === "Waiting for Payment") {
+            if (originalStatus === "Wait for Admin to Accept" || originalStatus === "Pending" || originalStatus === "Waiting for Payment") {
                 await returnStock(orderProducts);
                 
                 await updateDoc(orderRef, {
@@ -700,7 +768,9 @@ async function handleRefundAction(orderId, collectionName, action, refundAmount 
             else if (originalStatus === "Completed" || originalStatus === "Preparing" || originalStatus === "Delivery") {
                 
                 if (isEPayment) {
-                    const endpoint = "http://localhost:3000/refund-payment";
+                    //const endpoint = "http://localhost:3000/refund-payment";
+                    const endpoint = "/.netlify/functions/refund-payment";
+
 
                     await updateDoc(orderRef, {
                         status: "Refund Pending",
@@ -716,7 +786,6 @@ async function handleRefundAction(orderId, collectionName, action, refundAmount 
                     });
 
                     const data = await response.json();
-                    console.log("Refund response:", data);
 
                     if (data.error) {
                         customAlert(`PayMongo Refund failed: ${data.details || data.error}. Please check the PayMongo dashboard.`);
@@ -726,7 +795,6 @@ async function handleRefundAction(orderId, collectionName, action, refundAmount 
                         });
                         return;
                     }
-
                 } else { 
                     await updateDoc(orderRef, {
                         refundRequest: deleteField(),
@@ -737,9 +805,10 @@ async function handleRefundAction(orderId, collectionName, action, refundAmount 
                 }
             }
             else { 
-                
                 if (isEPayment) {
-                    const endpoint = "http://localhost:3000/refund-payment";
+                    //const endpoint = "http://localhost:3000/refund-payment";
+                    const endpoint = "/.netlify/functions/refund-payment";
+
 
                     await updateDoc(orderRef, {
                         status: "Refund Pending",
@@ -755,7 +824,6 @@ async function handleRefundAction(orderId, collectionName, action, refundAmount 
                     });
 
                     const data = await response.json();
-                    console.log("Refund response:", data);
 
                     if (data.error) {
                         customAlert(`PayMongo Refund failed: ${data.details || data.error}. Please check the PayMongo dashboard.`);
@@ -889,6 +957,7 @@ async function updateOrderStatus(orderId, collectionName, newStatus, eta = "") {
                 return;
             }
 
+            //const endpoint = "http://localhost:3000/generate-paymongo-link";
             const endpoint = "/.netlify/functions/generate-paymongo-link";
             customAlert("Generating secure payment link... Please wait. Do not navigate away.");
 
@@ -964,7 +1033,4 @@ function checkAdminAuth() {
 }
 
 checkAdminAuth();
-renderOrders();
-
-
-
+renderOrders(); 
