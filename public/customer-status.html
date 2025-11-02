@@ -1,110 +1,144 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Café Amore - Customer Orders</title>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Café Amore - Customer Orders</title>
 
-    <link rel="stylesheet" href="customer-status.css">
-    <link rel="stylesheet" href="customer-side.css">
-    <link rel="stylesheet" href="OrderStatusNotif.css">
+  <link rel="stylesheet" href="customer-status.css">
+  <link rel="stylesheet" href="customer-side.css">
+  <link rel="stylesheet" href="OrderStatusNotif.css">
 
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css">
+  <script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
 </head>
 <body>
 
-    <div class="top-bar">
-        <div class="hamburger" id="hamburger"><i class="fas fa-bars"></i></div>
-        <div class="mobile-logo">
-            <img src="logo.png" alt="Café Amore Logo">
-            <span class="brand">Café Amore</span>
-        </div>
+  <div class="top-bar">
+    <div class="hamburger" id="hamburger">
+      <i class="fas fa-bars"></i>
+    </div>
+    <div class="mobile-logo">
+      <img src="logo.png" alt="Café Amore Logo">
+      <span class="brand">Café Amore</span>
+    </div>
+  </div>
+
+  <div id="notifBellContainer">
+    <i class="fas fa-bell"></i>
+    <span class="badge">0</span>
+  </div>
+  <div id="notifDropdown"></div>
+
+  <aside class="sidebar" id="sidebar">
+    <div class="close-btn hidden" id="closeBtn">&times;</div>
+
+    <div class="logo">
+      <img src="logo.png" alt="Café Amore Logo">
+      <span class="brand">Café Amore</span>
     </div>
 
-    <div id="notifBellContainer">
-        <i class="fas fa-bell"></i>
-        <span class="badge">0</span>
-    </div>
-    <div id="notifDropdown"></div>
+    <nav>
+      <ul>
+        <li class="menu-link"><i class="fas fa-utensils"></i> Menu</li>
+        <li class="cart-link"><i class="fas fa-shopping-cart"></i> Cart</li>
+        <li class="order-status-link active"><i class="fas fa-truck"></i> Order Status</li>
+        <li class="favorites-link"><i class="fas fa-heart"></i> Favorites</li>
+        <li class="history-link"><i class="fas fa-history"></i> History</li>
+      </ul>
+    </nav>
 
-    <aside class="sidebar" id="sidebar">
-        <div class="close-btn hidden" id="closeBtn">&times;</div>
-        <div class="logo">
-            <img src="logo.png" alt="Café Amore Logo">
-            <span class="brand">Café Amore</span>
-        </div>
-        <nav>
-            <ul>
-                <li class="menu-link"><i class="fas fa-utensils"></i> Menu</li>
-                <li class="cart-link"><i class="fas fa-shopping-cart"></i> Cart</li>
-                <li class="order-status-link active"><i class="fas fa-truck"></i> Order Status</li>
-                <li class="favorites-link"><i class="fas fa-heart"></i> Favorites</li>
-                <li class="history-link"><i class="fas fa-history"></i> History</li>
-
-                </ul>
-        </nav>
-        <div class="login-link"><i class="fas fa-sign-in-alt"></i> Login</div>
-        <div class="profile-card">
-            <div class="profile-avatar"><i class="fas fa-user-circle"></i></div>
-            <div class="profile-info">
-                <p class="profile-name">Customer</p>
-                <p class="edit-text">Edit Profile</p>
-            </div>
-        </div>
-        <div class="logout"><i class="fas fa-sign-out-alt"></i> Log Out</div>
-    </aside>
-
-    <main class="menu-container">
-        <section class="orders-container">
-            <h1>My Orders</h1>
-
-            <div class="tabs">
-                <button class="tab-btn active" data-status="Waiting for Payment" ><i class="fas fa-clock"></i> Waiting for Payment</button>
-                <button class="tab-btn" data-status="Pending"><i class="fas fa-clipboard-list"></i> Pending</button>
-                <button class="tab-btn" data-status="Preparing"><i class="fas fa-utensils"></i> Preparing</button>
-                <button class="tab-btn" data-status="Delivery"><i class="fas fa-truck"></i> Delivery</button>
-                <button class="tab-btn" data-status="To Receive"><i class="fas fa-box"></i> To Receive</button>
-                <button class="tab-btn" data-status="To Rate"><i class="fas fa-star"></i> To Rate</button>
-                <button class="tab-btn" data-status="Completed"><i class="fas fa-check-circle"></i> Completed</button>
-                <button class="tab-btn" data-status="Canceled"><i class="fas fa-times-circle"></i> Canceled</button>
-                <button class="tab-btn" data-status="Refund"><i class="fas fa-money-bill-wave"></i> Refund</button>
-
-            </div>
-
-            <div id="order-items"></div>
-        </section>
-    </main>
-
-    <div id="feedback-modal" class="modal">
-        <div class="modal-content">
-            <span class="close-btn">&times;</span>
-            <h2>Leave Feedback</h2>
-            <form id="feedback-form">
-                <div id="feedback-items"></div>
-                <button type="submit">Submit Feedback</button>
-            </form>
-        </div>
+    <div class="login-link">
+      <i class="fas fa-sign-in-alt"></i> Login
     </div>
 
-    <div id="refund-modal" class="modal">
-        <div class="modal-content">
-            <span class="close-btn">&times;</span>
-            <h2>Select Products to Refund</h2>
-            <form id="refund-form">
-                <h4 id="total-refundable" style="margin-bottom: 15px;">Total Refundable: ₱0.00</h4>
-                <div id="refund-items"></div>
-                <button type="submit" class="action-btn">Submit Refund Request</button>
-            </form>
-        </div>
+    <div class="profile-card">
+      <div class="profile-avatar">
+        <i class="fas fa-user-circle"></i>
+      </div>
+      <div class="profile-info">
+        <p class="profile-name">Customer</p>
+        <p class="edit-text">Edit Profile</p>
+      </div>
     </div>
 
+    <div class="logout">
+      <i class="fas fa-sign-out-alt"></i> Log Out
+    </div>
+  </aside>
 
-    <script type="module" src="customer-status.js"></script>
-    <script type="module" src="customer-side.js"></script>
-        <script type="module" src="OrderStatusNotif.js"></script>
-        <script type="module" src="AutoCancel.js"></script>
+  <main class="menu-container">
+    <section class="orders-container">
+      <h1>My Orders</h1>
 
+      <div class="tabs">
+        <button class="tab-btn active" data-status="Waiting for Payment">
+          <i class="fas fa-clock"></i> Waiting for Payment
+        </button>
+        <button class="tab-btn" data-status="Pending">
+          <i class="fas fa-clipboard-list"></i> Pending
+        </button>
+        <button class="tab-btn" data-status="Preparing">
+          <i class="fas fa-utensils"></i> Preparing
+        </button>
+        <button class="tab-btn" data-status="Delivery">
+          <i class="fas fa-truck"></i> Delivery
+        </button>
+        <button class="tab-btn" data-status="To Receive">
+          <i class="fas fa-box"></i> To Receive
+        </button>
+        <button class="tab-btn" data-status="To Rate">
+          <i class="fas fa-star"></i> To Rate
+        </button>
+        <button class="tab-btn" data-status="Completed">
+          <i class="fas fa-check-circle"></i> Completed
+        </button>
+        <button class="tab-btn" data-status="Canceled">
+          <i class="fas fa-times-circle"></i> Canceled
+        </button>
+        <button class="tab-btn" data-status="Refund">
+          <i class="fas fa-money-bill-wave"></i> Refund
+        </button>
+      </div>
 
+      <div class="filter-section">
+        <label for="dateFilter">Date:</label>
+        <select id="dateFilter">
+          <option value="today">Today</option>
+          <option value="week">This Week</option>
+          <option value="month">This Month</option>
+          <option value="year">This Year</option>
+          <option value="all">All</option>
+          <option value="custom">Custom Range</option>
+        </select>
 
+        <input type="text" id="customRange" placeholder="Select date range" style="display:none;">
+
+        <label for="productFilter">Product:</label>
+        <input type="text" id="productFilter" placeholder="Search product">
+      </div>
+
+      <div id="order-items"></div>
+    </section>
+  </main>
+
+  <div id="refund-modal" class="modal">
+    <div class="modal-content">
+      <span class="close-btn">&times;</span>
+      <h2>Select Products to Refund</h2>
+      <form id="refund-form">
+        <h4 id="total-refundable" style="margin-bottom: 15px;">Total Refundable: ₱0.00</h4>
+        <div id="refund-items"></div>
+        <button type="submit" class="action-btn">Submit Refund Request</button>
+      </form>
+    </div>
+  </div>
+
+  <script type="module" src="customer-status.js"></script>
+  <script type="module" src="customer-side.js"></script>
+  <script type="module" src="OrderStatusNotif.js"></script>
+  <script type="module" src="AutoCancel.js"></script>
 </body>
 </html>
