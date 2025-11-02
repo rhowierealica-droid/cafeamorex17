@@ -203,14 +203,11 @@ function renderDashboard() {
                 o.status.toLowerCase().includes("stockreturned"))
     );
 
-    // Helper to get the total *excluding* the delivery fee, if present.
-    // Assumes deliveryFee is stored in the order object for DeliveryOrders
+
     const getNetTotal = (order) => {
         const total = order.total || 0;
         const deliveryFee = order.deliveryFee || 0;
 
-        // Only deduct deliveryFee if the order came from the DeliveryOrders collection
-        // and a deliveryFee is actually present.
         if (order.collection === "DeliveryOrders" && deliveryFee > 0) {
             return total - deliveryFee;
         }
@@ -264,7 +261,6 @@ function renderHourlyChart(orders) {
         const deliveryFee = o.deliveryFee || 0;
         let netTotal = total;
         
-        // Deduct delivery fee for chart data
         if (o.collection === "DeliveryOrders" && deliveryFee > 0) {
             netTotal = total - deliveryFee;
         }
@@ -306,7 +302,6 @@ function renderTopSellers(orders) {
         (o) => o.status && o.status.toLowerCase().includes("completed")
     );
     completedOrders.forEach((o) => {
-        // Calculate the ratio of product cost to total order cost (excluding delivery fee)
         const orderTotal = o.total || 0;
         const deliveryFee = o.deliveryFee || 0;
         let orderNetTotal = orderTotal;
@@ -314,35 +309,27 @@ function renderTopSellers(orders) {
             orderNetTotal = orderTotal - deliveryFee;
         }
         
-        // This is the total value of all products in the order, potentially excluding tip/discount
-        // A better approach would be to ensure `lineTotal` in the item is the product price.
         const totalProductValueInOrder = (o.products || o.items || []).reduce(
             (sum, p) => sum + (p.total || (p.qty || 1) * (p.basePrice || 0) + (p.addonsPrice || 0)),
             0
         );
         
-        // This ratio helps to proportionally adjust the product sales if the order's total 
-        // includes a discount/markup that's not per-item, but is now excluding delivery fee.
-        // If orderNetTotal is 0, ratio is 0 to avoid division by zero.
         const salesAdjustmentRatio = totalProductValueInOrder > 0 ? orderNetTotal / totalProductValueInOrder : 0;
 
 
         (o.products || o.items || []).forEach((p) => {
-            const name = p.product || "Unnamed Product";
+            const name = p.product || "Unnamed Product"; 
             const qty = p.qty || 1;
             
-            // This is the line total for the item as stored in the order
             const lineTotal =
                 p.total || (p.qty || 1) * (p.basePrice || 0) + (p.addonsPrice || 0);
             
-            // Adjust the line total based on the ratio calculated above, effectively
-            // distributing the net sales (excluding delivery fee) across products.
             const netLineTotal = lineTotal * salesAdjustmentRatio;
 
 
             if (!productSales[name]) productSales[name] = { qty: 0, total: 0 };
             productSales[name].qty += qty;
-            productSales[name].total += netLineTotal; // Use netLineTotal
+            productSales[name].total += netLineTotal; 
         });
     });
 
@@ -374,9 +361,6 @@ function generateSalesPdf() {
     );
     if (orders.length === 0) return;
 
-    // --- 1. Calculate Summary Metrics ---
-
-    // Helper to get the total *excluding* the delivery fee, if present.
     const getNetTotal = (order) => {
         const total = order.total || 0;
         const deliveryFee = order.deliveryFee || 0;
@@ -397,9 +381,7 @@ function generateSalesPdf() {
     });
 
     const grandTotalSales = cashTotal + ePayTotal;
-    let currentY = 20; // Starting Y position
-
-    // --- 2. Report Header and Filters ---
+    let currentY = 20; 
 
     const filterText = salesFilter.options[
         salesFilter.selectedIndex
@@ -426,29 +408,27 @@ function generateSalesPdf() {
     );
     currentY += 10;
     
-    // --- 3. Sales Summary Table ---
     
-    currentY += 5; // Extra space before summary
+    currentY += 5; 
     
     doc.setFont("helvetica", "bold");
     doc.setFontSize(14);
     doc.text("Financial Summary", 14, currentY);
     currentY += 5;
 
-    // ALIGNMENT FIX 1: Added currency hint to header
-    const summaryHead = [["Metric", "Value (₱)"]]; 
+    const summaryHead = [["Metric", "Value"]]; 
     const summaryBody = [
         ["Completed Orders", completedOrdersCount.toLocaleString()],
-        ["Total Net Sales", formatCurrency(grandTotalSales)], 
-        ["Cash Payments", formatCurrency(cashTotal)],
-        ["E-Payments", formatCurrency(ePayTotal)],
+        ["Total Net Sales", (grandTotalSales)], 
+        ["Cash Payments", (cashTotal)],
+        ["E-Payments", (ePayTotal)],
     ];
     
     doc.autoTable({
         startY: currentY,
         head: summaryHead,
         body: summaryBody,
-        theme: "plain", // Use plain theme for a clean look
+        theme: "plain",
         styles: {
             fontSize: 10,
             cellPadding: 2,
@@ -465,101 +445,15 @@ function generateSalesPdf() {
         },
     });
 
-    // Update Y position after the Summary Table
     currentY = doc.lastAutoTable.finalY + 10;
     
-    // --- 4. High-Level Sales Narrative Summary (NEW SECTION) ---
-
-    // Calculate High/Low sales for narrative
-    const productSalesData = {};
-    orders.forEach((order) => {
-        const orderTotal = order.total || 0;
-        const deliveryFee = order.deliveryFee || 0;
-        let orderNetTotal = orderTotal;
-        if (order.collection === "DeliveryOrders" && deliveryFee > 0) {
-            orderNetTotal = orderTotal - deliveryFee;
-        }
-        const totalProductValueInOrder = (order.products || order.items || []).reduce(
-            (sum, p) => sum + (p.total || (p.qty || 1) * (p.basePrice || 0) + (p.addonsPrice || 0)),
-            0
-        );
-        const salesAdjustmentRatio = totalProductValueInOrder > 0 ? orderNetTotal / totalProductValueInOrder : 0;
-        
-        (order.products || order.items || []).forEach((item) => {
-            const productName = item.product || "Unnamed Product";
-            const sizeName =
-                item.size && typeof item.size === "string" ? ` [${item.size}]` : "";
-            const key = `${productName}${sizeName} | ${order.channel} | ${order.paymentMethod}`;
-            const qty = item.qty || 1; 
-            const lineTotal =
-                item.total ||
-                (item.qty || 1) * (item.basePrice || 0) + (item.addonsPrice || 0);
-            const netLineTotal = lineTotal * salesAdjustmentRatio;
-
-            if (!productSalesData[key]) {
-                productSalesData[key] = { product: productName + sizeName, sales: 0 };
-            }
-            productSalesData[key].sales += netLineTotal; 
-        });
-    });
-
-    const sortedSales = Object.values(productSalesData).sort((a, b) => a.sales - b.sales);
-    const highestSalesItem = sortedSales.length > 0 ? sortedSales[sortedSales.length - 1] : null;
-    const inStoreOrdersCount = orders.filter(o => o.channel === 'In-store').length;
-    const deliveryOrdersCount = orders.filter(o => o.channel === 'Online').length;
-    
-    
-    // Generate Narrative Summary
-    doc.setFont("helvetica", "bold");
-    doc.setFontSize(14);
-    doc.text("High-Level Sales Overview", 14, currentY);
-    currentY += 5;
-
-    doc.setFont("helvetica", "normal");
-    doc.setFontSize(10);
-
-    const totalOrdersText = completedOrdersCount.toLocaleString();
-    const totalSalesText = formatCurrency(grandTotalSales);
-    const dateRangeText = rangeText;
-
-    // 4.1 Channel Comparison Narrative
-    let channelSummary = "";
-    const totalOrders = inStoreOrdersCount + deliveryOrdersCount;
-    if (inStoreOrdersCount > totalOrders * 0.6) {
-        channelSummary = `In-store orders (${inStoreOrdersCount.toLocaleString()} transactions) were the dominant channel, securing the majority of sales.`;
-    } else if (deliveryOrdersCount > totalOrders * 0.4) {
-        channelSummary = `The online channel (${deliveryOrdersCount.toLocaleString()} transactions) shows a significant and growing contribution to overall revenue.`;
-    } else if (totalOrders > 0) {
-        channelSummary = `Channel performance is well-balanced across both in-store and online operations.`;
-    } else {
-        channelSummary = `No completed orders were found for channel analysis.`;
-    }
-
-    // 4.2 Product Highlight Narrative
-    let productHighlight = "";
-    if (highestSalesItem) {
-        productHighlight = `The top-selling product was the ${highestSalesItem.product}, which generated a substantial net sales revenue of ${formatCurrency(highestSalesItem.sales)}.`;
-    } else {
-        productHighlight = `Product-specific data for the best seller was unavailable for detailed analysis.`;
-    }
-
-    const summaryParagraph = `This Sales Performance Summary covers the period: ${dateRangeText}. The business achieved a robust total net revenue of ${totalSalesText} from ${totalOrdersText} completed orders. ${channelSummary} ${productHighlight} This overall performance confirms strong customer engagement and consistent demand for core menu items.`;
-
-    const splitSummaryText = doc.splitTextToSize(summaryParagraph, 182); 
-    doc.text(splitSummaryText, 14, currentY);
-    currentY += (splitSummaryText.length * 4) + 8; // Update Y position for the paragraph height
-    
-    // --- 5. Product Sales Breakdown Table (Original Step 4) ---
-
     doc.setFont("helvetica", "bold");
     doc.setFontSize(14);
     doc.text("Detailed Product Sales Breakdown", 14, currentY);
     currentY += 5;
 
-    // ALIGNMENT FIX 2: Removed trailing space from "Net Sales "
-    const head = [["Product", "Qty", "Net Sales", "Channel", "Payment"]]; 
+    const head = [["Product", "Qty", "Net Sales"]]; 
     
-    // Re-use productSalesData calculated in step 4
     const simpleProductSales = {};
     orders.forEach((order) => {
         const orderTotal = order.total || 0;
@@ -577,10 +471,9 @@ function generateSalesPdf() {
         
         (order.products || order.items || []).forEach((item) => {
             const productName = item.product || "Unnamed Product";
-            const sizeName = item.size && typeof item.size === "string" ? ` [${item.size}]` : "";
-            const productDisplay = productName + sizeName;
             
-            const key = `${productDisplay} | ${order.channel} | ${order.paymentMethod}`;
+            const key = productName; 
+            
             const qty = item.qty || 1;
             const lineTotal =
                 item.total ||
@@ -589,11 +482,9 @@ function generateSalesPdf() {
 
             if (!simpleProductSales[key]) {
                 simpleProductSales[key] = {
-                    product: productDisplay,
+                    product: productName, 
                     qty: 0,
                     sales: 0,
-                    channel: order.channel,
-                    payment: order.paymentMethod,
                 };
             }
             simpleProductSales[key].qty += qty;
@@ -602,23 +493,18 @@ function generateSalesPdf() {
     });
 
     const detailedBody = Object.values(simpleProductSales)
-        .sort((a, b) => b.sales - a.sales)
+        .sort((a, b) => b.sales - a.sales) 
         .map((item) => [
             item.product,
             item.qty, 
-            formatNumber(item.sales),
-            item.channel,
-            item.payment,
+            formatNumber(item.sales), 
         ]);
 
-
-    // ALIGNMENT FIX 3: Prepend currency symbol to the Grand Total for clear presentation.
     const foot = [
         [
             {
-                // This cell spans 2 columns: Product, Qty (Label)
                 content: "GRAND TOTAL (NET SALES)",
-                colSpan: 2, 
+                colSpan: 1, 
                 styles: {
                     fontStyle: "bold",
                     halign: "left", 
@@ -627,7 +513,12 @@ function generateSalesPdf() {
                 },
             },
             {
-                // This is the Sales value column (Column 2) - Prepended currency symbol
+                content: "", 
+                styles: {
+                    fillColor: [240, 240, 240],
+                },
+            },
+            {
                 content: '₱' + formatNumber(grandTotalSales),
                 styles: {
                     fontStyle: "bold",
@@ -636,21 +527,13 @@ function generateSalesPdf() {
                     textColor: [75, 54, 33],
                 },
             },
-            {
-                // This cell spans 2 columns: Channel and Payment (Empty)
-                content: "", 
-                colSpan: 2,
-                styles: {
-                    fillColor: [240, 240, 240],
-                },
-            },
         ],
     ];
 
     doc.autoTable({
         startY: currentY,
         head: head,
-        body: detailedBody, // Use the correctly formatted body
+        body: detailedBody, 
         foot: foot,
         theme: "striped",
         styles: {
@@ -667,14 +550,58 @@ function generateSalesPdf() {
         },
         alternateRowStyles: { fillColor: [250, 245, 235] },
         columnStyles: {
-            0: { cellWidth: 70, halign: "left" }, // Product
-            1: { cellWidth: 15, halign: "center" }, // Qty
-            2: { cellWidth: 35, halign: "right" }, // Sales (Currency aligned right)
-            3: { cellWidth: 30, halign: "center" }, // Channel
-            4: { cellWidth: 35, halign: "center" }, // Payment
+            0: { cellWidth: 100, halign: "left" }, 
+            1: { cellWidth: 30, halign: "center" }, 
+            2: { cellWidth: 50, halign: "right" }, 
         },
     });
 
+    currentY = doc.lastAutoTable.finalY + 10;
+    
+    const sortedSales = Object.values(simpleProductSales).sort((a, b) => a.sales - b.sales);
+    const highestSalesItem = sortedSales.length > 0 ? sortedSales[sortedSales.length - 1] : null;
+    const inStoreOrdersCount = orders.filter(o => o.channel === 'In-store').length;
+    const deliveryOrdersCount = orders.filter(o => o.channel === 'Online').length;
+    
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(14);
+    doc.text("Sales Overview", 14, currentY);
+    currentY += 5;
+
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(10);
+
+    const totalOrdersText = completedOrdersCount.toLocaleString();
+    const totalSalesText = (grandTotalSales);
+    const dateRangeText = rangeText;
+
+    let channelSummary = "";
+    const totalOrders = inStoreOrdersCount + deliveryOrdersCount;
+    if (inStoreOrdersCount > totalOrders * 0.6) {
+        channelSummary = `In-store orders (${inStoreOrdersCount.toLocaleString()} transactions) were the dominant channel, securing the majority of sales.`;
+    } else if (deliveryOrdersCount > totalOrders * 0.4) {
+        channelSummary = `The online channel (${deliveryOrdersCount.toLocaleString()} transactions) shows a significant and growing contribution to overall revenue.`;
+    } else if (totalOrders > 0) {
+        channelSummary = `Channel performance is well-balanced across both in-store and online operations.`;
+    } else {
+        channelSummary = `No completed orders were found for channel analysis.`;
+    }
+
+    let productHighlight = "";
+    if (highestSalesItem) {
+        productHighlight = `The top-selling product was the ${highestSalesItem.product}, which generated a substantial net sales revenue of ${(highestSalesItem.sales)}.`;
+    } else {
+        productHighlight = `Product-specific data for the best seller was unavailable for detailed analysis.`;
+    }
+    
+    const summaryParagraph = `This Sales Performance Summary covers the period: ${dateRangeText}. The business earned a total net revenue of about ${totalSalesText} from ${totalOrdersText} completed orders. ${channelSummary} ${productHighlight} This overall performance confirms strong customer engagement and consistent demand for core menu items.`;
+
+    const splitSummaryText = doc.splitTextToSize(summaryParagraph, 180); 
+    
+    doc.text(splitSummaryText, 14, currentY);
+    currentY += (splitSummaryText.length * 6) + 10; 
+    
+    
     const filename = `Sales_Report_${rangeText.replace(
         /\s/g,
         "_"
