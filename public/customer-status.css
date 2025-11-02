@@ -65,6 +65,88 @@ body {
   color: #fff;
 }
 
+.filter-section {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  margin-bottom: 25px;
+  gap: 10px;
+  align-items: center;
+}
+
+.filter-section label {
+  font-weight: bold;
+  margin-right: 5px;
+}
+
+.filter-section select,
+.filter-section input[type="text"],
+.filter-section input.flatpickr-input {
+  padding: 7px 10px;
+  border-radius: 8px;
+  border: 1px solid #ccc;
+  font-size: 0.95em;
+  outline: none;
+  min-width: 120px;
+  transition: border-color 0.2s, box-shadow 0.2s;
+}
+
+.filter-section select:focus,
+.filter-section input:focus {
+  border-color: #6f4e37;
+  box-shadow: 0 0 5px rgba(111,78,55,0.3);
+}
+
+.filter-section input.flatpickr-input {
+  display: none;
+}
+
+#customRange {
+  display: none;
+  cursor: pointer;
+  background: #fff;
+  border: 1px solid #ccc;
+  border-radius: 8px;
+  padding: 7px 10px;
+  font-size: 0.95em;
+  min-width: 200px;
+}
+
+.flatpickr-calendar {
+  font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+  border-radius: 12px;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+  border: 1px solid #ccc;
+}
+
+.flatpickr-months {
+  background: #f4f1ec;
+  color: #4b3621;
+  border-radius: 12px 12px 0 0;
+}
+
+.flatpickr-weekdays {
+  color: #6f4e37;
+}
+
+.flatpickr-day.today {
+  background: #6f4e37;
+  color: #fff;
+  border-radius: 50%;
+}
+
+.flatpickr-day.selected,
+.flatpickr-day.startRange,
+.flatpickr-day.endRange {
+  background: #4b3621;
+  color: #fff;
+  border-radius: 50%;
+}
+
+.flatpickr-day:hover {
+  background: rgba(75,54,33,0.2);
+}
+
 .user-order-card {
   background: #fff;
   padding: 18px;
@@ -159,7 +241,7 @@ body {
 }
 
 .modal {
-  display: none; 
+  display: none;
   position: fixed;
   z-index: 9999;
   left: 0;
@@ -222,11 +304,23 @@ body {
   transition: all 0.2s ease;
 }
 
-#confirm-yes { background-color: #28a745; color: #fff; }
-#confirm-yes:hover { background-color: #218838; }
+#confirm-yes {
+  background-color: #28a745;
+  color: #fff;
+}
 
-#confirm-no { background-color: #dc3545; color: #fff; }
-#confirm-no:hover { background-color: #c82333; }
+#confirm-yes:hover {
+  background-color: #218838;
+}
+
+#confirm-no {
+  background-color: #dc3545;
+  color: #fff;
+}
+
+#confirm-no:hover {
+  background-color: #c82333;
+}
 
 #feedback-form button[type="submit"] {
   background-color: #007bff;
@@ -269,8 +363,32 @@ body {
   display: inline-block;
 }
 
+.action-btn {
+  padding: 10px 20px;
+  margin-top: 20px;
+  margin-bottom: 20px;
+  background-color: #4b3621;
+  color: white;
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
+  font-size: 16px;
+  transition: background-color 0.2s;
+}
+
+.action-btn:hover {
+  background-color: #5c452e;
+}
 
 @media screen and (max-width: 480px) {
-  .modal-content { width: 95%; padding: 20px; }
-  .tab-btn { padding: 6px 12px; font-size: 0.8em; margin: 4px; }
+  .modal-content {
+    width: 95%;
+    padding: 20px;
+  }
+
+  .tab-btn {
+    padding: 6px 12px;
+    font-size: 0.8em;
+    margin: 4px;
+  }
 }
