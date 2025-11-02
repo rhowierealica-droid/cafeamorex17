@@ -1,4 +1,4 @@
-// netlify/functions/paymongo-webhook.js (FINAL UPDATED VERSION)
+// netlify/functions/paymongo-webhook.js (FINAL FIXED VERSION)
 
 require("dotenv").config();
 const admin = require("firebase-admin");
@@ -78,7 +78,6 @@ exports.handler = async (event, context) => {
     return { statusCode: 405, body: "Method Not Allowed" };
   if (!db) return { statusCode: 500, body: "Server not initialized" };
 
-  // ⚠️ Potential Issue: Ensure WEBHOOK_SECRET is set correctly in Netlify environment variables.
   const WEBHOOK_SECRET = process.env.WEBHOOK_SECRET;
   const rawBody = event.body;
   let payload;
@@ -91,39 +90,45 @@ exports.handler = async (event, context) => {
   }
 
   // -----------------------------
-  // Signature Verification (FIXED)
+  // ✅ FIXED Signature Verification
   // -----------------------------
   if (WEBHOOK_SECRET) {
     try {
-      // 💡 PayMongo uses the header 'X-Paymongo-Signature' or 'paymongo-signature'
-      const sigHeader = event.headers["x-paymongo-signature"] || event.headers["paymongo-signature"] || "";
-      
+      const sigHeader =
+        event.headers["x-paymongo-signature"] ||
+        event.headers["paymongo-signature"] ||
+        "";
+
       const parts = sigHeader.split(",").reduce((acc, part) => {
         const [key, value] = part.trim().split("=");
-        acc[key.trim()] = value.trim();
+        acc[key.trim()] = value?.trim();
         return acc;
       }, {});
 
       const receivedTimestamp = parts.t;
-      const receivedSignature = parts.v1;
+      const receivedSignature = parts.v1 || parts.te || parts.li; // ✅ accept multiple keys
 
       if (!receivedSignature || !receivedTimestamp) {
-        // Log the header to help debug if the format is unexpected
-        console.warn("⚠️ Signature verification failed: Missing timestamp (t) or signature (v1) in header. Header:", sigHeader); 
+        console.warn(
+          "⚠️ Signature verification failed: Missing timestamp (t) or signature (v1/te/li) in header. Header:",
+          sigHeader
+        );
         return { statusCode: 401, body: "Signature Invalid" };
       }
 
-      // ✅ FIX: PayMongo signs the raw body prefixed with the timestamp. 
-      // Your original code was only hashing rawBody, which is incorrect.
       const signedPayload = `${receivedTimestamp}.${rawBody}`;
-
       const expectedHash = crypto
         .createHmac("sha256", WEBHOOK_SECRET)
         .update(signedPayload)
         .digest("hex");
 
       if (receivedSignature !== expectedHash) {
-        console.error("❌ Signature mismatch. Expected:", expectedHash, "Received:", receivedSignature);
+        console.error(
+          "❌ Signature mismatch. Expected:",
+          expectedHash,
+          "Received:",
+          receivedSignature
+        );
         return { statusCode: 401, body: "Signature Invalid" };
       }
 
@@ -141,14 +146,17 @@ exports.handler = async (event, context) => {
   // -----------------------------
   // Ignore Refunds
   // -----------------------------
-  if (eventType === "payment.refunded" || eventType === "payment.refund.updated") {
+  if (
+    eventType === "payment.refunded" ||
+    eventType === "payment.refund.updated"
+  ) {
     return { statusCode: 200, body: JSON.stringify({ received: true }) };
   }
 
   // -----------------------------
   // Payment Success
   // -----------------------------
-  if (eventType === "payment.paid" || eventType === "checkout_session.paid") { // Note: using checkout_session.paid for consistency
+  if (eventType === "payment.paid" || eventType === "checkout_session.paid") {
     const metadata = dataObject?.attributes?.metadata || {};
     const paymentId = dataObject.id;
     const source = metadata.source || "customer_checkout";
@@ -156,16 +164,16 @@ exports.handler = async (event, context) => {
     const orderDocId = metadata.orderId;
     const userId = metadata.userId;
     const queueNumber = metadata.queueNumber;
-    const rawCartItemIds = metadata.cartItemIds ?? metadata.CartItemIds ?? metadata.cartIds ?? [];
+    const rawCartItemIds =
+      metadata.cartItemIds ??
+      metadata.CartItemIds ??
+      metadata.cartIds ??
+      [];
     const cartItemIds = safeParse(rawCartItemIds, []);
 
     console.log(`📦 Metadata:`, metadata);
 
-    // ❌ Potential Issue: You are using root-level collections. 
-    // If your security rules enforce the path /artifacts/{appId}/public/data/CollectionName, 
-    // the transaction will fail to find or update the document. If your app is simple and uses root collections, this is fine.
-    
-    // ✅ Handle Admin-Approved Payment (no userId or queue)
+    // ✅ Admin-Approved Payment
     if (source === "admin_approval_link") {
       console.log(`🧾 Admin-Approved Payment detected for Order ID: ${orderDocId}`);
 
@@ -173,9 +181,11 @@ exports.handler = async (event, context) => {
         await db.runTransaction(async (transaction) => {
           const orderRef = db.collection(collectionName).doc(orderDocId);
           const orderSnap = await transaction.get(orderRef);
-          if (!orderSnap.exists) throw new Error(`Order ${orderDocId} not found in ${collectionName}.`);
+          if (!orderSnap.exists)
+            throw new Error(`Order ${orderDocId} not found in ${collectionName}.`);
 
-          const orderItems = orderSnap.data().items || orderSnap.data().products || [];
+          const orderItems =
+            orderSnap.data().items || orderSnap.data().products || [];
           await deductInventory(orderItems, transaction);
 
           transaction.update(orderRef, {
@@ -190,7 +200,10 @@ exports.handler = async (event, context) => {
         // Auto change to Preparing
         setTimeout(async () => {
           try {
-            await db.collection(collectionName).doc(orderDocId).update({ status: "Preparing" });
+            await db
+              .collection(collectionName)
+              .doc(orderDocId)
+              .update({ status: "Preparing" });
             console.log(`🔁 Order ${orderDocId} auto-updated to 'Preparing'`);
           } catch (err) {
             console.warn("⚠️ Auto-update failed:", err.message);
@@ -200,9 +213,10 @@ exports.handler = async (event, context) => {
         return { statusCode: 200, body: JSON.stringify({ received: true }) };
       } catch (err) {
         console.error("❌ Admin-approved Payment Error:", err.message);
-        // Returning 200 here tells PayMongo the webhook was received, preventing retries. 
-        // Log the error for internal debugging.
-        return { statusCode: 200, body: JSON.stringify({ received: true, error: err.message }) }; 
+        return {
+          statusCode: 200,
+          body: JSON.stringify({ received: true, error: err.message }),
+        };
       }
     }
 
@@ -213,17 +227,16 @@ exports.handler = async (event, context) => {
         let orderSnap;
         let existingOrderFound = false;
 
-        // Lookup by orderId
         if (orderDocId) {
           orderRef = db.collection(collectionName).doc(orderDocId);
           orderSnap = await transaction.get(orderRef);
           if (orderSnap.exists) existingOrderFound = true;
         }
 
-        // Fallback: userId + queueNumber
         if (!existingOrderFound && userId && queueNumber) {
           const query = await transaction.get(
-            db.collection(collectionName)
+            db
+              .collection(collectionName)
               .where("userId", "==", userId)
               .where("queueNumber", "==", queueNumber)
               .limit(1)
@@ -235,9 +248,13 @@ exports.handler = async (event, context) => {
           }
         }
 
-        if (!existingOrderFound) throw new Error(`Order not found by ID (${orderDocId}) or User/Queue (${userId}/${queueNumber}).`);
+        if (!existingOrderFound)
+          throw new Error(
+            `Order not found by ID (${orderDocId}) or User/Queue (${userId}/${queueNumber}).`
+          );
 
-        const orderItems = orderSnap.data().items || orderSnap.data().products || [];
+        const orderItems =
+          orderSnap.data().items || orderSnap.data().products || [];
         await deductInventory(orderItems, transaction);
 
         transaction.update(orderRef, {
@@ -253,10 +270,10 @@ exports.handler = async (event, context) => {
       // Clean cart
       if (finalOrderRef && userId) {
         const batch = db.batch();
-        // ⚠️ Potential Issue: Cart is assumed to be at /users/{userId}/cart/{itemId}. 
-        // If your path is /artifacts/{appId}/users/{userId}/cart/{itemId}, this will also fail.
         for (const itemId of cartItemIds) {
-          batch.delete(db.collection("users").doc(userId).collection("cart").doc(itemId));
+          batch.delete(
+            db.collection("users").doc(userId).collection("cart").doc(itemId)
+          );
         }
         await batch.commit();
         console.log(`🗑️ Cart items cleaned for user ${userId}.`);
@@ -266,7 +283,8 @@ exports.handler = async (event, context) => {
       if (finalOrderRef) {
         setTimeout(async () => {
           try {
-            await db.collection(finalOrderRef.parent.id)
+            await db
+              .collection(finalOrderRef.parent.id)
               .doc(finalOrderRef.id)
               .update({ status: "Preparing" });
             console.log(`🔁 Order ${finalOrderRef.id} auto-updated to 'Preparing'`);
@@ -280,7 +298,10 @@ exports.handler = async (event, context) => {
       return { statusCode: 200, body: JSON.stringify({ received: true }) };
     } catch (err) {
       console.error("❌ Transaction Error:", err.message);
-      return { statusCode: 200, body: JSON.stringify({ received: true, error: err.message }) };
+      return {
+        statusCode: 200,
+        body: JSON.stringify({ received: true, error: err.message }),
+      };
     }
   }
 
