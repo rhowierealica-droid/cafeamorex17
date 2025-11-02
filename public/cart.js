@@ -184,21 +184,19 @@ onAuthStateChanged(auth, async (user) => {
 
         await mergeGuestCartToUser(currentUser.uid);
 
-        // --- FIX: Load addresses and set fee BEFORE starting cart listener ---
-        await loadSavedAddresses(true); // Load addresses, setting initial selectedAddress and userDeliveryFee
-        // --- END FIX ---
+        await loadSavedAddresses(true); 
         
-        startRealtimeListeners(); // This triggers the cart listener which calls renderCartItemsFromState
+        startRealtimeListeners(); 
     } else {
         currentUser = null;
         defaultUserDocData = null;
         userDeliveryFee = 0;
-        selectedAddress = null; // Clear address for guest
+        selectedAddress = null;
         if (unsubscribeCart) { unsubscribeCart(); unsubscribeCart = null; }
         startRealtimeListeners();
         cartItems = loadGuestCart();
         renderCartItemsFromState();
-        loadSavedAddresses(); // Also calls updateCartTotal/updateModalTotals internally
+        loadSavedAddresses(); 
     }
 });
 
@@ -415,30 +413,23 @@ function renderCartItemsFromState() {
         deliveryDiv.id = "delivery-fee";
         deliveryDiv.style.textAlign = "right";
         deliveryDiv.style.marginTop = "12px";
-        // Append deliveryDiv temporarily to cartItemsDiv to make sure it exists
-        // before the loop starts appending items, then we re-insert it later.
         cartItemsDiv.appendChild(deliveryDiv); 
     } else {
-        // Remove it if it was added previously to re-insert in the correct spot
         deliveryDiv.remove(); 
         cartItemsDiv.appendChild(deliveryDiv);
     }
     
-    // --- FIX: Add the total span container here for correct placement ---
     let totalContainer = document.getElementById("cart-total-container");
     if (!totalContainer) {
         totalContainer = document.createElement("div");
         totalContainer.id = "cart-total-container";
         totalContainer.style.textAlign = "right";
         totalContainer.style.marginTop = "8px";
-       // totalContainer.innerHTML = `<strong>Total: ₱<span id="cart-total">0.00</span></strong>`;
         cartItemsDiv.appendChild(totalContainer);
     } else {
          totalContainer.remove(); 
          cartItemsDiv.appendChild(totalContainer);
     }
-    // --- END FIX ---
-
 
     const availableItems = cartItems.filter(i => {
         const { stock, available } = computeStockForCartItem(i);
@@ -564,7 +555,7 @@ function renderCartItemsFromState() {
                 if (currentUser && !String(item.id).startsWith("guest_")) {
                     await updateDoc(doc(db, "users", currentUser.uid, "cart", item.id), {
                         quantity: newQty,
-                        unitPrice: newUnit, // Always good to update in case old items are missing it
+                        unitPrice: newUnit, 
                         totalPrice: newUnit * newQty
                     });
                 } else {
@@ -579,8 +570,6 @@ function renderCartItemsFromState() {
                         renderCartItemsFromState();
                     }
                 }
-                // Since this changes an item's total, update the overall total
-                // Realtime listener would eventually update, but this is faster for UX
                 updateCartTotal(); 
                 updateModalTotals();
             } catch (err) {
@@ -607,16 +596,13 @@ function renderCartItemsFromState() {
         }
     }
 
-    // Insert itemDiv before deliveryDiv
     cartItemsDiv.insertBefore(itemDiv, deliveryDiv);
 }
 
-    // --- FIX: Ensure delivery fee is updated after all items and checkboxes are rendered ---
-    // The previous code had a race condition where loadSavedAddresses might run later.
-    // By calling loadSavedAddresses on auth state change and then here, we ensure the fee is correct.
+    // Delivery Fee show
+   
     deliveryDiv.innerHTML = `<strong>Delivery Fee: ₱${selectedCartItems.size > 0 ? userDeliveryFee.toFixed(2) : "0.00"}</strong>`;
     
-    // Move total container to the end
     cartItemsDiv.appendChild(deliveryDiv);
     cartItemsDiv.appendChild(totalContainer);
     
@@ -624,7 +610,7 @@ function renderCartItemsFromState() {
 }
 
 function updateCartTotal() {
-    // Re-select the span element since the container might be re-rendered
+    // Select Product
     const currentCartTotalSpan = document.getElementById('cart-total');
     if (!currentCartTotalSpan) return;
     
@@ -635,12 +621,11 @@ function updateCartTotal() {
     const finalTotal = selectedCartItems.size > 0 ? (grandTotal + userDeliveryFee) : 0;
     currentCartTotalSpan.textContent = finalTotal.toFixed(2);
     
-    // --- FIX: Update Delivery Fee display here too (in case loadSavedAddresses was called later) ---
+    // Deliovery Fee show
     const deliveryDiv = document.getElementById("delivery-fee");
     if (deliveryDiv) {
          deliveryDiv.innerHTML = `<strong>Delivery Fee: ₱${selectedCartItems.size > 0 ? userDeliveryFee.toFixed(2) : "0.00"}</strong>`;
     }
-    // --- END FIX ---
 }
 
 function updateModalTotals() {
@@ -700,12 +685,11 @@ confirmOrderBtn?.addEventListener("click", () => {
 closeModalBtn?.addEventListener("click", () => { if (modal) modal.style.display = "none"; });
 window.addEventListener("click", e => { if (e.target === modal) modal.style.display = "none"; });
 
-async function loadSavedAddresses(initialLoad = false) { // Add a flag for initial load
+async function loadSavedAddresses(initialLoad = false) { 
     if (!savedAddressDiv) return;
     savedAddressDiv.innerHTML = "";
     cartAddresses = [];
     
-    // Clear previously selected address if this is not the initial load or a click
     if (!initialLoad) selectedAddress = null; 
 
     try {
@@ -722,7 +706,7 @@ async function loadSavedAddresses(initialLoad = false) { // Add a flag for initi
                 const div = document.createElement("div");
                 div.classList.add("delivery-address");
                 
-                // Only check the default address if no other address was previously selected
+                // Default Address Check
                 const isDefaultChecked = initialLoad || !selectedAddress; 
                 div.innerHTML = `<label><input type="radio" name="selectedAddress" value="${defaultAddr}" ${isDefaultChecked ? "checked" : ""}> Address 1 (Default): ${defaultAddr} (Fee: ₱${fee.toFixed(2)})</label>`;
                 savedAddressDiv.appendChild(div);
@@ -746,7 +730,7 @@ async function loadSavedAddresses(initialLoad = false) { // Add a flag for initi
                     .join(", ");
                 const fee = Number((data.deliveryFee ?? deliveryFees[data.barangay]) || 0);
                 
-                // Prevent duplicate display of the default address if it was saved as a separate address
+                // Prevent duplicate display of the default address
                 if (full !== (cartAddresses[0]?.fullAddress || '')) {
                     cartAddresses.push({ fullAddress: full, deliveryFee: fee });
                     
@@ -760,7 +744,7 @@ async function loadSavedAddresses(initialLoad = false) { // Add a flag for initi
             });
         }
 
-        // Final check and set the selected address/fee if nothing was selected initially
+        // check and set the selected address
         if (!selectedAddress && cartAddresses.length > 0) {
             const firstRadio = savedAddressDiv.querySelector("input[name='selectedAddress']");
             if (firstRadio) {
@@ -770,7 +754,7 @@ async function loadSavedAddresses(initialLoad = false) { // Add a flag for initi
                 userDeliveryFee = selected ? Number(selected.deliveryFee) : 0;
             }
         } else if (selectedAddress) {
-            // Update userDeliveryFee for a previously selected address (might have been set by a previous load)
+            // Update userDeliveryFee for a previous
              const selected = cartAddresses.find(a => a.fullAddress === selectedAddress);
              userDeliveryFee = selected ? Number(selected.deliveryFee) : 0;
         }
@@ -786,7 +770,7 @@ async function loadSavedAddresses(initialLoad = false) { // Add a flag for initi
             });
         });
 
-        // Always update totals after setting the final userDeliveryFee
+        // Update total after select address
         updateCartTotal(); 
         updateModalTotals();
     } catch (err) {
