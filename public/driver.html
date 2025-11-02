@@ -1,58 +1,79 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Café Amore - Rider Orders</title>
-    <link rel="stylesheet" href="driver.css">
-    <link rel="stylesheet" href="admin-nav.css">
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/js/all.min.js"></script>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Café Amore - Rider Orders</title>
+
+  <link rel="stylesheet" href="driver.css">
+  <link rel="stylesheet" href="admin-nav.css">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css">
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/js/all.min.js"></script>
 </head>
 <body>
-
-    <aside class="sidebar" id="sidebar">
-        <div class="logo">
-            <img src="logo.png" alt="Café Amore Logo">
-            <span class="brand">Café Amore</span>
-        </div>
-
-        <div class="profile-card">
-            <div class="profile-avatar">
-                <i class="fas fa-user-circle"></i>
-            </div>
-            <div class="profile-info">
-                <p class="profile-name">Loading...</p> 
-                <p class="edit-text">Edit Profile</p>
-            </div>
-        </div>
-
-        <div class="logout">
-            <i class="fas fa-sign-out-alt"></i> Log Out
-        </div>
-    </aside>
-
-    <div class="hamburger" id="hamburger">
-        <i class="fas fa-bars"></i>
+  <aside class="sidebar" id="sidebar">
+    <div class="logo">
+      <img src="logo.png" alt="Café Amore Logo">
+      <span class="brand">Café Amore</span>
     </div>
 
-    <main class="main-content">
-        <header>
-            <h1>My Deliveries</h1>
-            <div class="tabs">
-                <button class="tab-btn active" data-status="Delivery">Delivery</button>
-                <button class="tab-btn" data-status="Completed">Completed</button>
-                <button class="tab-btn" data-status="Canceled">Canceled</button>
-            </div>
-        </header>
+    <nav>
+      <ul>
+        <li class="active"><i class="fas fa-motorcycle"></i> Deliveries</li>
+      </ul>
+    </nav>
 
-        <section class="orders-container" id="ordersContainer">
-            <p>Loading orders...</p>
-        </section>
-    </main>
+    <div class="profile-card" id="profileCard">
+      <div class="profile-avatar">
+        <i class="fas fa-user-circle"></i>
+      </div>
+      <div class="profile-info">
+        <p class="profile-name" id="profileName">Rider</p>
+        <p class="edit-text">Edit Profile</p>
+      </div>
+    </div>
 
-    <script type="module" src="driver.js"></script>
-    <script type="module" src="employee-nav.js"></script>
-    <script type="module" src="AutoCancel.js"></script>
+    <div class="logout">
+      <i class="fas fa-sign-out-alt"></i> Log Out
+    </div>
+  </aside>
 
+  <div class="hamburger" id="hamburger">
+    <i class="fas fa-bars"></i>
+  </div>
+
+  <main class="main-content">
+    <header>
+      <h1>My Deliveries</h1>
+      <div class="tabs">
+        <button class="tab-btn active" data-status="Delivery">Delivery</button>
+        <button class="tab-btn" data-status="Completed">Completed</button>
+        <button class="tab-btn" data-status="Canceled">Canceled</button>
+      </div>
+    </header>
+
+    <div class="filter-section">
+      <select id="dateFilter">
+        <option value="all">All Dates</option>
+        <option value="today">Today</option>
+        <option value="week">This Week</option>
+        <option value="month">This Month</option>
+        <option value="custom">Custom Range</option>
+      </select>
+      <input type="text" id="customRange" placeholder="Select custom date range">
+      <input type="text" id="productFilter" placeholder="Search product name...">
+    </div>
+
+    <section class="orders-container" id="ordersContainer">
+      <p>Loading orders...</p>
+    </section>
+  </main>
+
+  <script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+  <script type="module" src="driver.js"></script>
+  <script type="module" src="employee-nav.js"></script>
+  <script type="module" src="Cashier-nav.js"></script>
+  <script type="module" src="AutoCancel.js"></script>
 </body>
 </html>
