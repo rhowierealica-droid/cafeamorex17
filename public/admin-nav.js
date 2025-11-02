@@ -112,7 +112,6 @@ logo?.addEventListener("click", () => {
   window.location.href = "adminpanel.html";
 });
 
-
 logout?.addEventListener("click", async (e) => {
   e.stopPropagation();
   try {
@@ -125,9 +124,9 @@ logout?.addEventListener("click", async (e) => {
   }
 });
 
+
 onAuthStateChanged(auth, async (user) => {
   if (!user) {
-    
     if (currentPage !== "login.html") {
       console.log("No authenticated user found. Redirecting to login.");
       window.location.href = "login.html";
@@ -142,7 +141,6 @@ onAuthStateChanged(auth, async (user) => {
       fullName = data.fullname || "Admin";
       localStorage.setItem("currentAdminName", fullName);
     } else {
-      
       const storedName = localStorage.getItem("currentAdminName");
       if (storedName) fullName = storedName;
     }
