@@ -1,4 +1,4 @@
-// netlify/functions/paymongo-webhook.js (FINAL FIXED VERSION)
+// netlify/functions/paymongo-webhook.js (FINAL FIXED VERSION - Pending after Payment)
 
 require("dotenv").config();
 const admin = require("firebase-admin");
@@ -90,7 +90,7 @@ exports.handler = async (event, context) => {
   }
 
   // -----------------------------
-  // ✅ FIXED Signature Verification
+  // ✅ Signature Verification
   // -----------------------------
   if (WEBHOOK_SECRET) {
     try {
@@ -106,11 +106,11 @@ exports.handler = async (event, context) => {
       }, {});
 
       const receivedTimestamp = parts.t;
-      const receivedSignature = parts.v1 || parts.te || parts.li; // ✅ accept multiple keys
+      const receivedSignature = parts.v1 || parts.te || parts.li;
 
       if (!receivedSignature || !receivedTimestamp) {
         console.warn(
-          "⚠️ Signature verification failed: Missing timestamp (t) or signature (v1/te/li) in header. Header:",
+          "⚠️ Signature verification failed: Missing timestamp (t) or signature (v1/te/li). Header:",
           sigHeader
         );
         return { statusCode: 401, body: "Signature Invalid" };
@@ -165,10 +165,7 @@ exports.handler = async (event, context) => {
     const userId = metadata.userId;
     const queueNumber = metadata.queueNumber;
     const rawCartItemIds =
-      metadata.cartItemIds ??
-      metadata.CartItemIds ??
-      metadata.cartIds ??
-      [];
+      metadata.cartItemIds ?? metadata.CartItemIds ?? metadata.cartIds ?? [];
     const cartItemIds = safeParse(rawCartItemIds, []);
 
     console.log(`📦 Metadata:`, metadata);
@@ -190,25 +187,12 @@ exports.handler = async (event, context) => {
 
           transaction.update(orderRef, {
             paymongoPaymentId: paymentId,
-            status: "Paid",
+            status: "Pending",
             paymentMetadata: admin.firestore.FieldValue.delete(),
           });
 
-          console.log(`✅ Admin-approved Order ${orderDocId} marked as 'Paid'.`);
+          console.log(`✅ Admin-approved Order ${orderDocId} marked as 'Pending'.`);
         });
-
-        // Auto change to Preparing
-        setTimeout(async () => {
-          try {
-            await db
-              .collection(collectionName)
-              .doc(orderDocId)
-              .update({ status: "Preparing" });
-            console.log(`🔁 Order ${orderDocId} auto-updated to 'Preparing'`);
-          } catch (err) {
-            console.warn("⚠️ Auto-update failed:", err.message);
-          }
-        }, 5000);
 
         return { statusCode: 200, body: JSON.stringify({ received: true }) };
       } catch (err) {
@@ -259,15 +243,15 @@ exports.handler = async (event, context) => {
 
         transaction.update(orderRef, {
           paymongoPaymentId: paymentId,
-          status: "Paid",
+          status: "Pending",
           paymentMetadata: admin.firestore.FieldValue.delete(),
         });
 
-        console.log(`✅ Regular order ${orderRef.id} marked as 'Paid'.`);
+        console.log(`✅ Regular order ${orderRef.id} marked as 'Pending'.`);
         return orderRef;
       });
 
-      // Clean cart
+      // 🗑️ Clean cart
       if (finalOrderRef && userId) {
         const batch = db.batch();
         for (const itemId of cartItemIds) {
@@ -277,21 +261,6 @@ exports.handler = async (event, context) => {
         }
         await batch.commit();
         console.log(`🗑️ Cart items cleaned for user ${userId}.`);
-      }
-
-      // Auto-update to Preparing
-      if (finalOrderRef) {
-        setTimeout(async () => {
-          try {
-            await db
-              .collection(finalOrderRef.parent.id)
-              .doc(finalOrderRef.id)
-              .update({ status: "Preparing" });
-            console.log(`🔁 Order ${finalOrderRef.id} auto-updated to 'Preparing'`);
-          } catch (err) {
-            console.warn("⚠️ Auto-update failed:", err.message);
-          }
-        }, 5000);
       }
 
       console.log("--- Webhook Handler Finished Successfully ---");
