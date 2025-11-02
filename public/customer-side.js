@@ -9,9 +9,7 @@ import {
   getDoc 
 } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 
-/* ===============================
-   DOM ELEMENTS
-=============================== */
+
 const sidebar = document.getElementById('sidebar');
 const hamburger = document.getElementById('hamburger');
 const closeBtn = document.getElementById('closeBtn');
@@ -23,9 +21,7 @@ const logout = document.querySelector('.logout');
 const logo = document.querySelector('.logo');
 const welcomeHeader = document.querySelector('.main-content header h1');
 
-/* ===============================
-   CREATE OVERLAY
-=============================== */
+
 let overlay = document.getElementById('overlay');
 if (!overlay) {
   overlay = document.createElement('div');
@@ -33,20 +29,13 @@ if (!overlay) {
   document.body.appendChild(overlay);
 }
 
-/* ===============================
-   FIREBASE INIT
-=============================== */
+
 const db = getFirestore();
 const auth = getAuth();
 
-/* ===============================
-   INITIAL STATE
-=============================== */
 if (closeBtn) closeBtn.style.display = 'none';
 
-/* ===============================
-   RESPONSIVE ELEMENTS HANDLER
-=============================== */
+
 function updateResponsiveElements() {
   if (window.innerWidth > 1024) {
     sidebar.classList.remove('active');
@@ -61,13 +50,11 @@ function updateResponsiveElements() {
   }
 }
 
-// Initial call + listener
+
 updateResponsiveElements();
 window.addEventListener('resize', updateResponsiveElements);
 
-/* ===============================
-   SIDEBAR TOGGLE FUNCTIONS
-=============================== */
+
 function openSidebar() {
   sidebar.classList.add('active');
   if (hamburger) hamburger.style.display = 'none';
@@ -90,16 +77,12 @@ function closeSidebar() {
   if (topBar) topBar.style.display = 'flex';
 }
 
-/* ===============================
-   EVENT LISTENERS
-=============================== */
+
 hamburger?.addEventListener('click', openSidebar);
 closeBtn?.addEventListener('click', closeSidebar);
 overlay.addEventListener('click', closeSidebar);
 
-/* ===============================
-   NAVIGATION LINKS
-=============================== */
+
 const navLinks = sidebar?.querySelectorAll('nav ul li') || [];
 const linkMap = {
   "menu-link": "menu.html",
@@ -117,9 +100,7 @@ navLinks.forEach(link => {
   });
 });
 
-/* ===============================
-   LOGIN / PROFILE / LOGOUT
-=============================== */
+
 loginLink?.addEventListener('click', () => {
   window.location.href = "login.html";
 });
@@ -143,33 +124,24 @@ logo?.addEventListener('click', () => {
   window.location.href = "menu.html";
 });
 
-/* ===============================
-   AUTH STATE OBSERVER
-=============================== */
 onAuthStateChanged(auth, async (user) => {
   const isLoggedIn = !!user;
 
-  // Ensure navLinks exist before modifying
   if (navLinks.length > 0) {
-    // Menu (always visible)
     if (navLinks[0]) navLinks[0].style.display = "flex";
 
-    // Show/Hide other links based on login
-    if (navLinks[1]) navLinks[1].style.display = isLoggedIn ? "flex" : "display"; // Cart
-    if (navLinks[2]) navLinks[2].style.display = isLoggedIn ? "flex" : "none"; // Order Status
-    if (navLinks[3]) navLinks[3].style.display = isLoggedIn ? "flex" : "none"; // Favorites
-    // if (navLinks[4]) navLinks[4].style.display = isLoggedIn ? "flex" : "none"; // History
+    if (navLinks[1]) navLinks[1].style.display = isLoggedIn ? "flex" : "display";
+    if (navLinks[2]) navLinks[2].style.display = isLoggedIn ? "flex" : "none";
+    if (navLinks[3]) navLinks[3].style.display = isLoggedIn ? "flex" : "none"; 
+    if (navLinks[4]) navLinks[4].style.display = isLoggedIn ? "flex" : "none"; 
   }
 
-  // Profile & login visibility
   if (profileCard) profileCard.style.display = isLoggedIn ? "flex" : "none";
   if (logout) logout.style.display = isLoggedIn ? "flex" : "none";
   if (loginLink) loginLink.style.display = isLoggedIn ? "none" : "flex";
 
-  // Default name
   let fullName = "Customer";
 
-  // Get stored name or fetch from Firestore
   const storedName = localStorage.getItem("currentUserName");
   if (storedName) {
     fullName = storedName;
@@ -185,7 +157,6 @@ onAuthStateChanged(auth, async (user) => {
     }
   }
 
-  // Update UI
   if (profileNameEl) profileNameEl.textContent = fullName;
   if (welcomeHeader) welcomeHeader.textContent = `Welcome, ${fullName}`;
 });
