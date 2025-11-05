@@ -14,7 +14,7 @@ let currentTab = "Waiting for Payment";
 
 const auth = getAuth();
 let currentUser = null;
-let currentUserEmail = null; // Stored user email
+let currentUserEmail = null; 
 let unsubscribeOrders = null;
 let dateRangeInstance = null; 
 
@@ -345,13 +345,9 @@ function listenOrders() {
 
             let statusMatch = false;
             if (tab === "waiting for payment") statusMatch = status === "waiting for payment";
-            // Corrected: Order must be marked 'Completed by Customer' but not have feedback yet
             else if (tab === "to rate") statusMatch = status === "completed by customer" && !order.feedback;
-            // Corrected: Order must be marked 'Completed' (by staff) but not yet marked as received by customer, and no refund request
             else if (tab === "to receive") statusMatch = status === "completed" && !order.refundRequest; 
-            // Corrected: Order must be fully 'Completed' (by customer) and have feedback
             else if (tab === "completed") statusMatch = status === "completed by customer" && order.feedback; 
-            // FIX: Added 'refunded' and the typo 'refundend' to statusMatch for the Refund tab
             else if (tab === "refund") statusMatch = order.refundRequest || ["succeeded", "manual", "failed", "denied", "refund pending"].includes(finalRefundStatus) || status === "refunded" || status === "refundend";
             else statusMatch = status === tab;
             
@@ -364,7 +360,7 @@ function listenOrders() {
                     return false;
                 }
             }
-            // 3. Filter by Product Name 
+            //  Filter by Product Name 
             if (filterableTabs.includes(currentTab) && productSearchTerm) {
                 const itemMatch = order.items?.some(p => {
                     const productName = (p.product || p.name || "").toLowerCase();
@@ -393,7 +389,6 @@ function listenOrders() {
             const orderTitle = document.createElement("h3");
             let titleText = `Order #${formatQueueNumber(order.queueNumber || order.queueNumberNumeric || "N/A")} - Status: ${order.status || "Unknown"}`;
             if (order.estimatedTime) titleText += ` | ETA: ${order.estimatedTime}`;
-            // if (currentTab === "Refund" || order.finalRefundStatus) titleText += ` | Refund: ${order.finalRefundStatus || order.refundStatus || "Refund"}`;
             orderTitle.textContent = titleText;
 
             orderHeader.appendChild(orderTitle);
@@ -482,7 +477,7 @@ function listenOrders() {
                     btn.textContent = order.refundRequest ? `Refund: ${order.refundStatus || "Requested"}` : "Request Refund";
                     btn.disabled = !!order.refundRequest;
                     btn.className = "action-btn cancel-refund-btn";
-                    btn.style.backgroundColor = order.refundRequest ? "#ccc" : "#dc3545"; // Red for refund, unless requested
+                    btn.style.backgroundColor = order.refundRequest ? "#ccc" : "#dc3545"; 
                     btn.style.cursor = order.refundRequest ? "not-allowed" : "pointer";
                     if (!order.refundRequest) {
                         btn.addEventListener("click", () => openRefundModal(order.id, order.items));
@@ -713,7 +708,6 @@ async function returnItemsToInventory(orderItems) {
             inventoryUpdates[id] = (inventoryUpdates[id] || 0) + totalConsumption;
         };
         
-        // --- START OF SECOND PART ---
         aggregateItem(item.sizeId, item.sizeQty || 1);
         item.ingredients?.forEach(ing => aggregateItem(ing.id, ing.qty || 1));
         item.addons?.forEach(addon => aggregateItem(addon.id, addon.qty || 1));
@@ -742,8 +736,6 @@ async function returnItemsToInventory(orderItems) {
     await batch.commit();
     console.log("✅ All items returned to inventory successfully.");
 }
-
-// --- Customer Action Functions ---
 
 async function handleCancelOrder(orderId, orderItems) {
     if (!confirm("Are you sure you want to cancel this order? Stock will be returned.")) return;
@@ -785,13 +777,10 @@ function showConfirmModal(orderId) {
 
     modalContent.querySelector("#confirm-yes").onclick = async () => {
         try {
-            // Update status to mark as received by customer, preparing for "To Rate"
             await updateDoc(doc(db, "DeliveryOrders", orderId), { status: "Completed by Customer" });
             closeModal();
-            // Automatically switch to the "To Rate" tab
             currentTab = "To Rate";
             tabs.forEach(t => t.classList.remove("active"));
-            // This line assumes you have a tab button with data-status="To Rate"
             const toRateTab = document.querySelector(`.tab-btn[data-status="To Rate"]`);
             if(toRateTab) toRateTab.classList.add("active");
             listenOrders();
@@ -806,8 +795,6 @@ function showConfirmModal(orderId) {
 }
 
 function openRefundModal(orderId, orderItems) {
-    // NOTE: This assumes a static modal structure with id="refund-modal" in the HTML.
-    // If not present, this will alert the user.
     const modal = document.getElementById("refund-modal"); 
     if (!modal) {
         alert("Refund modal structure (id='refund-modal') not found in HTML. Check your HTML file.");
@@ -962,7 +949,6 @@ function openFeedbackModal(orderId, items) {
         const feedbacks = [];
         const ratings = [];
 
-        // FIX: Capture the current user's email for the feedback record
         const userEmailForFeedback = currentUserEmail || (currentUser ? currentUser.email : 'anonymous@noemail.com');
 
         feedbackItemsDiv.querySelectorAll(".feedback-item").forEach((itemDiv, index) => {
@@ -982,12 +968,10 @@ function openFeedbackModal(orderId, items) {
                 comment: text || '',
                 productId: item.id || null, 
                 timestamp: new Date().getTime(),
-                // --- FIX APPLIED HERE ---
                 customerEmail: userEmailForFeedback,
                 customerId: currentUser?.uid || null
-                // -------------------------
             });
-            ratings.push(starValue); // For validation
+            ratings.push(starValue); 
         });
 
         if (ratings.some(r => r === 0)) {
@@ -998,10 +982,7 @@ function openFeedbackModal(orderId, items) {
         try {
             await updateDoc(doc(db, "DeliveryOrders", orderId), {
                 feedback: arrayUnion(...feedbacks),
-                // This status update moves the order from "To Rate" to "Completed" tab
-                status: "Completed by Customer", // Keep the status as "Completed by Customer" to trigger the "Completed" tab filter which checks for feedback.
-                // NOTE: Your filter logic for the "Completed" tab is: status === "completed by customer" && order.feedback
-                // If you update the status to "Completed" here, you need to update the filter logic accordingly, but this structure seems intentional.
+                status: "Completed by Customer", 
             });
 
             alert("Thank you for your feedback! The order is now marked as Completed.");
