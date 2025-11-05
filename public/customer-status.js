@@ -14,7 +14,7 @@ let currentTab = "Waiting for Payment";
 
 const auth = getAuth();
 let currentUser = null;
-let currentUserEmail = null;
+let currentUserEmail = null; // Stored user email
 let unsubscribeOrders = null;
 let dateRangeInstance = null; 
 
@@ -112,7 +112,7 @@ function injectPopupStyles() {
     #closeAlertBtn, #closeReceiptBtn { background-color: #6c757d; }
     #closeAlertBtn:hover, #closeReceiptBtn:hover { background-color: #5a6268; }
 
-    /* --- Feedback Modal Styles (Ensure .feedback-item styles are defined) --- */
+    /* --- Feedback/Refund Modal Styles --- */
     .modal {
         position: fixed; inset: 0; background-color: rgba(0, 0, 0, 0.7); display: none;
         justify-content: center; align-items: center; z-index: 10000;
@@ -152,6 +152,8 @@ function injectPopupStyles() {
         box-sizing: border-box;
         resize: vertical;
     }
+    .refund-item { margin-bottom: 10px; }
+    .refund-item label { display: block; }
     /* ------------------------------------------------------------------- */
     `;
     document.head.appendChild(style);
@@ -208,6 +210,7 @@ function calculateDateRange(filterValue, customRange) {
 
     if (filterValue === 'today') {
         start = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+        start.setHours(0, 0, 0, 0);
         end = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 23, 59, 59, 999);
     } else if (filterValue === 'week') {
         const dayOfWeek = now.getDay() === 0 ? 6 : now.getDay() - 1; // Mon=0, Sun=6
@@ -274,7 +277,7 @@ if (productFilterInput) {
 onAuthStateChanged(auth, user => {
     currentUser = user;
     if (user) {
-        currentUserEmail = user.email?.toLowerCase();
+        currentUserEmail = user.email?.toLowerCase(); // Save user email
         tabs.forEach(t => {
             if (t.dataset.status === currentTab) {
                 t.classList.add("active");
@@ -342,10 +345,14 @@ function listenOrders() {
 
             let statusMatch = false;
             if (tab === "waiting for payment") statusMatch = status === "waiting for payment";
+            // Corrected: Order must be marked 'Completed by Customer' but not have feedback yet
             else if (tab === "to rate") statusMatch = status === "completed by customer" && !order.feedback;
+            // Corrected: Order must be marked 'Completed' (by staff) but not yet marked as received by customer, and no refund request
             else if (tab === "to receive") statusMatch = status === "completed" && !order.refundRequest; 
+            // Corrected: Order must be fully 'Completed' (by customer) and have feedback
             else if (tab === "completed") statusMatch = status === "completed by customer" && order.feedback; 
-            else if (tab === "refund") statusMatch = order.refundRequest || ["succeeded", "manual", "failed", "denied"].includes(finalRefundStatus);
+            // FIX: Added 'refunded' and the typo 'refundend' to statusMatch for the Refund tab
+            else if (tab === "refund") statusMatch = order.refundRequest || ["succeeded", "manual", "failed", "denied", "refund pending"].includes(finalRefundStatus) || status === "refunded" || status === "refundend";
             else statusMatch = status === tab;
             
             if (!statusMatch) return false;
@@ -386,7 +393,7 @@ function listenOrders() {
             const orderTitle = document.createElement("h3");
             let titleText = `Order #${formatQueueNumber(order.queueNumber || order.queueNumberNumeric || "N/A")} - Status: ${order.status || "Unknown"}`;
             if (order.estimatedTime) titleText += ` | ETA: ${order.estimatedTime}`;
-            if (currentTab === "Refund" || order.finalRefundStatus) titleText += ` | Refund: ${order.finalRefundStatus || order.refundStatus || "Requested"}`;
+            // if (currentTab === "Refund" || order.finalRefundStatus) titleText += ` | Refund: ${order.finalRefundStatus || order.refundStatus || "Refund"}`;
             orderTitle.textContent = titleText;
 
             orderHeader.appendChild(orderTitle);
@@ -440,7 +447,7 @@ function listenOrders() {
 
             const paymentMethod = (order.paymentMethod || "").toLowerCase();
 
-            const isFinalState = ["Completed", "Completed by Customer", "Canceled", "Refunded", "Refund Denied", "Refund Failed"].includes(order.status);
+            const isFinalState = ["Completed", "Completed by Customer", "Canceled", "Refunded", "Refund Denied", "Refund Failed", "Refundend"].includes(order.status);
 
 
             if (currentTab === "Waiting for Payment") {
@@ -522,7 +529,7 @@ function listenOrders() {
                 }
             }
 
-            if (currentTab === "Refund") {
+           /* if (currentTab === "Refund") {
                 const refundBtn = document.createElement("button");
                 refundBtn.textContent = order.finalRefundStatus || order.refundStatus || "Requested";
                 refundBtn.disabled = true;
@@ -536,6 +543,7 @@ function listenOrders() {
 
                 itemsContainer.appendChild(refundBtn);
             }
+                */
             
             // Print Receipt button to completed
             if (isFinalState || order.status === "Completed by Customer" || (order.status === "Completed" && order.feedback) ) {
@@ -690,7 +698,6 @@ async function showReceiptPopup(orderId, collectionName) {
     }
 }
 
-
 async function returnItemsToInventory(orderItems) {
     if (!orderItems || orderItems.length === 0) return;
     const inventoryUpdates = {};
@@ -705,7 +712,8 @@ async function returnItemsToInventory(orderItems) {
             const totalConsumption = (consumptionPerProduct || 1) * productQtyOrdered;
             inventoryUpdates[id] = (inventoryUpdates[id] || 0) + totalConsumption;
         };
-
+        
+        // --- START OF SECOND PART ---
         aggregateItem(item.sizeId, item.sizeQty || 1);
         item.ingredients?.forEach(ing => aggregateItem(ing.id, ing.qty || 1));
         item.addons?.forEach(addon => aggregateItem(addon.id, addon.qty || 1));
@@ -734,6 +742,8 @@ async function returnItemsToInventory(orderItems) {
     await batch.commit();
     console.log("✅ All items returned to inventory successfully.");
 }
+
+// --- Customer Action Functions ---
 
 async function handleCancelOrder(orderId, orderItems) {
     if (!confirm("Are you sure you want to cancel this order? Stock will be returned.")) return;
@@ -775,11 +785,15 @@ function showConfirmModal(orderId) {
 
     modalContent.querySelector("#confirm-yes").onclick = async () => {
         try {
+            // Update status to mark as received by customer, preparing for "To Rate"
             await updateDoc(doc(db, "DeliveryOrders", orderId), { status: "Completed by Customer" });
             closeModal();
+            // Automatically switch to the "To Rate" tab
             currentTab = "To Rate";
             tabs.forEach(t => t.classList.remove("active"));
-            document.querySelector(`.tab-btn[data-status="To Rate"]`).classList.add("active");
+            // This line assumes you have a tab button with data-status="To Rate"
+            const toRateTab = document.querySelector(`.tab-btn[data-status="To Rate"]`);
+            if(toRateTab) toRateTab.classList.add("active");
             listenOrders();
         } catch (error) {
             console.error("Error confirming order:", error);
@@ -792,7 +806,9 @@ function showConfirmModal(orderId) {
 }
 
 function openRefundModal(orderId, orderItems) {
-    const modal = document.getElementById("refund-modal"); // Assumes a pre-existing modal in your HTML
+    // NOTE: This assumes a static modal structure with id="refund-modal" in the HTML.
+    // If not present, this will alert the user.
+    const modal = document.getElementById("refund-modal"); 
     if (!modal) {
         alert("Refund modal structure (id='refund-modal') not found in HTML. Check your HTML file.");
         return;
@@ -906,13 +922,16 @@ function openFeedbackModal(orderId, items) {
     submitBtn.className = "action-btn";
     submitBtn.textContent = "Submit Feedback";
 
+    modalContent.innerHTML = `<h2>Leave Product Feedback</h2>`; // Add modal title
+    modalContent.appendChild(closeBtn);
+    modalContent.appendChild(form);
     form.appendChild(feedbackItemsDiv);
     form.appendChild(submitBtn);
 
-    modalContent.appendChild(closeBtn);
-    modalContent.appendChild(form);
     modal.appendChild(modalContent);
     document.body.appendChild(modal);
+
+    modal.addEventListener("click", e => { if (e.target === modal) modal.remove(); });
 
 
     feedbackItemsDiv.querySelectorAll(".star-rating").forEach(starContainer => {
@@ -943,9 +962,13 @@ function openFeedbackModal(orderId, items) {
         const feedbacks = [];
         const ratings = [];
 
+        // FIX: Capture the current user's email for the feedback record
+        const userEmailForFeedback = currentUserEmail || (currentUser ? currentUser.email : 'anonymous@noemail.com');
+
         feedbackItemsDiv.querySelectorAll(".feedback-item").forEach((itemDiv, index) => {
             const text = itemDiv.querySelector("textarea").value;
-            const productName = items[index].product || items[index].name || "Unknown Product";
+            const item = items[index];
+            const productName = item.product || item.name || "Unknown Product";
 
             const stars = itemDiv.querySelectorAll(".star");
             let starValue = 0;
@@ -954,11 +977,15 @@ function openFeedbackModal(orderId, items) {
             });
 
             feedbacks.push({
-                productName: productName,
-                rating: starValue,
-                comment: text,
-                productId: items[index].id,
-                timestamp: new Date().getTime() 
+                productName: productName || 'N/A',
+                rating: starValue || 0,
+                comment: text || '',
+                productId: item.id || null, 
+                timestamp: new Date().getTime(),
+                // --- FIX APPLIED HERE ---
+                customerEmail: userEmailForFeedback,
+                customerId: currentUser?.uid || null
+                // -------------------------
             });
             ratings.push(starValue); // For validation
         });
@@ -971,7 +998,10 @@ function openFeedbackModal(orderId, items) {
         try {
             await updateDoc(doc(db, "DeliveryOrders", orderId), {
                 feedback: arrayUnion(...feedbacks),
-                status: "Completed" 
+                // This status update moves the order from "To Rate" to "Completed" tab
+                status: "Completed by Customer", // Keep the status as "Completed by Customer" to trigger the "Completed" tab filter which checks for feedback.
+                // NOTE: Your filter logic for the "Completed" tab is: status === "completed by customer" && order.feedback
+                // If you update the status to "Completed" here, you need to update the filter logic accordingly, but this structure seems intentional.
             });
 
             alert("Thank you for your feedback! The order is now marked as Completed.");
@@ -979,7 +1009,7 @@ function openFeedbackModal(orderId, items) {
             listenOrders();
         } catch (err) {
             console.error("Error saving feedback:", err);
-            alert("Failed to save feedback. Please try again.");
+            alert("Failed to save feedback. Please try again. Check console for details.");
         }
     };
 }
