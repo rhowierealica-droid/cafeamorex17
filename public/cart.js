@@ -7,26 +7,10 @@ import { getAuth, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/
 
 
 const deliveryFees = {
-    "Alima": 5, "Aniban I": 10, "Aniban II": 15, "Aniban III": 20,
-    "Aniban IV": 25, "Aniban V": 30, "Banalo": 35,
-    "Bayanan": 40, "Campo Santo": 45, "Daang Bukid": 50, "Digman": 55,
-    "Dulong Bayan": 60, "Habay I": 65, "Habay II": 70, "Ligas I": 75,
-    "Ligas II": 80, "Ligas III": 85, "Mabolo I": 90, "Mabolo II": 95,
-    "Mabolo III": 100, "Maliksi I": 105, "Maliksi II": 110, "Maliksi III": 115,
-    "Mambog I": 120, "Mambog II": 125, "Mambog III": 130, "Mambog IV": 135,
-    "Mambog V": 140, "Molino I": 145, "Molino II": 150, "Molino III": 155,
-    "Molino IV": 160, "Molino V": 165, "Molino VI": 170, "Molino VII": 175,
-    "Niog I": 180, "Niog II": 185, "Niog III": 190, "P.F. Espiritu I (Panapaan)": 195,
-    "P.F. Espiritu II": 200, "P.F. Espiritu III": 205, "P.F. Espiritu IV": 210,
-    "P.F. Espiritu V": 215, "P.F. Espiritu VI": 220, "P.F. Espiritu VII": 225,
-    "P.F. Espiritu VIII": 230, "Queens Row Central": 235, "Queens Row East": 240,
-    "Queens Row West": 245, "Real I": 250, "Real II": 255, "Salinas I": 260,
-    "Salinas II": 265, "Salinas III": 270, "Salinas IV": 275, "San Nicolas I": 280,
-    "San Nicolas II": 285, "San Nicolas III": 290, "Sineguelasan": 295,
-    "Tabing Dagat (Poblacion)": 300, "Talaba I": 305, "Talaba II": 310,
-    "Talaba III": 315, "Talaba IV": 320, "Talaba V": 325, "Talaba VI": 330,
-    "Talaba VII": 335, "Zapote I": 340, "Zapote II": 345, "Zapote III": 350,
-    "Zapote IV": 355, "Zapote V": 360
+    "Aniban I": 57, "Aniban 557": 15, "Aniban III": 56,
+    "Aniban 54": 25, "Aniban V": 55,
+    "Ligas I": 50, "Ligas II": 57, "Ligas III": 58, "San Nicolas I": 61,
+    "San Nicolas II": 64, "San Nicolas III": 104, "Zapote I": 62,
 };
 
 
