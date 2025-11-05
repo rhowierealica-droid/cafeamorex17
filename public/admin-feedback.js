@@ -17,7 +17,6 @@ import {
 const auth = getAuth();
 const feedbackContainer = document.getElementById('feedback-container');
 
-// --- Inject CSS for Star Rating Display and Card Styling ---
 const style = document.createElement('style');
 style.textContent = `
 .rating-stars { 
@@ -61,7 +60,6 @@ style.textContent = `
 }
 `;
 document.head.appendChild(style);
-// --- End CSS Injection ---
 
 onAuthStateChanged(auth, async (user) => {
   if (!user) {
@@ -122,14 +120,14 @@ function maskEmail(email) {
 }
 
 /**
- * Safely extracts feedback text, rating, and email from the feedback object.
- * @param {object} feedback The raw feedback object.
- * @returns {{text: string, rating: number, email: string | null}} Cleaned data.
+ 
+ * @param {object} feedback 
+ * @returns {{text: string, rating: number, email: string | null}} 
  */
 function getCleanFeedbackData(feedback) {
   let text = '*(No text feedback provided)*';
   let rating = 0;
-  let email = null; // Capture email if available
+  let email = null; 
 
   if (feedback && typeof feedback === 'object' && feedback !== null) {
     if (feedback.comment && typeof feedback.comment === 'string') {
@@ -173,13 +171,12 @@ async function loadFeedback() {
       if (hasValidData) {
         hasFeedback = true;
 
-        // --- Determine which email to use ---
         let emailToMask = orderEmail;
         if (!emailToMask && feedbackEmail) {
           emailToMask = feedbackEmail;
         }
         const maskedEmail = maskEmail(emailToMask);
-        // --- End email logic ---
+        
 
         const ratingHtml = getStarHtml(itemRating);
         const productName = fb.productName || items[index]?.product || 'Unnamed Item';
