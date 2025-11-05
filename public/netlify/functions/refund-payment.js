@@ -38,15 +38,16 @@ exports.handler = async (event, context) => {
     // ==============================
     // VALIDATION & DEFAULTS
     // ==============================
-    const { paymongoPaymentId, amount, reason } = payload;
+    // IMPORTANT: Include orderId and collectionName in destructuring
+    const { paymongoPaymentId, amount, reason, orderId, collectionName } = payload;
     const refundReason = reason || "requested_by_customer"; // Default reason
 
-    if (!paymongoPaymentId || !amount || typeof amount !== 'number' || amount <= 0) {
+    if (!paymongoPaymentId || !amount || typeof amount !== 'number' || amount <= 0 || !orderId || !collectionName) {
         return { 
             statusCode: 400, 
             body: JSON.stringify({ 
                 error: "Invalid Request", 
-                details: "Missing or invalid paymongoPaymentId or amount in body." 
+                details: "Missing or invalid paymongoPaymentId, amount, orderId, or collectionName." 
             }) 
         };
     }
@@ -55,15 +56,14 @@ exports.handler = async (event, context) => {
     const amountInCentavos = Math.round(amount); 
     
     // ⚠️ IMPORTANT DEBUG LOG: Log what we are sending 
-    console.log(`[DEBUG] Attempting refund for Payment ID: ${paymongoPaymentId} with amount (centavos): ${amountInCentavos}`);
-    console.log(`[DEBUG] Using Refund Reason: ${refundReason}`);
+    console.log(`[DEBUG] Attempting refund for Order: ${orderId} in Collection: ${collectionName}`);
+    console.log(`[DEBUG] Payment ID: ${paymongoPaymentId} with amount (centavos): ${amountInCentavos}`);
 
 
     try {
         // ==============================
         // 3. Send Refund Request to PayMongo
         // ==============================
-        // NOTE: Using native global fetch
         const response = await fetch(PAYMONGO_API_URL, {
             method: 'POST',
             headers: {
@@ -76,7 +76,12 @@ exports.handler = async (event, context) => {
                     attributes: {
                         payment_id: paymongoPaymentId,
                         amount: amountInCentavos,
-                        reason: refundReason
+                        reason: refundReason,
+                        // ✅ CRITICAL UPDATE: Add metadata for webhook processing
+                        metadata: {
+                            orderId: orderId,
+                            collectionName: collectionName
+                        }
                     }
                 }
             })
@@ -109,6 +114,8 @@ exports.handler = async (event, context) => {
         const finalStatus = paymongoData.data.attributes.status;
         console.log(`[SUCCESS] Refund initiated successfully for ID: ${paymongoData.data.id}. Status: ${finalStatus}`);
 
+        // NOTE: Since this is a serverless function, we only initiate the refund. 
+        // The main Express server's webhook will handle the Firestore status update.
         return {
             statusCode: 200,
             body: JSON.stringify({ 
