@@ -1,15 +1,67 @@
 import { db } from './firebase-config.js';
 
 import {
-  collection, getDocs, query, orderBy, doc, getDoc
+  collection,
+  getDocs,
+  query,
+  orderBy,
+  doc,
+  getDoc
 } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 
 import {
-  getAuth, onAuthStateChanged
+  getAuth,
+  onAuthStateChanged
 } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
 
 const auth = getAuth();
 const feedbackContainer = document.getElementById('feedback-container');
+
+// --- Inject CSS for Star Rating Display and Card Styling ---
+const style = document.createElement('style');
+style.textContent = `
+.rating-stars { 
+  color: gold;
+  font-size: 1.2em;
+  margin-left: 5px;
+}
+.feedback-card {
+  border: 1px solid #ccc;
+  padding: 15px;
+  margin-bottom: 15px;
+  border-radius: 8px;
+  background-color: #f9f9f9;
+  transition: box-shadow 0.3s;
+}
+.feedback-card:hover {
+  box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+}
+.order-info {
+  font-size: 0.9em;
+  color: #555;
+  margin-bottom: 10px;
+  border-bottom: 1px solid #eee;
+  padding-bottom: 5px;
+}
+.item-rating-info {
+  display: flex;
+  align-items: center;
+  font-weight: bold;
+  margin-bottom: 5px;
+}
+.feedback-text p {
+  margin: 5px 0 0 0;
+  font-style: italic;
+  color: #333;
+}
+.no-feedback {
+  text-align: center;
+  padding: 20px;
+  color: #777;
+}
+`;
+document.head.appendChild(style);
+// --- End CSS Injection ---
 
 onAuthStateChanged(auth, async (user) => {
   if (!user) {
@@ -19,7 +71,6 @@ onAuthStateChanged(auth, async (user) => {
 
   try {
     const userDoc = await getDoc(doc(db, "users", user.uid));
-
     if (!userDoc.exists() || userDoc.data().role !== "Admin") {
       console.error("Access denied. User is not an Admin.");
       window.location.href = "login.html";
@@ -38,25 +89,63 @@ onAuthStateChanged(auth, async (user) => {
 function getStarHtml(rating) {
   const maxStars = 5;
   let starsHtml = '';
-  for (let i = 1; i <= maxStars; i++) {
-    starsHtml += i <= rating ? '★' : '☆';
+  for (let i = 1; i <= rating; i++) {
+    starsHtml += '★';
+  }
+  for (let i = rating + 1; i <= maxStars; i++) {
+    starsHtml += '☆';
   }
   return `<span class="rating-stars">${starsHtml}</span>`;
 }
 
-
 function maskEmail(email) {
   if (typeof email !== 'string' || !email.includes('@') || email.length < 5) {
-    return "No Email Found";
+    return "(Email unavailable)";
   }
 
   const atIndex = email.indexOf('@');
   const localPart = email.substring(0, atIndex);
   const domainPart = email.substring(atIndex);
 
-  const firstThree = localPart.substring(0, Math.min(localPart.length, 3));
+  if (localPart.length <= 3) {
+    const firstChar = localPart.substring(0, 1);
+    const mask = '*'.repeat(localPart.length - 1);
+    return `${firstChar}${mask}${domainPart}`;
+  }
 
-  return `${firstThree}****${domainPart}`;
+  // Mask all but the first three characters
+  const firstThree = localPart.substring(0, 3);
+  const maskLength = localPart.length - 3;
+  const mask = '*'.repeat(maskLength);
+
+  return `${firstThree}${mask}${domainPart}`;
+}
+
+/**
+ * Safely extracts feedback text, rating, and email from the feedback object.
+ * @param {object} feedback The raw feedback object.
+ * @returns {{text: string, rating: number, email: string | null}} Cleaned data.
+ */
+function getCleanFeedbackData(feedback) {
+  let text = '*(No text feedback provided)*';
+  let rating = 0;
+  let email = null; // Capture email if available
+
+  if (feedback && typeof feedback === 'object' && feedback !== null) {
+    if (feedback.comment && typeof feedback.comment === 'string') {
+      text = feedback.comment.trim() || '*(No text feedback provided)*';
+    }
+    if (feedback.rating != null) {
+      rating = Number(feedback.rating) || 0;
+    }
+    if (feedback.customerEmail && typeof feedback.customerEmail === 'string') {
+      email = feedback.customerEmail;
+    }
+  } else if (typeof feedback === 'string') {
+    text = feedback.trim() || '*(No text feedback provided)*';
+  }
+
+  return { text, rating, email };
 }
 
 async function loadFeedback() {
@@ -69,46 +158,48 @@ async function loadFeedback() {
 
   snapshot.forEach(docSnap => {
     const order = docSnap.data();
+    const feedbackArray = order.feedback || [];
+    const items = order.items || [];
 
-    if (order.feedback && order.feedback.length > 0 && order.items?.length > 0) {
-      hasFeedback = true;
+    if (feedbackArray.length === 0) return;
 
-      let emailToMask = order.customerEmail;
-      let customerName = order.customerName || "Unknown Customer";
+    let displayCustomerName = order.customerName || "Customer";
+    let orderEmail = order.customerEmail || "";
 
-      if ((!emailToMask || !emailToMask.includes('@')) && customerName.includes('@')) {
-        emailToMask = customerName;
-        customerName = "Customer";
-      }
+    feedbackArray.forEach((fb, index) => {
+      const { text: cleanFeedbackText, rating: itemRating, email: feedbackEmail } = getCleanFeedbackData(fb);
+      const hasValidData = (cleanFeedbackText !== '*(No text feedback provided)*') || (itemRating > 0);
 
-      const maskedEmail = maskEmail(emailToMask);
+      if (hasValidData) {
+        hasFeedback = true;
 
-      const ratings = order.feedbackRating || [];
-
-      order.items.forEach((item, index) => {
-        const feedbackText = order.feedback[index];
-        const itemRating = ratings[index] || 0;
-        const ratingHtml = getStarHtml(itemRating);
-
-        if (feedbackText) {
-          const card = document.createElement('div');
-          card.className = 'feedback-card';
-
-          card.innerHTML = `
-            <div class="order-info">
-              Order #${order.queueNumber || docSnap.id} - ${customerName} - ${maskedEmail}
-            </div>
-            <div class="item-rating-info">
-              <strong>${item.product}</strong> ${ratingHtml}
-            </div>
-            <div class="feedback-text">
-              <p>💬 ${feedbackText}</p>
-            </div>
-          `;
-          feedbackContainer.appendChild(card);
+        // --- Determine which email to use ---
+        let emailToMask = orderEmail;
+        if (!emailToMask && feedbackEmail) {
+          emailToMask = feedbackEmail;
         }
-      });
-    }
+        const maskedEmail = maskEmail(emailToMask);
+        // --- End email logic ---
+
+        const ratingHtml = getStarHtml(itemRating);
+        const productName = fb.productName || items[index]?.product || 'Unnamed Item';
+
+        const card = document.createElement('div');
+        card.className = 'feedback-card';
+        card.innerHTML = `
+          <div class="order-info">
+            Order #${order.queueNumber || docSnap.id} - (${maskedEmail})
+          </div>
+          <div class="item-rating-info">
+            Item: <strong>${productName}</strong> ${ratingHtml}
+          </div>
+          <div class="feedback-text">
+            <p>💬 ${cleanFeedbackText}</p>
+          </div>
+        `;
+        feedbackContainer.appendChild(card);
+      }
+    });
   });
 
   if (!hasFeedback) {
