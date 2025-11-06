@@ -645,7 +645,7 @@ async function saveOrder(paymentMethod, cash = 0) {
         createdAt: serverTimestamp()
       });
 
-      showMessage(`Order #${queueNumber} saved successfully! Stock deducted.`, "success");
+      showMessage(`Order #${queueNumber} successfully!`, "success");
 
       currentOrder = [];
       renderOrder();
