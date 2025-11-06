@@ -66,16 +66,16 @@ if (loginRedirect) {
 
 
 document.getElementById('emailLink').addEventListener('click', function (e) {
-    e.preventDefault();
-    const email = 'cafeamorex17s@gmail.com';
-    const gmailUrl = `https://mail.google.com/mail/?view=cm&fs=1&to=${email}`;
-    const newTab = window.open(gmailUrl, '_blank');
+    e.preventDefault();
+    const email = 'cafeamorex17s@gmail.com';
+    const gmailUrl = `https://mail.google.com/mail/?view=cm&fs=1&to=${email}`;
+    const newTab = window.open(gmailUrl, '_blank');
 
 
-    if (!newTab || newTab.closed || typeof newTab.closed === 'undefined') {
-      window.location.href = `mailto:${email}`;
-    }
-  });
+    if (!newTab || newTab.closed || typeof newTab.closed === 'undefined') {
+      window.location.href = `mailto:${email}`;
+    }
+  });
 
 function openPopup(popupEl) {
   if (!popupEl) return;
@@ -358,18 +358,24 @@ function loadProductsRealtime() {
               (async () => {
                 const orderSnapshot = await getDocs(collection(db, "DeliveryOrders"));
                 let totalRating = 0, count = 0;
+                const productFeedbacks = []; acks
+
                 orderSnapshot.forEach(docSnap => {
                   const order = docSnap.data();
-                  order.items?.forEach((item, index) => {
-                    if (item.product === product.name && order.feedbackRating?.[index] != null) {
-                      totalRating += order.feedbackRating[index];
+                  order.feedback?.forEach(f => {
+                    if (f.productId === product.id || f.productName === product.name) {
+                      totalRating += f.rating || 0;
                       count++;
+                        productFeedbacks.push(f);
                     }
                   });
                 });
                 let avgRating = count ? totalRating / count : 0;
                 starsInner.style.width = `${(avgRating / 5) * 100}%`;
                 ratingNumber.textContent = count ? `(${avgRating.toFixed(1)})` : '';
+                // Store feedbacks on the card for the popup
+                card.dataset.feedbacks = JSON.stringify(productFeedbacks);
+
               })();
 
               horizontalContainer.appendChild(card);
@@ -418,21 +424,8 @@ function loadProductsRealtime() {
               card.appendChild(reviewBtn);
 
               reviewBtn.addEventListener('click', async () => {
-                const orderSnapshot = await getDocs(collection(db, "DeliveryOrders"));
-                const feedbacks = [];
-                orderSnapshot.forEach(docSnap => {
-                  const order = docSnap.data();
-                  order.items?.forEach((item, index) => {
-                    if (item.product === product.name && order.feedback?.[index]) {
-                      const rating = order.feedbackRating?.[index] || 0;
-                      feedbacks.push({ 
-                        text: order.feedback[index], 
-                        customerEmail: order.customerName || "", 
-                        rating: rating
-                      });
-                    }
-                  });
-                });
+                const storedFeedbacks = card.dataset.feedbacks;
+                const feedbacks = storedFeedbacks ? JSON.parse(storedFeedbacks) : [];
                 showReviewsPopup(product.name, feedbacks);
               });
             }
@@ -623,9 +616,11 @@ function showReviewsPopup(productName, feedbacks) {
   
   if (feedbacks.length) {
     feedbacks.forEach(f => {
-      let emailMasked = f.customerEmail;
-      if (emailMasked) { 
+      let emailMasked = f.customerEmail || "Anonymous";
+      
+      if (emailMasked !== "Anonymous" && emailMasked.includes('@')) { 
         const [name, domain] = emailMasked.split('@'); 
+        // Mask the name part
         emailMasked = `${name.slice(0,3)}****@${domain}`; 
       }
 
@@ -652,7 +647,7 @@ function showReviewsPopup(productName, feedbacks) {
       header.appendChild(ratingEl);
       
       const feedbackTextEl = document.createElement('p');
-      feedbackTextEl.textContent = f.text;
+      feedbackTextEl.textContent = f.comment;
 
       reviewItem.appendChild(header);
       reviewItem.appendChild(feedbackTextEl);
