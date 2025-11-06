@@ -5,7 +5,6 @@ import {
     signInWithPhoneNumber,
     sendEmailVerification,
     onAuthStateChanged,
-    reload
 } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
 import { doc, setDoc, deleteDoc } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 
@@ -15,11 +14,83 @@ const popupOkBtn = document.getElementById("popupOkBtn");
 const countdownDisplay = document.getElementById("countdownDisplay"); 
 const registerButton = document.getElementById("registerButton");
 
+const resendEmailBtn = document.getElementById("resendEmailBtn");
+const resendTimerDisplay = document.getElementById("resendTimerDisplay");
+
 let shouldRedirect = false;
 let timerInterval = null; 
 let verificationCheckInterval = null; 
 
-function showMessage(msg, redirect = false) {
+// 3 Mins
+const MAIN_VERIFICATION_DURATION = 180; 
+// 30 Sec
+const RESEND_COOLDOWN_DURATION = 30; 
+
+
+//  start the 30-second cooldown on the Resend button
+function startResendCooldown() {
+    let countdown = RESEND_COOLDOWN_DURATION;
+    
+    resendEmailBtn.disabled = true;
+    resendEmailBtn.textContent = `Resend Email (${countdown}s)`;
+    resendEmailBtn.style.opacity = 0.5;
+    resendEmailBtn.style.cursor = 'not-allowed';
+    resendTimerDisplay.textContent = `Wait ${countdown} seconds before trying again.`;
+
+    const resendInterval = setInterval(() => {
+        countdown--;
+        resendEmailBtn.textContent = `Resend Email (${countdown}s)`;
+        resendTimerDisplay.textContent = `Wait ${countdown} seconds before trying again.`;
+
+        if (countdown <= 0) {
+            clearInterval(resendInterval);
+            resendEmailBtn.disabled = false;
+            resendEmailBtn.textContent = 'Resend Email';
+            resendEmailBtn.style.opacity = 1;
+            resendEmailBtn.style.cursor = 'pointer';
+            resendTimerDisplay.textContent = 'Ready to resend.';
+        }
+    }, 1000);
+}
+
+if (resendEmailBtn) {
+    resendEmailBtn.addEventListener('click', async () => {
+        const user = auth.currentUser;
+        if (!user) {
+            messageText.textContent = "Error: No active user session. Please try logging in again.";
+            resendEmailBtn.style.display = "none";
+            popupOkBtn.style.display = "block";
+            return;
+        }
+
+        try {
+            // fresh token and state before resending
+            await user.reload(); 
+            
+            if (user.emailVerified) {
+                messageText.textContent = "Your email is already verified! You can now log in.";
+                startResendCooldown(); // Still start cooldown 
+                return;
+            }
+            
+            await sendEmailVerification(user);
+            messageText.textContent = "Verification email successfully resent! Please check your inbox (and spam folder).";
+            startResendCooldown();
+        } catch (error) {
+            let errorMessage = "Failed to resend verification email. Please try again later.";
+            if (error.code === 'auth/too-many-requests') {
+                 errorMessage = "Too many resend attempts. Please wait a minute before trying again.";
+            } else if (error.code === 'auth/missing-continue-uri') {
+                 errorMessage = "Configuration error. Please contact support.";
+            }
+            messageText.textContent = errorMessage;
+            console.error("Resend Email Error:", error);
+        }
+    });
+}
+
+
+function showMessage(msg, type = 'info') {
     // Clear any existing timer or verification check
     if (timerInterval) {
         clearInterval(timerInterval);
@@ -32,26 +103,30 @@ function showMessage(msg, redirect = false) {
     
     messageText.textContent = msg;
 
-    // Hide countdown and show the OK button 
-    if (countdownDisplay) {
-        countdownDisplay.style.display = "none";
-    }
-    if (popupOkBtn) {
-        popupOkBtn.style.display = "block";
+    if (countdownDisplay) countdownDisplay.style.display = "none";
+    if (popupOkBtn) popupOkBtn.style.display = "block";
+    if (resendEmailBtn) resendEmailBtn.style.display = "none";
+    if (resendTimerDisplay) resendTimerDisplay.style.display = "none";
+
+    if (type === 'verification-pending') {
+        resendEmailBtn.style.display = "block";
+        resendTimerDisplay.style.display = "block";
+        startResendCooldown(); // Start cooldown immediately after first send
+        startCountdownTimer(MAIN_VERIFICATION_DURATION);
+    } else if (type === 'success-redirect') {
+        shouldRedirect = true;
+    } else {
+        shouldRedirect = false;
     }
     
-    shouldRedirect = redirect;
     messagePopup.style.display = "flex";
 }
 
 // Starts the 3-minute countdown timer and starts the background verification check.
- 
 function startCountdownTimer(durationInSeconds) {
     let timer = durationInSeconds;
     let minutes, seconds;
-    const user = auth.currentUser;
-
-    // Hide the OK button while the user is actively verifying
+    
     if (popupOkBtn) popupOkBtn.style.display = 'none';
 
     // Disable the register button when the timer starts
@@ -60,7 +135,8 @@ function startCountdownTimer(durationInSeconds) {
         registerButton.style.opacity = 0.5;
         registerButton.textContent = "Verifying...";
     }
-        startVerificationCheck();
+        
+    startVerificationCheck();
 
     // Display countdown time
     if (countdownDisplay) {
@@ -68,7 +144,7 @@ function startCountdownTimer(durationInSeconds) {
         seconds = parseInt(timer % 60, 10);
         minutes = minutes < 10 ? "0" + minutes : minutes;
         seconds = seconds < 10 ? "0" + seconds : seconds;
-        countdownDisplay.textContent = `Time left to verify: ${minutes}:${seconds}`;
+        countdownDisplay.textContent = `Time left for automatic verification check: ${minutes}:${seconds}`;
         countdownDisplay.style.display = "block";
     }
 
@@ -82,7 +158,7 @@ function startCountdownTimer(durationInSeconds) {
         seconds = seconds < 10 ? "0" + seconds : seconds;
 
         if (countdownDisplay) {
-            countdownDisplay.textContent = `Time left to verify: ${minutes}:${seconds}`;
+            countdownDisplay.textContent = `Time left for automatic verification check: ${minutes}:${seconds}`;
         }
         
         if (--timer < 0) {
@@ -99,14 +175,15 @@ function startCountdownTimer(durationInSeconds) {
             if (messagePopup.style.display === "flex") {
                 messageText.textContent = "Email verification timed out. Your unverified account may be deleted. Please try to register again.";
                 if(countdownDisplay) countdownDisplay.style.display = "none";
+                if(resendEmailBtn) resendEmailBtn.style.display = "none"; // Hide resend button on timeout
+                if(resendTimerDisplay) resendTimerDisplay.style.display = "none";
                 if(popupOkBtn) popupOkBtn.style.display = 'block';
             }
         }
     }, 1000);
 }
 
-// Continuously checks the current user's email verification status.
- 
+// Continuously checks the current user's email verification status
 function startVerificationCheck() {
     if (verificationCheckInterval) {
         clearInterval(verificationCheckInterval);
@@ -122,17 +199,18 @@ function startVerificationCheck() {
                 clearInterval(verificationCheckInterval); // Stop checking
                 clearInterval(timerInterval); // Stop the countdown
                 
-                // Successful Verification
+                // Successful Verification UI Update
                 if (registerButton) {
                     registerButton.disabled = false;
                     registerButton.style.opacity = 1;
                     registerButton.textContent = "REGISTER";
                 }
 
-                // Change the popup message
                 if (messagePopup.style.display === "flex") {
-                    messageText.textContent = "Registration successful! Please login";
+                    messageText.textContent = "Email verification successful! You can now login.";
                     if(countdownDisplay) countdownDisplay.style.display = 'none';
+                    if(resendEmailBtn) resendEmailBtn.style.display = 'none';
+                    if(resendTimerDisplay) resendTimerDisplay.style.display = 'none';
                     if(popupOkBtn) popupOkBtn.style.display = 'block';
 
                     popupOkBtn.onclick = () => {
@@ -159,6 +237,7 @@ popupOkBtn.addEventListener("click", () => {
         verificationCheckInterval = null;
     }
     
+    // Reset register button 
     if (registerButton) {
         registerButton.disabled = false;
         registerButton.style.opacity = 1;
@@ -167,6 +246,7 @@ popupOkBtn.addEventListener("click", () => {
 
     if (shouldRedirect) window.location.href = "login.html";
     
+    // Reset default OK button behavior
     popupOkBtn.onclick = () => {
         messagePopup.style.display = "none";
     };
@@ -231,37 +311,30 @@ function validatePassword(pass) {
 }
 
 function validateEmailDomain(email) {
-    return email.toLowerCase().endsWith('@gmail.com');
+    const allowedDomains = [
+        '@live.com', 
+        '@gmail.com', 
+        '@outlook.com', 
+        '@yahoo.com', 
+        '@hotmail.com'
+    ];
+    
+    const lowerCaseEmail = email.toLowerCase();
+    return allowedDomains.some(domain => lowerCaseEmail.endsWith(domain));
 }
 
 
 const deliveryFees = {
-    "Alima": 5, "Aniban I": 10, "Aniban II": 15, "Aniban III": 20,
-    "Aniban IV": 25, "Aniban V": 30, "Banalo": 35, "Bayanan": 40, "Campo Santo": 45,
-    "Daang Bukid": 50, "Digman": 55, "Dulong Bayan": 60, "Habay I": 65, "Habay II": 70,
-    "Ligas I": 75, "Ligas II": 80, "Ligas III": 85, "Mabolo I": 90, "Mabolo II": 95,
-    "Mabolo III": 100, "Maliksi I": 105, "Maliksi II": 110, "Maliksi III": 115,
-    "Mambog I": 120, "Mambog II": 125, "Mambog III": 130, "Mambog IV": 135,
-    "Mambog V": 140, "Molino I": 145, "Molino II": 150, "Molino III": 155,
-    "Molino IV": 160, "Molino V": 165, "Molino VI": 170, "Molino VII": 175,
-    "Niog I": 180, "Niog II": 185, "Niog III": 190, "P.F. Espiritu I (Panapaan)": 195,
-    "P.F. Espiritu II": 200, "P.F. Espiritu III": 205, "P.F. Espiritu IV": 210,
-    "P.F. Espiritu V": 215, "P.F. Espiritu VI": 220, "P.F. Espiritu VII": 225,
-    "P.F. Espiritu VIII": 230, "Queens Row Central": 235, "Queens Row East": 240,
-    "Queens Row West": 245, "Real I": 250, "Real II": 255, "Salinas I": 260,
-    "Salinas II": 265, "Salinas III": 270, "Salinas IV": 275, "San Nicolas I": 280,
-    "San Nicolas II": 285, "San Nicolas III": 290, "Sineguelasan": 295,
-    "Tabing Dagat (Poblacion)": 300, "Talaba I": 305, "Talaba II": 310,
-    "Talaba III": 315, "Talaba IV": 320, "Talaba V": 325, "Talaba VI": 330,
-    "Talaba VII": 335, "Zapote I": 340, "Zapote II": 345, "Zapote III": 350,
-    "Zapote IV": 355, "Zapote V": 360
+    "Aniban I": 57, "Aniban 557": 15, "Aniban III": 56,
+    "Aniban 54": 25, "Aniban V": 55,
+    "Ligas I": 50, "Ligas II": 57, "Ligas III": 58, "San Nicolas I": 61,
+    "San Nicolas II": 64, "San Nicolas III": 104, "Zapote I": 62,
 };
 function getDeliveryFee(barangay) {
     return deliveryFees[barangay] || 0;
 }
 
 
-// OTP 
 
 const phoneInput = document.getElementById("phoneNumber");
 const sendOtpBtn = document.getElementById("sendOtpBtn");
@@ -362,7 +435,7 @@ if (registerForm) {
         const email = document.getElementById("email").value.trim();
         const pass = password.value;
         const confirmPass = confirmPassword.value;
-                
+                         
         if (!termsCheckbox.checked) {
             showMessage("You must agree to the Terms and Conditions before registering.");
             return;
@@ -374,7 +447,7 @@ if (registerForm) {
         }
         
         if (!validateEmailDomain(email)) {
-            showMessage("Registration is only allowed for @gmail.com accounts.");
+            showMessage("Registration is only allowed for email accounts (@live.com, @gmail.com, @outlook.com, @yahoo.com, @hotmail.com).");
             return;
         }
 
@@ -410,9 +483,6 @@ if (registerForm) {
             const userCred = await createUserWithEmailAndPassword(auth, email, pass);
             const user = userCred.user;
             
-            // The duration for the countdown 180 seconds
-            const countdownDuration = 180;
-
             await sendEmailVerification(user);
 
             const deliveryFee = getDeliveryFee(barangay);
@@ -431,11 +501,8 @@ if (registerForm) {
                 deliveryFee
             });
 
-            showMessage("Registration successful! Please check your email now to verify your account.", true); 
-            
-            // Start the 3-minute 
-            startCountdownTimer(countdownDuration);
-            
+            showMessage("Please check your email now to verify your account.", 'verification-pending'); 
+                        
             registerForm.reset();
             termsCheckbox.checked = false;
             isPhoneVerified = false;
