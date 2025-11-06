@@ -94,6 +94,7 @@ body {
 .login-box input[type="text"], 
 .login-box input[type="email"], 
 .login-box input[type="password"], 
+.login-box input[type="tel"], 
 .login-box select {
     background: #fff; 
     color: #552915;
@@ -125,6 +126,35 @@ body {
     flex-direction: column;
     margin-bottom: 12px;
 }
+
+.password-input-wrapper {
+    position: relative; 
+}
+
+.password-input-wrapper input[type="password"],
+.password-input-wrapper input[type="text"] {
+    padding-right: 40px; 
+    margin-bottom: 0; 
+}
+
+.toggle-password {
+    position: absolute;
+    right: 12px;
+    top: 50%;
+    transform: translateY(-50%); 
+    cursor: pointer;
+    color: #a65b35; 
+    z-index: 10;
+    font-size: 1.1em;
+    transition: color 0.2s;
+}
+
+.toggle-password:hover {
+    color: #552915;
+}
+
+
+
 #sendOtpBtn {
     margin-top: 8px;
     padding: 10px;
@@ -247,6 +277,40 @@ body {
     font-weight: bold;
     font-size: 1.1em;
 }
+
+#resendEmailBtn {
+    padding: 10px 16px;
+    border-radius: 10px;
+    border: 1px solid #a65b35;
+    cursor: pointer;
+    font-weight: bold;
+    background: #a65b35;
+    color: #fff;
+    transition: 0.3s;
+    margin-top: 5px; 
+    width: 100%;
+}
+#resendEmailBtn:hover:not([disabled]) {
+    background: #552915;
+    border-color: #552915;
+    color: #fff8f0;
+}
+#resendEmailBtn[disabled] {
+    background: #cccccc;
+    color: #666666;
+    border-color: #cccccc;
+    cursor: not-allowed;
+    opacity: 0.8;
+}
+#resendTimerDisplay {
+    font-size: 0.85em;
+    color: #552915;
+    text-align: center;
+    margin-top: -10px; 
+    font-style: italic;
+}
+
+
 .terms-content {
     background: #fffefb;
     padding: 35px 30px;
