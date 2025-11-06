@@ -208,6 +208,7 @@ function renderDashboard() {
         const total = order.total || 0;
         const deliveryFee = order.deliveryFee || 0;
 
+       
         if (order.collection === "DeliveryOrders" && deliveryFee > 0) {
             return total - deliveryFee;
         }
@@ -261,6 +262,7 @@ function renderHourlyChart(orders) {
         const deliveryFee = o.deliveryFee || 0;
         let netTotal = total;
         
+        // Deduct delivery fee for chart data
         if (o.collection === "DeliveryOrders" && deliveryFee > 0) {
             netTotal = total - deliveryFee;
         }
@@ -302,6 +304,7 @@ function renderTopSellers(orders) {
         (o) => o.status && o.status.toLowerCase().includes("completed")
     );
     completedOrders.forEach((o) => {
+        // Calculate the ratio of product excluding delivery fee
         const orderTotal = o.total || 0;
         const deliveryFee = o.deliveryFee || 0;
         let orderNetTotal = orderTotal;
@@ -318,12 +321,13 @@ function renderTopSellers(orders) {
 
 
         (o.products || o.items || []).forEach((p) => {
-            const name = p.product || "Unnamed Product"; 
+            const name = p.product || "Unnamed Product";
             const qty = p.qty || 1;
             
             const lineTotal =
                 p.total || (p.qty || 1) * (p.basePrice || 0) + (p.addonsPrice || 0);
             
+         
             const netLineTotal = lineTotal * salesAdjustmentRatio;
 
 
@@ -349,6 +353,30 @@ function renderTopSellers(orders) {
     });
 }
 
+/**
+ * @param {Date} date 
+ * @returns {string} 
+ */
+function getMonthYear(date) {
+    const month = date.toLocaleString('default', { month: 'long' });
+    const year = date.getFullYear();
+    return `${month} ${year}`;
+}
+
+/**
+ 
+ * @param {object} order 
+ * @returns {number} 
+ */
+const getNetTotal = (order) => {
+    const total = order.total || 0;
+    const deliveryFee = order.deliveryFee || 0;
+    if (order.collection === "DeliveryOrders" && deliveryFee > 0) {
+        return total - deliveryFee;
+    }
+    return total;
+};
+
 
 function generateSalesPdf() {
     if (typeof jsPDF === "undefined") return;
@@ -361,27 +389,88 @@ function generateSalesPdf() {
     );
     if (orders.length === 0) return;
 
-    const getNetTotal = (order) => {
-        const total = order.total || 0;
-        const deliveryFee = order.deliveryFee || 0;
-        if (order.collection === "DeliveryOrders" && deliveryFee > 0) {
-            return total - deliveryFee;
-        }
-        return total;
-    };
-    
-    let cashTotal = 0;
-    let ePayTotal = 0;
-    const completedOrdersCount = orders.length;
 
-    orders.forEach((o) => {
+    const now = new Date();
+    const currentYear = now.getFullYear();
+    const yearlyCompletedOrders = allOrders.filter(
+        (o) => o.status && o.status.toLowerCase().includes("completed") && 
+               (o.createdAt.toDate ? o.createdAt.toDate().getFullYear() : o.createdAt.getFullYear()) === currentYear
+    );
+    
+    let totalSalesYear = 0;
+    let totalItemsSoldYear = 0;
+    let monthlySales = {}; 
+    let allProductsSet = new Set();
+    let productYearlySales = {}; 
+
+    yearlyCompletedOrders.forEach(o => {
         const netTotal = getNetTotal(o);
-        if (o.paymentMethod === "Cash") cashTotal += netTotal;
-        if (o.paymentMethod === "E-Payment") ePayTotal += netTotal;
+        totalSalesYear += netTotal;
+
+        const createdAt = o.createdAt.toDate ? o.createdAt.toDate() : o.createdAt;
+        const monthYear = getMonthYear(createdAt);
+        
+        if (!monthlySales[monthYear]) {
+            monthlySales[monthYear] = { sales: 0, items: 0 };
+        }
+        monthlySales[monthYear].sales += netTotal;
+        
+        const totalProductValueInOrder = (o.products || o.items || []).reduce(
+            (sum, p) => sum + (p.total || (p.qty || 1) * (p.basePrice || 0) + (p.addonsPrice || 0)),
+            0
+        );
+        const salesAdjustmentRatio = totalProductValueInOrder > 0 ? netTotal / totalProductValueInOrder : 0;
+
+        (o.products || o.items || []).forEach(p => {
+            const productName = p.product || "Unnamed Product";
+            const sizeName = p.size && typeof p.size === "string" ? ` [${p.size}]` : "";
+            const productDisplay = productName + sizeName;
+            
+            allProductsSet.add(productDisplay);
+            
+            const qty = p.qty || 1;
+            totalItemsSoldYear += qty;
+            monthlySales[monthYear].items += qty;
+            
+            const lineTotal = p.total || (p.qty || 1) * (p.basePrice || 0) + (p.addonsPrice || 0);
+            const netLineTotal = lineTotal * salesAdjustmentRatio;
+
+            if (!productYearlySales[productDisplay]) {
+                productYearlySales[productDisplay] = { qty: 0, sales: 0 };
+            }
+            productYearlySales[productDisplay].qty += qty;
+            productYearlySales[productDisplay].sales += netLineTotal;
+        });
+    });
+    
+    // Find highest month
+    let highestSalesMonth = null;
+    let highestItemsMonth = null;
+    Object.entries(monthlySales).forEach(([month, data]) => {
+        if (!highestSalesMonth || data.sales > highestSalesMonth.sales) {
+            highestSalesMonth = { month, ...data };
+        }
+        if (!highestItemsMonth || data.items > highestItemsMonth.items) {
+            highestItemsMonth = { month, ...data };
+        }
     });
 
-    const grandTotalSales = cashTotal + ePayTotal;
+    // Find most sold product
+    const sortedProductsYearly = Object.entries(productYearlySales)
+        .sort((a, b) => b[1].qty - a[1].qty);
+    const mostSoldProduct = sortedProductsYearly.length > 0 ? sortedProductsYearly[0] : null;
+
+    let cashTotalFilter = 0;
+    let ePayTotalFilter = 0;
+    orders.forEach((o) => {
+        const netTotal = getNetTotal(o);
+        if (o.paymentMethod === "Cash") cashTotalFilter += netTotal;
+        if (o.paymentMethod === "E-Payment") ePayTotalFilter += netTotal;
+    });
+
+    const grandTotalSalesFilter = cashTotalFilter + ePayTotalFilter;
     let currentY = 20; 
+
 
     const filterText = salesFilter.options[
         salesFilter.selectedIndex
@@ -413,22 +502,26 @@ function generateSalesPdf() {
     
     doc.setFont("helvetica", "bold");
     doc.setFontSize(14);
-    doc.text("Financial Summary", 14, currentY);
+    doc.text("Financial Summary (Current Year Focus)", 14, currentY);
     currentY += 5;
 
     const summaryHead = [["Metric", "Value"]]; 
     const summaryBody = [
-        ["Completed Orders", completedOrdersCount.toLocaleString()],
-        ["Total Net Sales", (grandTotalSales)], 
-        ["Cash Payments", (cashTotal)],
-        ["E-Payments", (ePayTotal)],
+        ["Total Products", allProductsSet.size.toLocaleString()],
+        ["Cash Payment ", (cashTotalFilter)],
+        ["E-Payment ", (ePayTotalFilter)],
+        ["Total Sales for the Year", (totalSalesYear)], 
+        ["Total Items Sold for the Year", totalItemsSoldYear.toLocaleString()],
+        ["Month with Highest Total Sales", highestSalesMonth ? `${highestSalesMonth.month} (${(highestSalesMonth.sales)})` : 'N/A'],
+        ["Month with Highest Item Sold", highestItemsMonth ? `${highestItemsMonth.month} (${highestItemsMonth.items.toLocaleString()} items)` : 'N/A'],
+        ["Most Sold Product ", mostSoldProduct ? `${mostSoldProduct[0]} (${mostSoldProduct[1].qty.toLocaleString()} Sold)` : 'N/A'],
     ];
     
     doc.autoTable({
         startY: currentY,
         head: summaryHead,
         body: summaryBody,
-        theme: "plain",
+        theme: "plain", 
         styles: {
             fontSize: 10,
             cellPadding: 2,
@@ -441,19 +534,66 @@ function generateSalesPdf() {
         },
         columnStyles: {
             0: { cellWidth: 80, fontStyle: "bold" },
-            1: { halign: "right", fontStyle: "bold" }, 
+            1: { halign: "right" }, 
         },
     });
 
     currentY = doc.lastAutoTable.finalY + 10;
     
+    
     doc.setFont("helvetica", "bold");
     doc.setFontSize(14);
-    doc.text("Detailed Product Sales Breakdown", 14, currentY);
+    doc.text(`Monthly Sales Breakdown (${currentYear})`, 14, currentY);
     currentY += 5;
 
-    const head = [["Product", "Qty", "Net Sales"]]; 
+    const monthlyHead = [["Month", "Total Sales (₱)", "Total Items Sold"]];
+    const monthlyBody = Object.entries(monthlySales)
+        .sort((a, b) => {
+            const dateA = new Date(a[0]);
+            const dateB = new Date(b[0]);
+            return dateA - dateB;
+        })
+        .map(([month, data]) => [
+            month,
+            formatNumber(data.sales),
+            data.items.toLocaleString()
+        ]);
+
+    doc.autoTable({
+        startY: currentY,
+        head: monthlyHead,
+        body: monthlyBody, 
+        theme: "striped",
+        styles: {
+            fontSize: 9,
+            cellPadding: 3,
+        },
+        headStyles: {
+            fillColor: [75, 54, 33],
+            textColor: 255,
+        },
+        alternateRowStyles: { fillColor: [250, 245, 235] },
+        columnStyles: {
+            0: { halign: "left" }, 
+            1: { halign: "right" }, 
+            2: { halign: "right" }, 
+        },
+    });
     
+    currentY = doc.lastAutoTable.finalY + 10;
+    
+
+    if (currentY > 260) {
+        doc.addPage();
+        currentY = 20;
+    }
+
+
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(14);
+    doc.text("Detailed Product Sales Breakdown (Filtered Range)", 14, currentY);
+    currentY += 5;
+
     const simpleProductSales = {};
     orders.forEach((order) => {
         const orderTotal = order.total || 0;
@@ -471,10 +611,13 @@ function generateSalesPdf() {
         
         (order.products || order.items || []).forEach((item) => {
             const productName = item.product || "Unnamed Product";
+            const sizeName = item.size && typeof item.size === "string" ? ` [${item.size}]` : "";
+            const productDisplay = productName + sizeName;
             
-            const key = productName; 
-            
+            const key = productDisplay; 
             const qty = item.qty || 1;
+            const basePrice = item.basePrice || 0; 
+            
             const lineTotal =
                 item.total ||
                 (item.qty || 1) * (item.basePrice || 0) + (item.addonsPrice || 0);
@@ -482,9 +625,10 @@ function generateSalesPdf() {
 
             if (!simpleProductSales[key]) {
                 simpleProductSales[key] = {
-                    product: productName, 
+                    product: productDisplay,
                     qty: 0,
                     sales: 0,
+                    price: basePrice, 
                 };
             }
             simpleProductSales[key].qty += qty;
@@ -492,19 +636,23 @@ function generateSalesPdf() {
         });
     });
 
+    const head = [["Product", "Qty", "Price", "Net Sales"]]; 
+
     const detailedBody = Object.values(simpleProductSales)
         .sort((a, b) => b.sales - a.sales) 
         .map((item) => [
             item.product,
             item.qty, 
+            formatNumber(item.price), 
             formatNumber(item.sales), 
         ]);
+
 
     const foot = [
         [
             {
                 content: "GRAND TOTAL (NET SALES)",
-                colSpan: 1, 
+                colSpan: 2, 
                 styles: {
                     fontStyle: "bold",
                     halign: "left", 
@@ -513,13 +661,15 @@ function generateSalesPdf() {
                 },
             },
             {
+                //  Price column 
                 content: "", 
                 styles: {
                     fillColor: [240, 240, 240],
                 },
             },
             {
-                content: '₱' + formatNumber(grandTotalSales),
+                //  Sales value column
+                content: formatNumber(grandTotalSalesFilter),
                 styles: {
                     fontStyle: "bold",
                     halign: "right", 
@@ -550,29 +700,36 @@ function generateSalesPdf() {
         },
         alternateRowStyles: { fillColor: [250, 245, 235] },
         columnStyles: {
-            0: { cellWidth: 100, halign: "left" }, 
-            1: { cellWidth: 30, halign: "center" }, 
-            2: { cellWidth: 50, halign: "right" }, 
+            0: { cellWidth: 80, halign: "left" }, // Product 
+            1: { cellWidth: 20, halign: "center" }, // Qty
+            2: { cellWidth: 40, halign: "right" }, // Price
+            3: { cellWidth: 50, halign: "right" }, // Sales 
         },
     });
 
     currentY = doc.lastAutoTable.finalY + 10;
     
-    const sortedSales = Object.values(simpleProductSales).sort((a, b) => a.sales - b.sales);
-    const highestSalesItem = sortedSales.length > 0 ? sortedSales[sortedSales.length - 1] : null;
+    
+    const sortedFilteredSales = Object.values(simpleProductSales).sort((a, b) => a.sales - b.sales);
+    const highestSalesItem = sortedFilteredSales.length > 0 ? sortedFilteredSales[sortedFilteredSales.length - 1] : null;
     const inStoreOrdersCount = orders.filter(o => o.channel === 'In-store').length;
     const deliveryOrdersCount = orders.filter(o => o.channel === 'Online').length;
     
+    if (currentY > 260) {
+        doc.addPage();
+        currentY = 20;
+    }
+    
     doc.setFont("helvetica", "bold");
     doc.setFontSize(14);
-    doc.text("Sales Overview", 14, currentY);
+    doc.text("Sales Overview (Filtered Range)", 14, currentY);
     currentY += 5;
 
     doc.setFont("helvetica", "normal");
     doc.setFontSize(10);
 
-    const totalOrdersText = completedOrdersCount.toLocaleString();
-    const totalSalesText = (grandTotalSales);
+    const totalOrdersText = orders.length.toLocaleString();
+    const totalSalesText = (grandTotalSalesFilter);
     const dateRangeText = rangeText;
 
     let channelSummary = "";
@@ -605,7 +762,7 @@ function generateSalesPdf() {
     const filename = `Sales_Report_${rangeText.replace(
         /\s/g,
         "_"
-    )}_${today.replace(/\//g, "-")}.pdf`;
+    )}_filtered_by_filter.pdf`;
     doc.save(filename);
 }
 
