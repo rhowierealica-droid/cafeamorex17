@@ -137,6 +137,33 @@ if (newPhoneInput) {
     newPhoneInput.addEventListener("input", () => formatPhone(newPhoneInput));
 }
 
+/**
+ * ☕ Calculates a hypothetical delivery fee based on the barangay.
+ * This should ideally come from a Firestore collection or a robust distance matrix API.
+ * For this example, we use a simple lookup.
+ * @param {string} barangay 
+ * @returns {number} The delivery fee in PHP.
+ */
+function calculateDeliveryFee(barangay) {
+    const fees = {
+        "Aniban I": 50,
+        "Aniban II": 50,
+        "Aniban III": 60,
+        "Aniban IV": 60,
+        "Aniban V": 70,
+        "San Nicolas I": 40,
+        "San Nicolas II": 40,
+        "San Nicolas III": 50,
+        "Ligas I": 70,
+        "Ligas II": 80,
+        "Ligas III": 80,
+        "Zapote 1": 90
+    };
+    // Default fee for areas not listed or addresses outside the main delivery zone
+    return fees[barangay] || 100; 
+}
+
+
 async function loadUserData() {
     const user = auth.currentUser;
     if (!user) return;
@@ -157,6 +184,13 @@ async function loadUserData() {
         regionInput.value = data.region || "South Luzon";
         provinceInput.value = data.province || "Cavite";
         cityInput.value = data.city || "Bacoor";
+
+        // Calculate and display fee for the default address
+        const defaultFee = calculateDeliveryFee(data.barangay);
+        // You'll need an element for this in your HTML, e.g., <p id="defaultAddressFee"></p>
+        const feeEl = document.getElementById("defaultAddressFee");
+        if (feeEl) feeEl.textContent = ` (Delivery Fee: ₱${defaultFee})`;
+
 
         barangayInput.disabled = true;
         houseNumberInput.disabled = true;
@@ -228,12 +262,12 @@ function setupEditSaveCancel(editBtnId, saveBtnId, cancelBtnId, inputs, formId, 
             inputs.forEach(i => i.disabled = true);
 
             if (formId === "emailForm") {
-                 emailInput.value = maskEmail(auth.currentUser.email);
-                 if (currentEmailInput) currentEmailInput.value = "";
+                emailInput.value = maskEmail(auth.currentUser.email);
+                if (currentEmailInput) currentEmailInput.value = "";
             }
             if (formId === "phoneForm") {
-                 loadUserData();
-                 if (currentPhoneInput) currentPhoneInput.value = "";
+                loadUserData();
+                if (currentPhoneInput) currentPhoneInput.value = "";
             }
 
         } else {
@@ -479,7 +513,7 @@ setupEditSaveCancel(
         const user = auth.currentUser;
         if (!user) throw new Error("No account detected.");
 
-        const confirmPhone = currentPhoneInput.value.trim(); 
+        const confirmPhone = currentPhoneInput.value.trim();
         const newPhone = newPhoneInput.value.trim();
         const currentPassword = currentPhonePasswordInput.value;
 
@@ -491,7 +525,7 @@ setupEditSaveCancel(
         if (!docSnap.exists()) throw new Error("User data not found.");
         const data = docSnap.data();
 
-   
+        
         if (confirmPhone !== data.phoneNumber) {
              throw new Error("The entered current phone number does not match your account's phone number.");
         }
@@ -557,8 +591,8 @@ setupEditSaveCancel(
         if (phoneEditFields) phoneEditFields.style.display = "none";
         if (phoneInput) phoneInput.disabled = true;
         if (currentPhoneInput) {
-             currentPhoneInput.value = "";
-             currentPhoneInput.placeholder = "";
+            currentPhoneInput.value = "";
+            currentPhoneInput.placeholder = "";
         }
         if (newPhoneInput) newPhoneInput.value = "";
         if (currentPhonePasswordInput) currentPhonePasswordInput.value = "";
@@ -566,7 +600,17 @@ setupEditSaveCancel(
 );
 
 function formatAddress(data = {}) {
-    return [data.houseNumber, data.barangay, data.city, data.province, data.region].filter(Boolean).join(", ");
+    // Add delivery fee to the address data object before passing it to formatAddress, 
+    // or calculate it here if the data has the necessary info (barangay)
+    const fee = data.barangay ? calculateDeliveryFee(data.barangay) : null;
+    let addressParts = [data.houseNumber, data.barangay, data.city, data.province, data.region].filter(Boolean);
+    
+    // Append the delivery fee information to the formatted string
+    if (fee !== null) {
+        addressParts.push(`(Fee: ₱${fee})`);
+    }
+
+    return addressParts.join(", ");
 }
 
 function populateAddressForm(data, addressId) {
@@ -614,14 +658,16 @@ function handleAddressEditClick(data, addressId, cardElement) {
     if (addressEditContainer) {
         cardElement.appendChild(addressEditContainer);
         addressEditContainer.style.display = "block";
+        cardElement.classList.add('active-edit'); // Add this line which was the end of Part 2
     }
-
-    cardElement.classList.add('active-edit');
+    
     populateAddressForm(data, addressId);
 
+    // Ensure save/cancel buttons are shown (part of your original logic)
     document.getElementById("saveAddressBtn").style.display = "inline-block";
     document.getElementById("cancelAddressBtn").style.display = "inline-block";
 }
+
 
 async function promoteAddressToDefault(savedAddressId, savedAddressData, defaultAddressData) {
     const user = auth.currentUser;
@@ -638,14 +684,18 @@ async function promoteAddressToDefault(savedAddressId, savedAddressData, default
         region: defaultAddressData.region || "",
     };
 
+    // Update the saved address with the old default address data
     await setDoc(savedAddressDocRef, newSavedAddressData);
 
+    // Update the default address with the new data (from the saved address)
     await updateDoc(userDocRef, {
         houseNumber: savedAddressData.houseNumber,
         barangay: savedAddressData.barangay,
         city: savedAddressData.city,
         province: savedAddressData.province,
         region: savedAddressData.region,
+        // Crucially, you must also update the deliveryFee if you save it to the user's root document
+        deliveryFee: calculateDeliveryFee(savedAddressData.barangay) 
     });
 
     alert("Default Address updated successfully! The old default is now a saved address.");
@@ -682,7 +732,8 @@ async function loadAddressesIntoAddressTab() {
                 region: userData.region
             };
 
-            const defaultAddressStr = formatAddress(defaultAddressData);
+            const defaultFee = calculateDeliveryFee(userData.barangay); // Calculate fee
+            const defaultAddressStr = formatAddress({ ...defaultAddressData, deliveryFee: defaultFee });
 
             if (defaultAddressStr) {
                 const card = document.createElement("div");
@@ -690,8 +741,8 @@ async function loadAddressesIntoAddressTab() {
                 card.setAttribute('data-address-id', 'default');
                 card.innerHTML = `
                     <div style="flex:1;">
-                        <strong>Default Address</strong><br>
-                        <span class="addr-text">${defaultAddressStr}</span>
+                        <strong>Default Address </strong> <span style="color: #552915;">(Fee: ₱${defaultFee})</span><br>
+                        <span class="addr-text">${formatAddress(defaultAddressData)}</span> 
                     </div>
                 `;
                 addressSavedListEl.appendChild(card);
@@ -705,6 +756,7 @@ async function loadAddressesIntoAddressTab() {
             snapshot.forEach(docSnap => {
                 const id = docSnap.id;
                 const data = docSnap.data();
+                const fee = calculateDeliveryFee(data.barangay); // Calculate fee for saved address
                 const full = formatAddress(data);
                 index++;
 
@@ -799,27 +851,42 @@ setupEditSaveCancel(
             region: regionInput.value,
             province: provinceInput.value,
             city: cityInput.value,
+            // Calculate and save the delivery fee
+            deliveryFee: calculateDeliveryFee(barangayInput.value) 
         };
 
         const addressId = editingAddressIdInput.value;
 
         if (addressId === 'default') {
             await updateDoc(doc(db, "users", user.uid), {
-                barangay: addressData.barangay,
-                houseNumber: addressData.houseNumber,
+                ...addressData
             });
-            alert("Default Address updated successfully! (Barangay/House Number changed)");
+            alert("Default Address updated successfully! (Barangay/House Number/Fee changed)");
         } else {
-            await updateDoc(doc(db, "users", user.uid, "addresses", addressId), addressData);
-            alert("Saved Address updated successfully! (Barangay/House Number changed)");
+            // Update an existing saved address
+            if (addressId) {
+                await updateDoc(doc(db, "users", user.uid, "addresses", addressId), addressData);
+                alert("Saved Address updated successfully! (Barangay/House Number/Fee changed)");
+            } else {
+                // Add a new saved address (assuming the logic is to add one if no ID is present, 
+                // but your setup seems focused on editing the default or saved ones).
+                // To ADD a new one, you'd use addDoc(collection(db, "users", user.uid, "addresses"), addressData);
+                // For now, let's assume this save button is strictly for editing as per your provided logic.
+                throw new Error("Cannot save: Unknown address ID. Please use the edit buttons.");
+            }
         }
 
         await loadAddressesIntoAddressTab();
     },
     () => {
+        // onEditExtra
         editingAddressIdInput.value = 'default';
+        if (addressEditContainer) {
+            document.getElementById("addressTab").appendChild(addressEditContainer);
+        }
     },
     () => {
+        // onCancelExtra
         editingAddressIdInput.value = '';
     }
 );
