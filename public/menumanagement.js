@@ -16,7 +16,7 @@ const D = {
     cropperModal: document.getElementById("cropperModal"),
     imageToCrop: document.getElementById("imageToCrop"),
     cropAndSaveBtn: document.getElementById("cropAndSaveBtn"),
-    closeCropperBtn: document.getElementById("closeCropperBtn"),
+    cancelCropperBtn: document.getElementById("cancelCropperBtn"), 
     ingredientsList: document.getElementById("ingredientsList"),
     sizesList: document.getElementById("sizesList"),
     addonsList: document.getElementById("addonsList"),
@@ -100,7 +100,7 @@ function normalizeCategory(cat) {
 const openPopup = () => D.popup.classList.add("show");
 const closePopup = () => D.popup.classList.remove("show");
 
-//  MANAGE INGREDIENTS IMAGE 
+//  MANAGE INGREDIENTS IMAGE 
 const openIngredientsPopup = () => D.ingredientsImagePopup.classList.add("show");
 const closeIngredientsPopup = () => D.ingredientsImagePopup.classList.remove("show");
 
@@ -147,13 +147,21 @@ D.cropAndSaveBtn?.addEventListener("click", () => {
         cropper.destroy(); cropper = null;
     }
 });
-[D.closeCropperBtn, D.cropperModal].forEach(el => el?.addEventListener("click", e => {
-    if (e.target === D.closeCropperBtn || e.target === D.cropperModal) {
+
+D.cancelCropperBtn?.addEventListener("click", () => {
+    D.cropperModal.classList.remove("show");
+    if (cropper) { cropper.destroy(); cropper = null; }
+    D.productImage.value = null; 
+});
+
+D.cropperModal?.addEventListener("click", e => {
+    if (e.target === D.cropperModal) {
         D.cropperModal.classList.remove("show");
         if (cropper) { cropper.destroy(); cropper = null; }
-        D.productImage.value = null;
+        D.productImage.value = null; 
     }
-}));
+});
+
 
 function addInventoryHeader(container, type) {
     const header = document.createElement("div");
@@ -561,6 +569,7 @@ D.popupForm?.addEventListener("submit", async e => {
 const openDeletePopup = (productId) => {
     productToDelete = productId;
     D.deletePopup.classList.add("show");
+    
 };
 
 const closeDeletePopup = () => {
