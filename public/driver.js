@@ -237,7 +237,7 @@ async function showReceiptPopup(orderId, collectionName) {
     popupTitle.textContent = `Receipt for Queue #${formatQueueNumber(orderData.queueNumber || orderData.queueNumberNumeric)}`;
     popupReceiptContent.innerHTML = receiptHtml;
     popupButtonsContainer.innerHTML = `
-      <button id="downloadReceiptBtn" data-id="${orderId}" data-collection="${collectionName}">Download Receipt (PDF)</button>
+      <button id="downloadReceiptBtn" data-id="${orderId}" data-collection="${collectionName}">Download Receipt</button>
       <button id="closeReceiptBtn">Close</button>
     `;
     popup.style.display = "flex";
@@ -382,7 +382,7 @@ async function initializeDeliveryPage() {
       } else if (order.status === "Completed" || order.status === "Completed by Customer") {
         actionsHtml += `
           <button class="print-receipt-btn" onclick="showReceiptPopup('${order.id}', 'DeliveryOrders')">
-            <i class="fas fa-receipt"></i> View/Download Receipt
+            <i class="fas fa-receipt"></i> View Receipt
           </button>`;
       }
 
