@@ -81,20 +81,20 @@ cartPopup.className = 'popup';
 
 cartPopup.innerHTML = `
   <div class="popup-content cart-popup">
-    <h2 class="product-name"></h2>
-    <p class="product-desc"></p>
-    <div class="sizes-container"></div>
-    <div class="addons-container"></div>
+    <h2 class="product-name"></h2>
+    <p class="product-desc"></p>
+    <div class="sizes-container"></div>
+    <div class="addons-container"></div>
 
-    <div class="quantity-wrapper">
-      <button type="button" class="decrease-qty">−</button>
-      <input type="number" class="quantity-input" value="1" min="1">
-      <button type="button" class="increase-qty">+</button>
-    </div>
+    <div class="quantity-wrapper">
+      <button type="button" class="decrease-qty">−</button>
+      <input type="number" class="quantity-input" value="1" min="1">
+      <button type="button" class="increase-qty">+</button>
+    </div>
 
-    <button class="confirm-add-cart">Add to Cart</button>
-    <button class="close-cart">Close</button>
-  </div>
+    <button class="confirm-add-cart">Add to Cart</button>
+    <button class="close-cart">Close</button>
+  </div>
 `;
 document.body.appendChild(cartPopup);
 
@@ -192,49 +192,68 @@ function calculateProductStock(product, inventoryMap) {
   return stockPerSize;
 }
 
+// Function to generate the star HTML
+function getStarHtml(rating) {
+  const maxStars = 5;
+  let starsHtml = '';
+  for (let i = 1; i <= maxStars; i++) {
+    starsHtml += i <= rating ? '★' : '☆';
+  }
+  return `<span class="rating-stars">${starsHtml}</span>`;
+}
+
 function loadProductsRealtime() {
-  if (!drinksContainer && !sandwichContainer) return;
+  if (!drinksContainer && !sandwichContainer) return;
 
-  if (!currentUser) {
-    if (drinksContainer) drinksContainer.innerHTML = `<p style="padding:12px;"></p>`;
-    if (sandwichContainer) sandwichContainer.innerHTML = "";
-    return;
-  }
+  // 1. Set up inventory listener
+  onSnapshot(collection(db, "Inventory"), inventorySnapshot => {
+    inventoryMap = {};
+    inventorySnapshot.forEach(docSnap => {
+      inventoryMap[docSnap.id] = { id: docSnap.id, ...docSnap.data() };
+    });
 
-  onSnapshot(collection(db, "Inventory"), inventorySnapshot => {
-    inventoryMap = {};
-    inventorySnapshot.forEach(docSnap => {
-      inventoryMap[docSnap.id] = { id: docSnap.id, ...docSnap.data() };
-    });
+    // 2. Get favorite product IDs (if a user is logged in)
+    let favoriteProductIds = [];
+    const productQuery = query(collection(db, "products"));
+    
+    const fetchAndRender = async () => {
+      if (currentUser) {
+        const favQuery = query(collection(db, "favorites"), where("userId", "==", currentUser.uid));
+        const favSnapshot = await getDocs(favQuery);
+        favoriteProductIds = favSnapshot.docs.map(d => d.data().productId);
+      }
 
-    const favQuery = query(collection(db, "favorites"), where("userId", "==", currentUser.uid));
-    onSnapshot(favQuery, async favSnapshot => {
-      const favoriteProductIds = favSnapshot.docs.map(d => d.data().productId);
-      if (!favoriteProductIds.length) return renderProducts([]);
+      // 3. Set up products listener (to get all products)
+      onSnapshot(productQuery, productSnapshot => {
+        const allProducts = productSnapshot.docs
+          .map(doc => ({ id: doc.id, ...doc.data() }));
 
-      const productsQuery = query(collection(db, "products"));
-      onSnapshot(productsQuery, productSnapshot => {
-        const products = productSnapshot.docs
-          .map(doc => ({ id: doc.id, ...doc.data() }))
-          .filter(p => favoriteProductIds.includes(p.id));
-
-          renderProducts(products, favoriteProductIds);
-      });
-    });
-  });
+        // RENDER ALL PRODUCTS (not just favorites)
+        renderProducts(allProducts, favoriteProductIds);
+      });
+    };
+    
+    fetchAndRender();
+  });
 }
 
 function renderProducts(products, favoriteProductIds = []) {
   drinksContainer.innerHTML = "";
   sandwichContainer.innerHTML = "";
 
-  if (!products.length && currentUser) {
+  // Filter to show ONLY favorites if the user is logged in.
+  const productsToRender = products.filter(p => favoriteProductIds.includes(p.id));
+
+  if (!productsToRender.length && currentUser) {
     if (drinksContainer) drinksContainer.innerHTML = `<p style="padding:12px;">You have no favorite products yet.</p>`;
     return;
-  }
-
+  } else if (!productsToRender.length && !currentUser) {
+    if (drinksContainer) drinksContainer.innerHTML = `<p style="padding:12px;">Please log in to view your favorite products.</p>`;
+    return;
+  }
+  
   const grouped = {};
-  for (const product of products) {
+  for (const product of productsToRender) { 
     const mainCategory = ["Ice Espresso", "Non-Coffee", "Iced Cold Brew", "Hot Coffee"].includes(product.category)
       ? "Drink" : "Sandwich";
     const subCategory = product.category || "Others";
@@ -290,6 +309,7 @@ function renderProducts(products, favoriteProductIds = []) {
             ${!isUnavailable ? `<button class="add-cart-btn">Add to Cart</button>` : ''}
           `;
 
+          // --- ⭐️ RATING ELEMENTS ADDED HERE ⭐️ ---
           const starsContainer = document.createElement('div');
           starsContainer.className = 'stars-outer';
           const starsInner = document.createElement('div');
@@ -303,19 +323,28 @@ function renderProducts(products, favoriteProductIds = []) {
           (async () => {
             const orderSnapshot = await getDocs(collection(db, "DeliveryOrders"));
             let totalRating = 0, count = 0;
+            const productFeedbacks = []; 
+
             orderSnapshot.forEach(docSnap => {
               const order = docSnap.data();
-              order.items?.forEach((item, index) => {
-                if (item.product === product.name && order.feedbackRating?.[index] != null) {
-                  totalRating += order.feedbackRating[index];
+              // Assumes your Menu page is using the new "feedback" array format (objects)
+              order.feedback?.forEach(f => {
+                if (f.productId === product.id || f.productName === product.name) {
+                  totalRating += f.rating || 0;
                   count++;
+                  productFeedbacks.push(f);
                 }
               });
             });
+
             let avgRating = count ? totalRating / count : 0;
             starsInner.style.width = `${(avgRating / 5) * 100}%`;
             ratingNumber.textContent = count ? `(${avgRating.toFixed(1)})` : '';
+            // Store feedbacks on the card for the popup
+            card.dataset.feedbacks = JSON.stringify(productFeedbacks);
+
           })();
+          // --- ⭐️ END RATING ELEMENTS ⭐️ ---
 
           horizontalContainer.appendChild(card);
 
@@ -326,9 +355,11 @@ function renderProducts(products, favoriteProductIds = []) {
               openCartPopup(product, stockInfo);
             });
           }
-
+          
+          // Favorites icon logic (always render for productsToRender)
           const favIcon = document.createElement('i');
-          favIcon.className = 'fa-solid fa-heart favorite-icon favorited';
+          // Since this is a favorites page, the heart should be filled and removing the favorite.
+          favIcon.className = 'fa-solid fa-heart favorite-icon favorited'; 
           card.appendChild(favIcon);
 
           favIcon.addEventListener('click', async () => {
@@ -340,24 +371,19 @@ function renderProducts(products, favoriteProductIds = []) {
             } catch (err) { console.error("Error removing favorite:", err); }
           });
 
+          // --- 💬 REVIEWS BUTTON ADDED HERE 💬 ---
           const reviewBtn = document.createElement('button');
           reviewBtn.textContent = "Reviews";
           reviewBtn.className = "reviews-btn";
           card.appendChild(reviewBtn);
 
           reviewBtn.addEventListener('click', async () => {
-            const orderSnapshot = await getDocs(collection(db, "DeliveryOrders"));
-            const feedbacks = [];
-            orderSnapshot.forEach(docSnap => {
-              const order = docSnap.data();
-              order.items?.forEach((item, index) => {
-                if (item.product === product.name && order.feedback?.[index]) {
-                  feedbacks.push({ text: order.feedback[index], customerEmail: order.customerName || "" });
-                }
-              });
-            });
+            // Retrieve the feedbacks already calculated and stored on the card
+            const storedFeedbacks = card.dataset.feedbacks;
+            const feedbacks = storedFeedbacks ? JSON.parse(storedFeedbacks) : [];
             showReviewsPopup(product.name, feedbacks);
           });
+          // --- 💬 END REVIEWS BUTTON 💬 ---
         }
       }
     }
@@ -504,6 +530,7 @@ function openCartPopup(product, stockInfo = []) {
   };
 }
 
+// Function to handle the Reviews Popup (copied from your menu file)
 function showReviewsPopup(productName, feedbacks) {
   const popup = document.createElement('div'); 
   popup.className = 'popup reviews-popup'; 
@@ -514,14 +541,14 @@ function showReviewsPopup(productName, feedbacks) {
   popupContent.className = 'popup-content';
   Object.assign(popupContent.style, {
     position: 'relative',
-    backgroundColor: '#fff',
-    padding: '20px',
-    borderRadius: '10px',
-    maxWidth: '400px',
-    width: '90%',
+    backgroundColor: '#fff8f0', 
+    padding: '30px 25px', 
+    borderRadius: '14px', 
+    maxWidth: '520px',
+    width: '100%',
     maxHeight: '80vh',
     overflowY: 'auto',
-    boxShadow: '0 8px 20px rgba(0,0,0,0.2)'
+    boxShadow: '0 12px 30px rgba(0,0,0,0.2)'
   });
 
   const closeBtn = document.createElement('button');
@@ -534,6 +561,7 @@ function showReviewsPopup(productName, feedbacks) {
   title.textContent = `Reviews for ${productName}`;
   title.style.marginTop = '0';
   title.style.marginBottom = '15px';
+  title.style.color = '#4b3621'; 
 
   const list = document.createElement('div'); 
   list.className = 'feedback-list';
@@ -543,14 +571,44 @@ function showReviewsPopup(productName, feedbacks) {
 
   if (feedbacks.length) {
     feedbacks.forEach(f => {
-      let emailMasked = f.customerEmail;
-      if (emailMasked) { 
+      let emailMasked = f.customerEmail || "Anonymous";
+      
+      if (emailMasked !== "Anonymous" && emailMasked.includes('@')) { 
         const [name, domain] = emailMasked.split('@'); 
         emailMasked = `${name.slice(0,3)}****@${domain}`; 
       }
-      const p = document.createElement('p'); 
-      p.textContent = `${emailMasked}: ${f.text}`; 
-      list.appendChild(p);
+
+      const ratingHtml = getStarHtml(f.rating);
+      
+      const reviewItem = document.createElement('div');
+      reviewItem.className = 'review-item'; 
+      reviewItem.style.borderBottom = '1px dashed #ddd';
+      reviewItem.style.paddingBottom = '8px';
+
+      const header = document.createElement('div');
+      header.style.display = 'flex';
+      header.style.justifyContent = 'space-between';
+      header.style.alignItems = 'center';
+      header.style.marginBottom = '5px';
+      
+      const customerEl = document.createElement('span');
+      customerEl.textContent = emailMasked;
+      customerEl.style.fontWeight = 'bold';
+      customerEl.style.color = '#704225'; 
+
+      const ratingEl = document.createElement('span');
+      ratingEl.innerHTML = ratingHtml;
+
+      header.appendChild(customerEl);
+      header.appendChild(ratingEl);
+      
+      const feedbackTextEl = document.createElement('p');
+      feedbackTextEl.textContent = f.comment || "No comment provided.";
+
+      reviewItem.appendChild(header);
+      reviewItem.appendChild(feedbackTextEl);
+      
+      list.appendChild(reviewItem);
     });
   } else {
     const p = document.createElement('p');
