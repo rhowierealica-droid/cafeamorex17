@@ -9,13 +9,46 @@
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css" />
     <link rel="stylesheet" href="Employee-EditProfile.css" />
     <link rel="stylesheet" href="driver-nav.css" />
-        <link rel="stylesheet" href="admin-nav.css" />
+    <link rel="stylesheet" href="admin-nav.css" />
+    <link rel="stylesheet" href="employee-nav.css" />
 
+    <style>
+        .password-input-wrapper {
+            position: relative; 
+        }
+
+        .password-input-wrapper input[type="password"],
+        .password-input-wrapper input[type="text"] {
+            padding-right: 40px; 
+            margin-bottom: 0; 
+        }
+
+        .toggle-password {
+            position: absolute;
+            right: 15px; 
+            top: 50%;
+            transform: translateY(-50%); 
+            cursor: pointer;
+            color: #777;
+            z-index: 10;
+            font-size: 1.1em;
+            transition: color 0.2s;
+        }
+
+        .toggle-password:hover {
+            color: #333;
+        }
+
+        .input-group {
+            margin-bottom: 15px; 
+        }
+    </style>
 </head>
 
 <body>
 
-    <div class="hamburger" id="hamburger"><i class="fas fa-bars"></i></div>
+    <div class="hamburger" id="hamburger">
+        <i class="fas fa-bars"></i>
     </div>
 
 
@@ -27,8 +60,7 @@
 
         <nav>
             <ul>
-                <li class="active"><i class="fas fa-motorcycle"></i> Deliveries</li>
-                <li><i class="fas fa-history"></i> Delivery History</li>
+                <li id="deliveriesLink"><i class="fas fa-motorcycle"></i> Deliveries</li>
             </ul>
         </nav>
 
@@ -62,18 +94,29 @@
                     </div>
 
                     <div class="password-edit-fields" id="passwordEditFields" style="display:none;">
+                        
                         <div class="input-group">
                             <label for="currentPasswordForChange">Enter Current Password</label>
-                            <input type="password" id="currentPasswordForChange" placeholder="Enter current password"
-                                required />
+                            <div class="password-input-wrapper">
+                                <input type="password" id="currentPasswordForChange" class="password-field" placeholder="Enter current password" required />
+                                <i class="fas fa-eye toggle-password" data-target="currentPasswordForChange"></i>
+                            </div>
                         </div>
+                        
                         <div class="input-group">
                             <label for="password">New Password</label>
-                            <input type="password" id="password" placeholder="Enter new password" required />
+                            <div class="password-input-wrapper">
+                                <input type="password" id="password" class="password-field" placeholder="Enter new password" required />
+                                <i class="fas fa-eye toggle-password" data-target="password"></i>
+                            </div>
                         </div>
+                        
                         <div class="input-group">
                             <label for="confirmPassword">Confirm Password</label>
-                            <input type="password" id="confirmPassword" placeholder="Confirm new password" required />
+                            <div class="password-input-wrapper">
+                                <input type="password" id="confirmPassword" class="password-field" placeholder="Confirm new password" required />
+                                <i class="fas fa-eye toggle-password" data-target="confirmPassword"></i>
+                            </div>
                         </div>
                     </div>
 
@@ -103,7 +146,30 @@
 
 
     <script type="module" src="Employee-EditProfile.js"></script>
-    <script type="module" src="driver-nav.js"></script>
+    <script type="module" src="employee-nav.js"></script>
+    
+    <script>
+        function setupPasswordToggle(inputElementId) {
+            const passwordInput = document.getElementById(inputElementId);
+            const toggleIcon = document.querySelector(`[data-target="${inputElementId}"]`);
+
+            if (toggleIcon && passwordInput) {
+                toggleIcon.addEventListener('click', function () {
+                    const type = passwordInput.getAttribute('type') === 'password' ? 'text' : 'password';
+                    passwordInput.setAttribute('type', type);
+                    this.classList.toggle('fa-eye-slash');
+                });
+            }
+        }
+
+        document.addEventListener('DOMContentLoaded', () => {
+            setupPasswordToggle('currentPasswordForChange');
+            setupPasswordToggle('password');
+            setupPasswordToggle('confirmPassword');
+        });
+    </script>
+
+
 </body>
 
 </html>
