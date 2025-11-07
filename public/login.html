@@ -7,6 +7,44 @@
     <link rel="stylesheet" href="login.css">
     <link rel="stylesheet" href="customer-nav.css">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
+    <style>
+    
+        .password-input-wrapper {
+            position: relative; 
+            margin-bottom: 12px; 
+        }
+
+        .password-input-wrapper .password-field {
+            padding-right: 40px; 
+            margin-bottom: 0; 
+            width: 100%;
+            box-sizing: border-box; 
+        }
+
+        .toggle-password {
+            position: absolute;
+            right: 12px;
+            top: 50%;
+            transform: translateY(-50%); 
+            cursor: pointer;
+            color: #a65b35; 
+            z-index: 10;
+            font-size: 1.1em;
+            transition: color 0.2s;
+        }
+
+        .toggle-password:hover {
+            color: #552915;
+        }
+
+        .login-box label {
+            display: block;
+            margin-bottom: 5px; 
+            font-weight: bold; 
+            text-align: left;
+            color: #f2e6dc; 
+        }
+    </style>
 </head>
 <body>
 
@@ -39,7 +77,13 @@
                     <p>Please login to your account</p>
                     <form id="loginForm">
                         <input type="email" id="loginEmail" placeholder="Email Address" required>
-                        <input type="password" id="loginPassword" placeholder="Password" required>
+                        
+                        <label for="loginPassword">Password</label>
+                        <div class="password-input-wrapper">
+                            <input type="password" id="loginPassword" class="password-field" placeholder="Password" required>
+                            <i class="fas fa-eye toggle-password" data-target="loginPassword" id="togglePassword"></i>
+                        </div>
+                        
                         <button type="submit" class="signin-btn">Sign In</button>
                     </form>
                     <a href="#" id="forgotPassword" class="forgot-link">Forgot Password?</a>
@@ -82,6 +126,16 @@
     <div id="recaptcha-container"></div>
 
     <script type="module" src="login.js"></script>
+    <script>
+        const togglePassword = document.getElementById('togglePassword');
+        const passwordInput = document.getElementById('loginPassword');
+
+        togglePassword.addEventListener('click', function (e) {
+            const type = passwordInput.getAttribute('type') === 'password' ? 'text' : 'password';
+            passwordInput.setAttribute('type', type);
+            this.classList.toggle('fa-eye-slash');
+        });
+    </script>
 
 </body>
 </html>
