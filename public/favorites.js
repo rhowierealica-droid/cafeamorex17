@@ -7,6 +7,8 @@ import { getAuth, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/
 import { addToCart } from './cart.js';
 
 let inventoryMap = {};
+let selectedSize = null; 
+let selectedAddons = []; 
 
 function showToast(message = "Item added!", duration = 2000, type = "success") {
   let toast = document.querySelector('.toast');
@@ -49,7 +51,7 @@ const termsPopup = document.getElementById('termsPopup');
 const profileNameEl = document.querySelector('.profile-name');
 const welcomeHeader = document.querySelector('.main-content header h1');
 
-document.getElementById('emailLink').addEventListener('click', function (e) {
+document.getElementById('emailLink')?.addEventListener('click', function (e) {
     e.preventDefault();
     const email = 'cafeamorex17s@gmail.com';
     const gmailUrl = `https://mail.google.com/mail/?view=cm&fs=1&to=${email}`;
@@ -222,26 +224,26 @@ function loadProductsRealtime() {
       inventoryMap[docSnap.id] = { id: docSnap.id, ...docSnap.data() };
     });
 
-    let favoriteProductIds = [];
-    const productQuery = query(collection(db, "products"));
-    
-    const fetchAndRender = async () => {
-      if (currentUser) {
-        const favQuery = query(collection(db, "favorites"), where("userId", "==", currentUser.uid));
-        const favSnapshot = await getDocs(favQuery);
-        favoriteProductIds = favSnapshot.docs.map(d => d.data().productId);
-      }
+    fetchAndRender();
+  });
+}
 
-      onSnapshot(productQuery, productSnapshot => {
+function fetchAndRender() {
+    const productQuery = query(collection(db, "products"));
+    onSnapshot(productQuery, productSnapshot => {
         const allProducts = productSnapshot.docs
           .map(doc => ({ id: doc.id, ...doc.data() }));
 
-        renderProducts(allProducts, favoriteProductIds);
-      });
-    };
-    
-    fetchAndRender();
-  });
+        if (currentUser) {
+          const favQuery = query(collection(db, "favorites"), where("userId", "==", currentUser.uid));
+          onSnapshot(favQuery, favSnapshot => {
+            const favoriteProductIds = favSnapshot.docs.map(d => d.data().productId);
+            renderProducts(allProducts, favoriteProductIds);
+          });
+        } else {
+          renderProducts(allProducts, []);
+        }
+    });
 }
 
 function renderProducts(products, favoriteProductIds = []) {
@@ -252,11 +254,17 @@ function renderProducts(products, favoriteProductIds = []) {
 
   if (!productsToRender.length && currentUser) {
     if (drinksContainer) drinksContainer.innerHTML = `<p style="padding:12px;">You have no favorite products yet.</p>`;
+    if (sandwichContainer) sandwichContainer.innerHTML = `<p style="padding:12px;">You have no favorite products yet.</p>`;
+    if (drinksSection) drinksSection.style.display = 'none';
+    if (sandwichSection) sandwichSection.style.display = 'none';
     return;
   } else if (!productsToRender.length && !currentUser) {
-    if (drinksContainer) drinksContainer.innerHTML = `<p style="padding:12px;">Please log in to view your favorite products.</p>`;
-    return;
-  }
+    if (drinksContainer) drinksContainer.innerHTML = `<p style="padding:12px;">Please log in to view your favorite products.</p>`;
+    if (sandwichContainer) sandwichContainer.innerHTML = `<p style="padding:12px;">Please log in to view your favorite products.</p>`;
+    if (drinksSection) drinksSection.style.display = 'block'; 
+    if (sandwichSection) sandwichSection.style.display = 'none';
+    return;
+  }
   
   const grouped = {};
   for (const product of productsToRender) { 
@@ -357,7 +365,7 @@ function renderProducts(products, favoriteProductIds = []) {
               openCartPopup(product, stockInfo);
             });
           }
-          
+          
           const favIcon = document.createElement('i');
           favIcon.className = 'fa-solid fa-heart favorite-icon favorited'; 
           card.appendChild(favIcon);
@@ -367,7 +375,9 @@ function renderProducts(products, favoriteProductIds = []) {
             const favRef = doc(db, "favorites", `${currentUser.uid}_${product.id}`);
             try {
               await deleteDoc(favRef);
-              showToast(`${product.name} removed from favorites`, 1500, "error");
+              //showToast(`${product.name} removed from favorites`, 1500, "error");
+              
+
             } catch (err) { console.error("Error removing favorite:", err); }
           });
 
@@ -389,6 +399,50 @@ function renderProducts(products, favoriteProductIds = []) {
   });
 }
 
+function loadAddons(size) {
+  const addonsContainer = cartPopup.querySelector('.addons-container');
+  addonsContainer.innerHTML = '';
+  selectedAddons = []; 
+  if (!size?.addons?.length) return;
+  const heading = document.createElement('p'); heading.textContent = 'Add-ons:'; addonsContainer.appendChild(heading);
+
+  size.addons.forEach(addon => {
+    const inventoryItem = inventoryMap[addon.id];
+    const stock = inventoryItem ? Math.floor(inventoryItem.quantity / (addon.qty || 1)) : 0;
+    
+    const label = document.createElement('label'); 
+    label.classList.add('addon-btn'); 
+    label.textContent = `${addon.name} - ₱${(addon.price || 0).toFixed(2)}`;
+
+    
+    const input = document.createElement('input'); 
+    input.type = 'checkbox';
+    
+    const isOutOfStock = stock <= 0;
+    
+    if (isOutOfStock) { 
+      input.disabled = true; 
+      label.classList.add('unavailable'); 
+    }
+    
+    input.addEventListener('change', () => {
+      if (input.checked) {
+        if (!isOutOfStock) {
+          selectedAddons.push(addon);
+        } else {
+          input.checked = false;
+          showToast(`${addon.name} is out of stock!`, 2000, "error");
+        }
+      }
+      else selectedAddons = selectedAddons.filter(a => a.id !== addon.id);
+    });
+    
+    label.prepend(input); 
+    addonsContainer.appendChild(label);
+  });
+}
+
+
 function openCartPopup(product, stockInfo = []) {
   openPopup(cartPopup);
   cartPopup.querySelector('.product-name').textContent = product.name || 'Unnamed Product';
@@ -396,8 +450,8 @@ function openCartPopup(product, stockInfo = []) {
 
   const sizesContainer = cartPopup.querySelector('.sizes-container');
   sizesContainer.innerHTML = '';
-  let selectedSize = null;
-  let selectedAddons = []; 
+  selectedSize = null; // Reset for new product
+  selectedAddons = []; // Reset for new product
 
   if (Array.isArray(stockInfo) && stockInfo.length) {
     const heading = document.createElement('p'); heading.textContent = 'Sizes:'; sizesContainer.appendChild(heading);
@@ -446,50 +500,6 @@ function openCartPopup(product, stockInfo = []) {
       
       label.prepend(input); 
       sizesContainer.appendChild(label);
-    });
-  }
-
-  const addonsContainer = cartPopup.querySelector('.addons-container');
-  
-  function loadAddons(size) {
-    addonsContainer.innerHTML = '';
-    selectedAddons = []; 
-    if (!size?.addons?.length) return;
-    const heading = document.createElement('p'); heading.textContent = 'Add-ons:'; addonsContainer.appendChild(heading);
-
-    size.addons.forEach(addon => {
-      const inventoryItem = inventoryMap[addon.id];
-      const stock = inventoryItem ? Math.floor(inventoryItem.quantity / (addon.qty || 1)) : 0;
-      
-      const label = document.createElement('label'); 
-      label.classList.add('addon-btn'); 
-      label.textContent = `${addon.name} - ₱${(addon.price || 0).toFixed(2)}`;
-
-      
-      const input = document.createElement('input'); 
-      input.type = 'checkbox';
-      
-      const isOutOfStock = stock <= 0;
-      
-      if (isOutOfStock) { 
-        input.disabled = true; 
-        label.classList.add('unavailable'); 
-      }
-      
-      input.addEventListener('change', () => {
-        if (input.checked) {
-          if (!isOutOfStock) {
-            selectedAddons.push(addon);
-          } else {
-            input.checked = false;
-            showToast(`${addon.name} is out of stock!`, 2000, "error");
-          }
-        }
-        else selectedAddons = selectedAddons.filter(a => a.id !== addon.id);
-      });
-      
-      label.prepend(input); 
-      addonsContainer.appendChild(label);
     });
   }
 
