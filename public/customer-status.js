@@ -114,18 +114,19 @@ function injectPopupStyles() {
         font-size: 14px;
         line-height: 1.2;
     }
-    .print-receipt-btn, .view-proof-btn { 
-        background-color: #007bff; 
-        color: white; 
-        margin-top: 5px;
-        padding: 8px 15px;
-        border: none;
-        border-radius: 6px;
-        cursor: pointer;
-        width: 100%;
-        font-weight: bold;
-    }
-    .view-proof-btn { background-color: #17a2b8; }
+  .print-receipt-btn, .view-proof-btn { 
+    background-color: #007bff; 
+    color: white; 
+    margin: 5px 0; 
+    padding: 8px 15px;
+    border: none;
+    border-radius: 6px;
+    cursor: pointer;
+    width: 30%;  
+    font-weight: bold;
+    display: block; 
+}
+    .view-proof-btn { background-color: red;  }
     .print-receipt-btn:hover { background-color: #0056b3; }
     .view-proof-btn:hover { background-color: #138496; }
     #downloadReceiptBtn { background-color: #28a745; color: white; }
