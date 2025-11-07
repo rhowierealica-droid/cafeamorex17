@@ -1,0 +1,84 @@
+.sidebar {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 240px;
+    height: 100%;
+    background: #f3e9dc;
+    padding-top: 20px;
+    z-index: 2000;
+    display: flex;
+    flex-direction: column;
+    transition: transform 0.3s ease;
+    box-sizing: border-box;
+}
+
+
+.hamburger {
+    position: fixed;
+    top: 15px;
+    left: 15px;
+    font-size: 2em;
+    color: #552915;
+    cursor: pointer;
+    z-index: 2003; 
+    display: none; 
+    transition: color 0.3s ease; 
+}
+
+
+.top-bar {
+    display: none;
+    width: 100%;
+    padding: 10px 20px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    position: fixed;
+    top: 0;
+    left: 0;
+    z-index: 2002;
+    border-bottom: 2px solid #704225;
+    background-color: #fff8f0;
+    box-sizing: border-box;
+}
+
+.top-bar .hamburger {
+    position: absolute; 
+    left: 15px;
+    font-size: 1.8em;
+    color: #552915;
+    cursor: pointer;
+    top: auto; 
+}
+
+.top-bar .mobile-logo {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.top-bar .mobile-logo img {
+    width: 40px;
+    height: 40px;
+}
+
+
+@media (max-width: 1024px) {
+    .hamburger {
+        display: block; 
+    }
+
+    .sidebar {
+        transform: translateX(-240px);
+        padding-top: 20px;
+    }
+
+    .sidebar.open {
+        transform: translateX(0);
+    }
+
+    .top-bar {
+        display: flex;
+    }
+}

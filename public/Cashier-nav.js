@@ -3,11 +3,14 @@ document.addEventListener("DOMContentLoaded", () => {
     const hamburgerBtn = document.getElementById("hamburger");
     const closeBtn = document.getElementById("closeBtn");
     
-    const profileCard = document.getElementById("profileCard"); 
-    const profileName = document.getElementById("profileName"); 
+    const profileCard = document.querySelector(".profile-card") || document.getElementById("profileCard"); 
+    const profileName = document.querySelector(".profile-card .profile-name") || document.getElementById("profileName");
+    const logoutBtn = document.querySelector(".logout"); 
+    const navItems = sidebar ? sidebar.querySelectorAll("nav ul li") : [];
 
-    const navItems = sidebar.querySelectorAll("nav ul li");
-
+    const storedName = sessionStorage.getItem("cashierName"); 
+    const storedRole = sessionStorage.getItem("cashierRole");
+    
     const navPaths = [
         "employee-order.html", // Orders
         "employee-incomingorder.html", // Incoming Orders
@@ -15,13 +18,12 @@ document.addEventListener("DOMContentLoaded", () => {
     ];
 
     if (profileName) {
-        profileName.textContent = "Cashier"; 
+        profileName.textContent = storedName || storedRole || "Cashier User"; 
     }
-
     if (profileCard) {
         profileCard.style.cursor = "pointer"; 
         profileCard.addEventListener("click", () => {
-            window.location.href = "Employee-EditProfile.html"; 
+            window.location.href = "Cashier-EditProfile.html"; 
         });
     }
 
@@ -49,6 +51,21 @@ document.addEventListener("DOMContentLoaded", () => {
             if (sidebar) {
                 sidebar.classList.remove("open");
             }
+        });
+    }
+
+    if (logoutBtn) {
+        logoutBtn.style.cursor = "pointer";
+        logoutBtn.addEventListener("click", () => {
+            
+            setTimeout(() => {
+                sessionStorage.clear(); 
+                
+                localStorage.removeItem('cashierName'); 
+                localStorage.removeItem('cashierRole'); 
+
+                window.location.href = "login.html";
+            }, 50);
         });
     }
 });
