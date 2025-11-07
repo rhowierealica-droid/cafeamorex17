@@ -29,6 +29,8 @@ const addressFormDiv = document.getElementById("address-form-div");
 const addressForm = document.getElementById("address-form");
 const toastDiv = document.getElementById("toast");
 
+
+
 const auth = getAuth();
 let currentUser = null;
 let cartItems = [];
@@ -44,6 +46,18 @@ let cartAddresses = [];
 let inventoryMap = {};
 let productMap = {};
 
+document.getElementById('emailLink').addEventListener('click', function (e) {
+    e.preventDefault();
+    const email = 'cafeamorex17s@gmail.com';
+    const gmailUrl = `https://mail.google.com/mail/?view=cm&fs=1&to=${email}`;
+    const newTab = window.open(gmailUrl, '_blank');
+
+
+    if (!newTab || newTab.closed || typeof newTab.closed === 'undefined') {
+        window.location.href = `mailto:${email}`;
+    }
+});
+
 const GUEST_CART_KEY = "guest_cart_v1";
 
 function showToast(message, duration = 3000, color = "red", inline = false) {
@@ -54,6 +68,7 @@ function showToast(message, duration = 3000, color = "red", inline = false) {
     toastDiv.textContent = message;
     toastDiv.style.backgroundColor = color;
     toastDiv.style.visibility = "visible";
+    toastDiv.style.zIndex = "10000"; 
     toastDiv.style.display = inline ? "inline-block" : "flex";
     toastDiv.style.textAlign = "center";
     toastDiv.style.justifyContent = inline ? "flex-start" : "center";
@@ -411,8 +426,8 @@ function renderCartItemsFromState() {
         totalContainer.style.marginTop = "8px";
         cartItemsDiv.appendChild(totalContainer);
     } else {
-         totalContainer.remove(); 
-         cartItemsDiv.appendChild(totalContainer);
+           totalContainer.remove(); 
+           cartItemsDiv.appendChild(totalContainer);
     }
 
     const availableItems = cartItems.filter(i => {
@@ -452,7 +467,7 @@ function renderCartItemsFromState() {
         let statusLabel = "";
         if (!available) statusLabel = " (Unavailable)";
         else if (stock <= 0) statusLabel = " (Out of stock)";
-        else statusLabel = ` (Stock: ${stock})`;
+        //else statusLabel = ` (Stock: ${stock})`;
 
         let displayQty = Math.max(Number(item.quantity || 1), 0);
         if (stock <= 0) {
@@ -584,7 +599,7 @@ function renderCartItemsFromState() {
 }
 
     // Delivery Fee show
-   
+    
     deliveryDiv.innerHTML = `<strong>Delivery Fee: ₱${selectedCartItems.size > 0 ? userDeliveryFee.toFixed(2) : "0.00"}</strong>`;
     
     cartItemsDiv.appendChild(deliveryDiv);
@@ -608,7 +623,7 @@ function updateCartTotal() {
     // Deliovery Fee show
     const deliveryDiv = document.getElementById("delivery-fee");
     if (deliveryDiv) {
-         deliveryDiv.innerHTML = `<strong>Delivery Fee: ₱${selectedCartItems.size > 0 ? userDeliveryFee.toFixed(2) : "0.00"}</strong>`;
+           deliveryDiv.innerHTML = `<strong>Delivery Fee: ₱${selectedCartItems.size > 0 ? userDeliveryFee.toFixed(2) : "0.00"}</strong>`;
     }
 }
 
@@ -701,6 +716,7 @@ async function loadSavedAddresses(initialLoad = false) {
                 }
             }
         }
+
 
         if (currentUser) {
             const addrRef = collection(db, "users", currentUser.uid, "addresses");
@@ -900,7 +916,7 @@ finalConfirmBtn?.addEventListener("click", async () => {
             const { stock, available } = computeStockForCartItem(item);
 
             if (!available || stock <= 0 || requiredQty > stock) {
-                return showToast(`Stock check failed for item: ${item.name}. Available: ${stock}, Requested: ${requiredQty}. Cannot place order.`, 4000, "red", true);
+                return showToast(`Insufficient stock for item: ${item.name}. We currently only have ${stock} available, but you requested ${requiredQty}. Please adjust your quantity.`, 6000, "red", true);
             }
 
             const components = [
@@ -917,7 +933,7 @@ finalConfirmBtn?.addEventListener("click", async () => {
                 const finalNewQty = currentStock - totalDeduction;
 
                 if (finalNewQty < 0) {
-                    return showToast(`Insufficient stock for component ID: ${componentId} (for item: ${item.name}) due to combined order requirements. Cannot place order.`, 4000, "red", true);
+                    return showToast(`We ran out of an ingredient needed for the ${item.name}. This is due to the large size of your total order. Please try reducing the quantity of items in your cart.`, 6000, "red", true);
                 }
                 inventoryUpdates.set(componentId, finalNewQty);
             }
@@ -977,7 +993,6 @@ finalConfirmBtn?.addEventListener("click", async () => {
         } else if (paymentMethod === "E-Payment") {
             const { lineItems, customerDetails } = prepareLineItems(orderItems, userDeliveryFee, currentUser);
             
-
             customerDetails.phone = phoneNumber;
             customerDetails.name = customerFullName; 
 
