@@ -433,7 +433,7 @@ function renderOrders() {
             if (finalRefundStatus && ["Succeeded", "Manual", "Refunded", "Pending"].includes(finalRefundStatus)) {
                 mainStatusDisplay = finalRefundStatus === "Pending" ? "Refunded (Processing)" : "Refunded";
             } else if (mainStatus === "Refunded" || mainStatus === "Refund Denied") {
-                   mainStatusDisplay = mainStatus;
+                    mainStatusDisplay = mainStatus;
             }
 
 
@@ -441,7 +441,12 @@ function renderOrders() {
 
             let actionBtnHtml = "";
             const printButton = `<button class="print-receipt-btn" data-id="${orderId}" data-collection="${orderItem.collection}">View Receipt</button>`;
-            const infoButton = `<button class="view-info-btn" data-id="${orderId}" data-collection="${orderItem.collection}">View Information</button>`;
+            
+            // ⭐️ CONDITIONAL VIEW INFO BUTTON
+            const infoButton = orderItem.type === "Delivery" 
+                ? `<button class="view-info-btn" data-id="${orderId}" data-collection="${orderItem.collection}">View Information</button>` 
+                : '';
+
 
             const proofOfDeliveryURL = order.proofOfDeliveryURL;
             const proofOfDeliveryDocId = order.proofOfDeliveryDocId;
@@ -452,7 +457,7 @@ function renderOrders() {
                 switch (order.status) {
                     case "Wait for Admin to Accept":
                         actionBtnHtml = `<button class="admin-accept-btn" data-id="${orderId}" data-collection="${orderItem.collection}">Accept Order</button>
-                                             <button class="admin-decline-btn" data-id="${orderId}" data-collection="${orderItem.collection}">Decline Order</button>`;
+                                         <button class="admin-decline-btn" data-id="${orderId}" data-collection="${orderItem.collection}">Decline Order</button>`;
                         break;
                     case "Waiting for Payment":
                         actionBtnHtml = "";
@@ -471,7 +476,7 @@ function renderOrders() {
                         break;
                     case "Delivery":
                         if (proofOfDeliveryURL && proofOfDeliveryDocId) {
-                             actionBtnHtml = `<button class="complete-btn" data-id="${orderId}" data-collection="${orderItem.collection}" style="background-color: #4CAF50;">Order Completed</button>`;
+                               actionBtnHtml = `<button class="complete-btn" data-id="${orderId}" data-collection="${orderItem.collection}" style="background-color: #4CAF50;">Order Completed</button>`;
                         } else {
                             actionBtnHtml = `<button class="pod-upload-btn" data-id="${orderId}" data-collection="${orderItem.collection}">Upload POD</button>`;
                         }
@@ -490,10 +495,10 @@ function renderOrders() {
                 }
             }
 
-            if (actionBtnHtml) {
-                actionBtnHtml += infoButton;
-            } else {
-                actionBtnHtml += infoButton; // Add info button even if no other action is present
+            if (infoButton) {
+                 actionBtnHtml += infoButton;
+            } else if (actionBtnHtml === "" && orderItem.type === "DeliveryOrder") {
+                 actionBtnHtml += infoButton; 
             }
 
             if (["Completed", "Completed by Customer", "Canceled", "Refund Denied", "Refund Failed", "Refunded"].includes(order.status) && !actionBtnHtml.includes("View Receipt")) {
@@ -652,7 +657,6 @@ async function showReceiptPopup(orderId, collectionName) {
     }
 }
 
-// --- START: New Function to Show Customer Information ---
 async function showCustomerInfoPopup(orderId, collectionName) {
     const orderRef = doc(db, collectionName, orderId);
     try {
@@ -903,7 +907,7 @@ async function returnStock(orderItems) {
  * @param {File} file - 
  */
 async function uploadProofOfDelivery(orderId, collectionName, file) {
-    customAlert("Uploading Proof of Delivery... Please wait. **(Uploading...)**");
+    customAlert("Uploading Proof of Delivery... Please wait. ");
 
     if (collectionName !== "DeliveryOrders") {
         customAlert("Error: Proof of Delivery is only for Delivery Orders.");
@@ -996,8 +1000,7 @@ function showProofOfDeliveryUploadPopup(orderId, collectionName) {
 }
 
 /**
- 
- * @param {string} orderId 
+ * * @param {string} orderId 
  * @param {string} collectionName 
  * @param {string} podDocId 
  */
