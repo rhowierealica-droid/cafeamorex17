@@ -10,6 +10,8 @@
   <link rel="stylesheet" href="favorites.css">
   <link rel="stylesheet" href="OrderStatusNotif.css">
   <link rel="stylesheet" href="customer-side.css">
+    <link rel="stylesheet" href="termsandcondition.css">
+
 </head>
 <body>
 
@@ -59,7 +61,7 @@
     </header>
 
     <section class="main-section">
-      <h2>Favorites</h2>
+     <!-- <h2>Favorites</h2>  --> 
       
       <section class="category-section" data-section="Drink">
         <div class="category-list" data-main="Drink"></div>
@@ -89,7 +91,9 @@
       <div class="contact">
         <h3>Contact Us</h3>
         <p>
-          <a><i class="fas fa-envelope"></i> cafeamorex17s@gmail.com</a><br>
+          <a href="#" id="emailLink">
+              <i class="fas fa-envelope"></i> cafeamorex17s@gmail.com
+            </a><br>
           <a><i class="fas fa-phone"></i> +63 965 497 1413</a>
         </p>
       </div>
@@ -134,19 +138,160 @@
     </div>
   </div>
 
+ 
+
   <div id="termsPopup" class="popup hidden">
     <div class="popup-content">
-      <h3>Terms and Conditions</h3>
-      <div class="terms-body"></div>
-      <button class="close-terms">Close</button>
+        <div class="terms-body">
+<p>
+        By accessing or using the Café Amoré x17s Web-Based Product Ordering and Delivery System with Inventory and Sales Management, you agree to the following terms:
+      </p>
+
+      <h3>Platform Overview:</h3>
+      <ul>
+        <li>Allows customers to browse products, place orders, and arrange deliveries.</li>
+        <li>Provides authorized staff and administrators tools for inventory and sales management.</li>
+        <li>Terms may be updated at any time; continued use constitutes acceptance of updates.</li>
+      </ul>
+
+      <h3>User Eligibility:</h3>
+      <ul>
+        <li>Administrative accounts issued solely by management.</li>
+        <li>Users responsible for login credential confidentiality.</li>
+      </ul>
+
+      <h3>Products and Pricing:</h3>
+      <ul>
+        <li>Product availability and prices subject to change without notice.</li>
+        <li>Images and descriptions are for reference only; actual items may vary.</li>
+        <li>Prices are displayed in Philippine Pesos (₱).</li>
+      </ul>
+
+      <h3>Orders and Payment:</h3>
+      <ul>
+        <li>Orders must be reviewed and confirmed before submission.</li>
+        <li>Payment options include cash on delivery and GCash.</li>
+        <li>Orders are considered final once submitted and paid.</li>
+      </ul>
+
+      <h3>Delivery:</h3>
+      <ul>
+        <li>Delivery schedules, fees, and coverage areas displayed at checkout; may be affected by external factors.</li>
+      </ul>
+
+      <h3>Inventory and Sales Management:</h3>
+      <ul>
+        <li>Authorized staff must maintain accurate inventory and sales records.</li>
+        <li>All activities monitored for security and accountability.</li>
+      </ul>
+
+      <h3>Refunds, Returns, and Cancellations:</h3>
+      <ul>
+        <li>Orders may be canceled only under circumstances approved by management.</li>
+        <li>Refunds or replacements issued for incorrect, missing, or defective items only.</li>
+        <li>Issues must be reported within 24 hours of receipt.</li>
+      </ul>
+
+      <h3>User Responsibilities:</h3>
+      <ul>
+        <li>Provide accurate personal, contact, and delivery information.</li>
+        <li>Staff and administrators must handle system data responsibly.</li>
+        <li>Café Amoré x17s not liable for errors or delays caused by inaccurate or incomplete information.</li>
+      </ul>
+
+      <h3>Data Privacy and Security:</h3>
+      <ul>
+        <li>Personal and transactional data used solely for order fulfillment, delivery, and system improvement.</li>
+        <li>Data will not be shared with unauthorized parties.</li>
+        <li>Staff and administrators required to maintain data confidentiality.</li>
+      </ul>
+
+      <h3>Limitation of Liability:</h3>
+      <ul>
+        <li>Café Amoré x17s not responsible for indirect, incidental, or consequential damages from system use or order fulfillment.</li>
+        <li>Liability limited to the total value of the affected order.</li>
+      </ul>
+
+      <h3>Intellectual Property:</h3>
+      <ul>
+        <li>All content, materials, and system functionality are property of Café Amoré x17s.</li>
+        <li>Unauthorized reproduction, modification, or distribution prohibited.</li>
+      </ul>
+
+      <h3>Governing Law:</h3>
+      <ul>
+        <li>Terms governed by the laws of the Republic of the Philippines.</li>
+        <li>Disputes subject to Philippine court jurisdiction.</li>
+      </ul>
+
+      <h3>Acknowledgment:</h3>
+      <ul>
+        <li>By using the platform, users confirm they have read, understood, and agreed to these Terms and Conditions.</li>
+      </ul>
+
+      <hr>
+
+      <h2>Privacy Policy</h2>
+      <p><strong>Effective Date:</strong> [Insert Date]</p>
+      <p>
+        Café Amoré x17s (“we,” “us,” or “our”) is committed to protecting your privacy and ensuring the security of your personal information when using our web-based product ordering and delivery system, which includes inventory and sales management. By using this platform, you agree to the terms outlined below.
+      </p>
+
+      <h3>Information We Collect:</h3>
+      <ul>
+        <li>Personal details: name, email address, delivery address.</li>
+        <li>Order and transaction information: items ordered, payment details (processed securely), order history.</li>
+        <li>Technical information: IP address, device type, browser type, system interactions.</li>
+      </ul>
+
+      <h3>Use of Information:</h3>
+      <ul>
+        <li>Process and fulfill orders efficiently.</li>
+        <li>Communicate order updates and delivery information.</li>
+      </ul>
+
+      <h3>Data Protection:</h3>
+      <ul>
+        <li>Personal and payment information is secured using industry-standard measures.</li>
+        <li>Payment details are processed exclusively through trusted third-party providers.</li>
+        <li>Authorized staff and administrators are bound by confidentiality obligations.</li>
+      </ul>
+
+      <h3>Sharing of Information:</h3>
+      <ul>
+        <li>No selling, trading, or renting of personal information to third parties.</li>
+        <li>Shared only with authorized service providers for order fulfillment or as required by law.</li>
+      </ul>
+
+      <h3>User Rights:</h3>
+      <ul>
+        <li>Access and correct personal information.</li>
+        <li>Opt out of marketing communications.</li>
+        <li>Data retained only as long as necessary for operational, legal, and regulatory purposes.</li>
+      </ul>
+
+      <h3>Policy Updates:</h3>
+      <ul>
+        <li>Privacy Policy may be updated periodically; latest version posted on the platform.</li>
+        <li>Inquiries can be directed to [Insert Contact Email] or [Insert Contact Number].</li>
+      </ul>
+
+      <h3>Acknowledgment:</h3>
+      <ul>
+        <li>By using the platform, users confirm they have read, understood, and agreed to this Privacy Policy.</li>
+      </ul>
+    </div>        
+        <button class="close-terms">Close</button>
     </div>
-  </div>
+</div>
 
   <script type="module" src="favorites.js"></script>
   <script type="module" src="customer-side.js"></script>
   <script type="module" src="OrderStatusNotif.js"></script>
   <script type="module" src="AutoCancel.js"></script>
-              <script type="module" src="AccessCustomer.js"></script>
+  <script type="module" src="AccessCustomer.js"></script>
+                  <script type="module" src="AccessCustomer.js"></script>
+
 
 
 
@@ -185,5 +330,7 @@
       }
     });
   </script>
+
+  
 </body>
 </html>
