@@ -7,11 +7,19 @@ import {
   getFirestore,
   doc,
   getDoc,
+  onSnapshot,
 } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 
 const sidebar = document.getElementById("sidebar");
 const hamburger = document.getElementById("hamburger");
 const closeBtn = document.getElementById("closeBtn");
+const topBar = document.querySelector('.top-bar');
+let overlay = document.getElementById('overlay');
+if (!overlay) {
+  overlay = document.createElement('div');
+  overlay.id = 'overlay';
+  document.body.appendChild(overlay);
+}
 const profileCard = document.querySelector(".profile-card");
 const profileNameEl = profileCard?.querySelector(".profile-name");
 const logout = document.querySelector(".logout");
@@ -21,67 +29,85 @@ const welcomeHeader = document.querySelector(".main-content header h1");
 const auth = getAuth();
 const db = getFirestore();
 
+let unsubscribeUserListener = null;
+
+
 function updateSidebarDisplay() {
   if (window.innerWidth > 1024) {
     sidebar.classList.remove("active");
     if (hamburger) hamburger.style.display = "none";
     if (closeBtn) closeBtn.style.display = "none";
+    if (topBar) topBar.style.display = "none"; 
+    overlay.classList.remove('active');
   } else {
     if (hamburger) hamburger.style.display = "block";
     if (closeBtn) closeBtn.style.display = "none";
+    if (topBar) topBar.style.display = "flex"; 
   }
 }
+
+function openSidebar() {
+  sidebar.classList.add('active');
+  if (hamburger) hamburger.style.display = 'none';
+  if (closeBtn) {
+    closeBtn.style.display = 'block';
+  }
+  overlay.classList.add('active');
+  if (topBar) topBar.style.display = 'none'; 
+}
+
+function closeSidebar() {
+  sidebar.classList.remove('active');
+  if (hamburger) hamburger.style.display = 'block';
+  if (closeBtn) {
+    closeBtn.style.display = 'none';
+  }
+  overlay.classList.remove('active');
+  if (window.innerWidth <= 1024 && topBar) topBar.style.display = 'flex'; 
+}
+
 updateSidebarDisplay();
 window.addEventListener("resize", updateSidebarDisplay);
 
-hamburger?.addEventListener("click", () => {
-  sidebar.classList.add("active");
-  hamburger.style.display = "none";
-  if (closeBtn) closeBtn.style.display = "block";
-});
-
-closeBtn?.addEventListener("click", () => {
-  sidebar.classList.remove("active");
-  hamburger.style.display = "block";
-  closeBtn.style.display = "none";
-});
-
+hamburger?.addEventListener("click", openSidebar);
+closeBtn?.addEventListener("click", closeSidebar);
+overlay.addEventListener('click', closeSidebar);
 
 const navLinks = sidebar.querySelectorAll("nav ul li");
 if (navLinks.length >= 6) {
   navLinks[0].addEventListener(
     "click",
-    () => (window.location.href = "adminpanel.html")
+    () => { window.location.href = "adminpanel.html"; closeSidebar(); }
   );
   navLinks[1].addEventListener(
     "click",
-    () => (window.location.href = "menumanagement.html")
+    () => { window.location.href = "menumanagement.html"; closeSidebar(); }
   );
   navLinks[2].addEventListener(
     "click",
-    () => (window.location.href = "orders.html")
+    () => { window.location.href = "orders.html"; closeSidebar(); }
   );
   navLinks[3].addEventListener(
     "click",
-    () => (window.location.href = "incomingorder.html")
+    () => { window.location.href = "incomingorder.html"; closeSidebar(); }
   );
   navLinks[4].addEventListener(
     "click",
-    () => (window.location.href = "admin-feedback.html")
+    () => { window.location.href = "admin-feedback.html"; closeSidebar(); }
   );
   navLinks[5].addEventListener(
     "click",
-    () => (window.location.href = "inventory.html")
-  ); 
+    () => { window.location.href = "inventory.html"; closeSidebar(); }
+  );
   if (navLinks[6])
     navLinks[6].addEventListener(
       "click",
-      () => (window.location.href = "employeeManagement.html")
+      () => { window.location.href = "employeeManagement.html"; closeSidebar(); }
     );
   if (navLinks[7])
     navLinks[7].addEventListener(
       "click",
-      () => (window.location.href = "sales.html")
+      () => { window.location.href = "sales.html"; closeSidebar(); }
     );
 }
 
@@ -115,41 +141,67 @@ logo?.addEventListener("click", () => {
 logout?.addEventListener("click", async (e) => {
   e.stopPropagation();
   try {
-    await signOut(auth); 
-    localStorage.removeItem("currentAdminName"); 
+    if (unsubscribeUserListener) {
+      unsubscribeUserListener();
+      unsubscribeUserListener = null;
+    }
+    await signOut(auth);
+    localStorage.removeItem("currentAdminName");
     console.log("User signed out successfully. Redirecting to login page.");
     window.location.href = "login.html";
   } catch (error) {
-    console.error("Error signing out:", error); 
+    console.error("Error signing out:", error);
   }
 });
 
 
+/**
+ * @param {object} user 
+ */
+function setupRealTimeNameUpdate(user) {
+    if (unsubscribeUserListener) {
+        unsubscribeUserListener();
+    }
+
+    const userRef = doc(db, "users", user.uid);
+
+    unsubscribeUserListener = onSnapshot(userRef, (docSnapshot) => {
+        let fullName = "Admin";
+        
+        if (docSnapshot.exists()) {
+            const data = docSnapshot.data();
+            fullName = data.fullname || "Admin";
+            localStorage.setItem("currentAdminName", fullName); 
+        } else {
+            const storedName = localStorage.getItem("currentAdminName");
+            if (storedName) fullName = storedName;
+        }
+
+        if (profileNameEl) profileNameEl.textContent = fullName;
+        if (welcomeHeader) welcomeHeader.textContent = `Welcome, ${fullName}`;
+
+    }, (error) => {
+        console.error("Error setting up real-time name listener:", error);
+        const storedName = localStorage.getItem("currentAdminName");
+        if (storedName) {
+            if (profileNameEl) profileNameEl.textContent = storedName;
+            if (welcomeHeader) welcomeHeader.textContent = `Welcome, ${storedName}`;
+        }
+    });
+}
+
+
 onAuthStateChanged(auth, async (user) => {
   if (!user) {
+    if (unsubscribeUserListener) {
+      unsubscribeUserListener();
+      unsubscribeUserListener = null;
+    }
     if (currentPage !== "login.html") {
       console.log("No authenticated user found. Redirecting to login.");
       window.location.href = "login.html";
     }
-    return; 
-  } 
-  let fullName = "Admin";
-  try {
-    const userDoc = await getDoc(doc(db, "users", user.uid));
-    if (userDoc.exists()) {
-      const data = userDoc.data();
-      fullName = data.fullname || "Admin";
-      localStorage.setItem("currentAdminName", fullName);
-    } else {
-      const storedName = localStorage.getItem("currentAdminName");
-      if (storedName) fullName = storedName;
-    }
-  } catch (err) {
-    console.error("Error fetching admin data:", err);
-    const storedName = localStorage.getItem("currentAdminName");
-    if (storedName) fullName = storedName;
+    return;
   }
-
-  if (profileNameEl) profileNameEl.textContent = fullName;
-  if (welcomeHeader) welcomeHeader.textContent = `Welcome, ${fullName}`;
+  setupRealTimeNameUpdate(user);
 });
