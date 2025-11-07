@@ -11,20 +11,20 @@ import { doc, setDoc, deleteDoc } from "https://www.gstatic.com/firebasejs/10.12
 const messagePopup = document.getElementById("messagePopup");
 const messageText = document.getElementById("messageText");
 const popupOkBtn = document.getElementById("popupOkBtn");
-const countdownDisplay = document.getElementById("countdownDisplay"); 
+const countdownDisplay = document.getElementById("countdownDisplay");
 const registerButton = document.getElementById("registerButton");
 
 const resendEmailBtn = document.getElementById("resendEmailBtn");
 const resendTimerDisplay = document.getElementById("resendTimerDisplay");
 
 let shouldRedirect = false;
-let timerInterval = null; 
-let verificationCheckInterval = null; 
+let timerInterval = null;
+let verificationCheckInterval = null;
 
 // 3 Mins
-const MAIN_VERIFICATION_DURATION = 180; 
+const MAIN_VERIFICATION_DURATION = 180;
 // 30 Sec
-const RESEND_COOLDOWN_DURATION = 30; 
+const RESEND_COOLDOWN_DURATION = 30;
 
 const password = document.getElementById("password");
 const confirmPassword = document.getElementById("confirmPassword");
@@ -40,7 +40,7 @@ togglePasswordIcons.forEach(icon => {
         if (passwordInput) {
             const type = passwordInput.getAttribute('type') === 'password' ? 'text' : 'password';
             passwordInput.setAttribute('type', type);
-            
+
             icon.classList.toggle('fa-eye');
             icon.classList.toggle('fa-eye-slash');
         }
@@ -48,10 +48,10 @@ togglePasswordIcons.forEach(icon => {
 });
 
 
-//  start the 30-second cooldown on the Resend button
+//  start the 30-second cooldown on the Resend button
 function startResendCooldown() {
     let countdown = RESEND_COOLDOWN_DURATION;
-    
+
     resendEmailBtn.disabled = true;
     resendEmailBtn.textContent = `Resend Email (${countdown}s)`;
     resendEmailBtn.style.opacity = 0.5;
@@ -85,7 +85,6 @@ if (resendEmailBtn) {
         }
 
         try {
-            // fresh token and state before resending
             await user.reload(); 
             
             if (user.emailVerified) {
@@ -128,6 +127,9 @@ function showMessage(msg, type = 'info') {
     if (popupOkBtn) popupOkBtn.style.display = "block";
     if (resendEmailBtn) resendEmailBtn.style.display = "none";
     if (resendTimerDisplay) resendTimerDisplay.style.display = "none";
+    
+    // Always set shouldRedirect to false by default
+    shouldRedirect = false; 
 
     if (type === 'verification-pending') {
         resendEmailBtn.style.display = "block";
@@ -136,8 +138,6 @@ function showMessage(msg, type = 'info') {
         startCountdownTimer(MAIN_VERIFICATION_DURATION);
     } else if (type === 'success-redirect') {
         shouldRedirect = true;
-    } else {
-        shouldRedirect = false;
     }
     
     messagePopup.style.display = "flex";
@@ -232,11 +232,9 @@ function startVerificationCheck() {
                     if(resendEmailBtn) resendEmailBtn.style.display = 'none';
                     if(resendTimerDisplay) resendTimerDisplay.style.display = 'none';
                     if(popupOkBtn) popupOkBtn.style.display = 'block';
-
-                    popupOkBtn.onclick = () => {
-                        messagePopup.style.display = "none";
-                        window.location.href = 'login.html';
-                    };
+                    
+                    
+                    shouldRedirect = true; 
                 }
             }
         } else {
@@ -264,11 +262,12 @@ popupOkBtn.addEventListener("click", () => {
         registerButton.textContent = "REGISTER";
     }
 
-    if (shouldRedirect) window.location.href = "login.html";
+    if (shouldRedirect) {
+        window.location.href = "login.html";
+        shouldRedirect = false; 
+    }
     
-    popupOkBtn.onclick = () => {
-        messagePopup.style.display = "none";
-    };
+    
 });
 
 // Terms and Condition
@@ -457,7 +456,7 @@ if (registerForm) {
         const email = document.getElementById("email").value.trim();
         const pass = password.value;
         const confirmPass = confirmPassword.value;
-                                    
+                                            
         if (!termsCheckbox.checked) {
             showMessage("You must agree to the Terms and Conditions before registering.");
             return;
@@ -524,7 +523,7 @@ if (registerForm) {
             });
 
             showMessage("Please check your email now to verify your account.", 'verification-pending'); 
-                        
+                                        
             registerForm.reset();
             termsCheckbox.checked = false;
             isPhoneVerified = false;
