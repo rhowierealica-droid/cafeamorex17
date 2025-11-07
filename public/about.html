@@ -6,41 +6,35 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Café Amore | About Us</title>
 
-  <!-- Font Awesome -->
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
 
-  <!-- CSS -->
-  <link rel="stylesheet" href="index.css">
+  <link rel="stylesheet" href="menu.css">
   <link rel="stylesheet" href="customer-side.css">
   <link rel="stylesheet" href="about.css">
 </head>
 
 <body>
-  <!-- Hamburger (only visible on small screens) -->
+  
   <div class="hamburger hidden" id="hamburger"><i class="fas fa-bars"></i></div>
 
-  <!-- Sidebar Navigation -->
   <aside class="sidebar" id="sidebar">
     <div class="close-btn hidden" id="closeBtn">&times;</div>
 
-    <!-- Logo -->
     <div class="logo">
       <img src="logo.png" alt="Café Amore Logo">
       <span class="brand">Café Amore</span>
     </div>
 
-    <!-- Navigation -->
     <nav>
       <ul>
         <li class="menu-link"><i class="fas fa-utensils"></i> Menu</li>
         <li class="cart-link"><i class="fas fa-shopping-cart"></i> Cart</li>
         <li class="favorites-link"><i class="fas fa-heart"></i> Favorites</li>
-        <!--  <li class="history-link"><i class="fas fa-history"></i> History</li> -->
+        <li class="history-link"><i class="fas fa-history"></i> History</li>
         <li class="feedback-link"><i class="fa-solid fa-comment"></i> Feedback</li>
       </ul>
     </nav>
 
-    <!-- Profile Card -->
     <div class="profile-card" id="profileCard">
       <div class="profile-avatar"><i class="fas fa-user-circle"></i></div>
       <div class="profile-info">
@@ -49,21 +43,19 @@
       </div>
     </div>
 
-    <!-- Logout -->
+
     <div class="logout" id="logoutBtn"><i class="fas fa-sign-out-alt"></i> Log Out</div>
   </aside>
 
-  <!-- Main Content -->
   <main class="menu-container">
     <section class="main-content about-section">
 
       <div class="about-content">
-        <!-- Image -->
+
         <div class="img-container">
           <img class="img-owner" src="download.jpg" alt="Café Amore Owner">
         </div>
 
-        <!-- Text -->
         <div class="p-about">
           <h1 class="about-title">Who we are</h1>
           <p class="p-content">
@@ -81,7 +73,7 @@
         </div>
       </div>
 
-      <!-- Map Section -->
+ 
       <div class="map-container">
         <h2 class="map-title">Find Us Here</h2>
         <div class="map-wrapper coffee-map">
@@ -95,8 +87,7 @@
     </section>
   </main>
 
-  <!-- JS -->
-  <script type="module" src="index.js"></script>
+  <script type="module" src="menu.js"></script>
   <script type="module" src="customer-side.js"></script>
   <script type="module" src="OrderStatusNotif.js"></script>
 </body>
