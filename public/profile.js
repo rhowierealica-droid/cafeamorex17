@@ -3,7 +3,6 @@ import { auth, db } from './firebase-config.js';
 import { doc, getDoc } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 import { onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
 
-/* Mask email (same logic as edit page) */
 function maskEmail(email) {
   if (!email || typeof email !== 'string') return "";
   const [userPart = "", domain = ""] = email.split("@");
@@ -11,7 +10,6 @@ function maskEmail(email) {
   return userPart.substring(0, 3) + "*".repeat(Math.max(userPart.length - 3, 3)) + "@" + domain;
 }
 
-/* Load and display user info */
 async function loadProfile(user) {
   try {
     const userRef = doc(db, "users", user.uid);
@@ -36,16 +34,13 @@ async function loadProfile(user) {
   }
 }
 
-/* Auth */
 onAuthStateChanged(auth, (user) => {
   if (!user) {
-    // Redirect if not logged in
     window.location.href = "login.html";
     return;
   }
   loadProfile(user);
 
-  // Edit button -> go to edit-profile page
   document.getElementById("editBtn").addEventListener("click", () => {
     window.location.href = "edit-profile.html";
   });
