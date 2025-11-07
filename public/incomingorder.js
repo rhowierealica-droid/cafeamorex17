@@ -387,7 +387,7 @@ function renderOrders() {
                 return `<div>${qty} × ${p.product}${sizeText}${addons} — ₱${total.toFixed(2)}</div>`;
             }).join("");
 
-            // Dlivery fee show
+            // Delivery fee show
             const deliveryFee = order.deliveryFee || 0;
             const deliveryFeeHtml = deliveryFee > 0
                 ? `<div style="margin-top: 5px; border-top: 1px dashed #ccc; padding-top: 5px;">Delivery Fee: ₱${deliveryFee.toFixed(2)}</div>`
@@ -447,7 +447,7 @@ function renderOrders() {
             const podViewButton = `<button class="pod-view-btn" data-id="${orderId}" data-collection="${orderItem.collection}" data-doc-id="${order.proofOfDeliveryDocId}">View POD</button>`;
 
 
-            if (order.refundRequest) {
+            if (order.refundRequest || order.finalRefundStatus === "Pending") {
                 actionBtnHtml = refundButton;
             } else {
                 switch (order.status) {
@@ -471,27 +471,26 @@ function renderOrders() {
                             : `<button class="complete-btn" data-id="${orderId}" data-collection="${orderItem.collection}">Completed</button>`;
                         break;
                     case "Delivery":
-                         actionBtnHtml = order.proofOfDeliveryURL && order.proofOfDeliveryDocId 
+                        actionBtnHtml = order.proofOfDeliveryURL && order.proofOfDeliveryDocId 
                              ? `<button class="complete-btn" data-id="${orderId}" data-collection="${orderItem.collection}" style="background-color: #4CAF50;">Order Completed</button>`
                              : podUploadButton;
                         break;
                 }
             }
             
-            actionBtnHtml += infoButton;
+          
+            if (orderItem.type === "Delivery") {
+                actionBtnHtml += infoButton;
+            }
 
             if (["Completed", "Completed by Customer", "Canceled", "Refund Denied", "Refund Failed", "Refunded"].includes(order.status) || order.finalRefundStatus) {
                  if (!actionBtnHtml.includes("View Receipt")) {
-                    actionBtnHtml += printButton;
-                }
+                     actionBtnHtml += printButton;
+                 }
             }
 
             if (orderItem.type === "Delivery" && ["Completed", "Completed by Customer"].includes(order.status) && order.proofOfDeliveryURL && order.proofOfDeliveryDocId) {
                 actionBtnHtml += podViewButton;
-            }
-            
-            if (order.finalRefundStatus === "Pending") {
-                 actionBtnHtml += refundButton; 
             }
 
             tr.innerHTML = `
@@ -681,7 +680,7 @@ async function showCustomerInfoPopup(orderId, collectionName) {
         customAlert("Failed to load customer information.");
     }
 }
-// --- END: New Function to Show Customer Information ---
+
 
 
 function showRefundAmountPopup(orderId, collectionName, maxRefundable, paymongoPaymentId) {
@@ -966,7 +965,7 @@ function showProofOfDeliveryUploadPopup(orderId, collectionName) {
 
             if (uploadUrl) {
                 
-                await updateOrderStatus(orderId, collectionName, "Completed");
+                
                 closePopup();
             } else {
             
