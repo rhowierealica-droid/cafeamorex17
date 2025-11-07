@@ -63,15 +63,15 @@ function injectPopupStyles() {
     .refund-error { background-color: #6c757d; }
     .view-refund-btn { background-color: #795548; color: white; }
     .view-refund-btn:hover { background-color: #5d4037; }
-    .admin-accept-btn { background-color: #4CAF50; color: white; }
+    .admin-accept-btn { background-color: #4CAF50; }
     .admin-accept-btn:hover { background-color: #45a049; }
-    .admin-decline-btn { background-color: #f44336; color: white;}
+    .admin-decline-btn { background-color: #f44336; }
     .admin-decline-btn:hover { background-color: #d32f2f; }
     .print-receipt-btn { background-color: #007bff; color: white; margin-top: 5px;}
     .print-receipt-btn:hover { background-color: #0056b3; }
-    .pod-upload-btn { background-color: #45a049; color:white;}
-    .pod-upload-btn:hover { background-color: #4CAF50; }
-    .pod-view-btn { background-color: #5bc0de; color: white;}
+    .pod-upload-btn { background-color: #ff9800; }
+    .pod-upload-btn:hover { background-color: #e68a00; }
+    .pod-view-btn { background-color: #5bc0de; }
     .pod-view-btn:hover { background-color: #46b8da; }
     .view-info-btn { background-color: #3f51b5; color: white; margin-top: 5px;}
     .view-info-btn:hover { background-color: #303f9f; }
@@ -387,7 +387,7 @@ function renderOrders() {
                 return `<div>${qty} × ${p.product}${sizeText}${addons} — ₱${total.toFixed(2)}</div>`;
             }).join("");
 
-            // Delivery fee show
+            // Dlivery fee show
             const deliveryFee = order.deliveryFee || 0;
             const deliveryFeeHtml = deliveryFee > 0
                 ? `<div style="margin-top: 5px; border-top: 1px dashed #ccc; padding-top: 5px;">Delivery Fee: ₱${deliveryFee.toFixed(2)}</div>`
@@ -433,7 +433,7 @@ function renderOrders() {
             if (finalRefundStatus && ["Succeeded", "Manual", "Refunded", "Pending"].includes(finalRefundStatus)) {
                 mainStatusDisplay = finalRefundStatus === "Pending" ? "Refunded (Processing)" : "Refunded";
             } else if (mainStatus === "Refunded" || mainStatus === "Refund Denied") {
-                    mainStatusDisplay = mainStatus;
+                   mainStatusDisplay = mainStatus;
             }
 
 
@@ -442,21 +442,20 @@ function renderOrders() {
             let actionBtnHtml = "";
             const printButton = `<button class="print-receipt-btn" data-id="${orderId}" data-collection="${orderItem.collection}">View Receipt</button>`;
             const infoButton = `<button class="view-info-btn" data-id="${orderId}" data-collection="${orderItem.collection}">View Information</button>`;
-            const refundButton = `<button class="view-refund-btn" data-id="${orderId}" data-collection="${orderItem.collection}">View Refund Request</button>`;
-            const podUploadButton = `<button class="pod-upload-btn" data-id="${orderId}" data-collection="${orderItem.collection}">Upload POD</button>`;
-            const podViewButton = `<button class="pod-view-btn" data-id="${orderId}" data-collection="${orderItem.collection}" data-doc-id="${order.proofOfDeliveryDocId}">View POD</button>`;
 
+            const proofOfDeliveryURL = order.proofOfDeliveryURL;
+            const proofOfDeliveryDocId = order.proofOfDeliveryDocId;
 
-            if (order.refundRequest || order.finalRefundStatus === "Pending") {
-                actionBtnHtml = refundButton;
+            if (order.refundRequest) {
+                actionBtnHtml = `<button class="view-refund-btn" data-id="${orderId}" data-collection="${orderItem.collection}">View Refund Request</button>`;
             } else {
                 switch (order.status) {
                     case "Wait for Admin to Accept":
                         actionBtnHtml = `<button class="admin-accept-btn" data-id="${orderId}" data-collection="${orderItem.collection}">Accept Order</button>
-                                         <button class="admin-decline-btn" data-id="${orderId}" data-collection="${orderItem.collection}">Decline Order</button>`;
+                                             <button class="admin-decline-btn" data-id="${orderId}" data-collection="${orderItem.collection}">Decline Order</button>`;
                         break;
                     case "Waiting for Payment":
-                        actionBtnHtml = ""; 
+                        actionBtnHtml = "";
                         break;
                     case "Pending":
                         actionBtnHtml = orderItem.type === "Delivery"
@@ -471,27 +470,40 @@ function renderOrders() {
                             : `<button class="complete-btn" data-id="${orderId}" data-collection="${orderItem.collection}">Completed</button>`;
                         break;
                     case "Delivery":
-                        actionBtnHtml = order.proofOfDeliveryURL && order.proofOfDeliveryDocId 
-                             ? `<button class="complete-btn" data-id="${orderId}" data-collection="${orderItem.collection}" style="background-color: #4CAF50;">Order Completed</button>`
-                             : podUploadButton;
+                        if (proofOfDeliveryURL && proofOfDeliveryDocId) {
+                             actionBtnHtml = `<button class="complete-btn" data-id="${orderId}" data-collection="${orderItem.collection}" style="background-color: #4CAF50;">Order Completed</button>`;
+                        } else {
+                            actionBtnHtml = `<button class="pod-upload-btn" data-id="${orderId}" data-collection="${orderItem.collection}">Upload POD</button>`;
+                        }
+                        break;
+                    case "Refund Pending":
+                        actionBtnHtml = `<button class="view-refund-btn" disabled>Refund Processing...</button>`;
+                        break;
+                    case "Completed":
+                    case "Completed by Customer":
+                    case "Canceled":
+                    case "Refund Denied":
+                    case "Refund Failed":
+                    case "Refunded":
+                        actionBtnHtml = printButton;
                         break;
                 }
             }
-            
-          
-            if (orderItem.type === "Delivery") {
+
+            if (actionBtnHtml) {
                 actionBtnHtml += infoButton;
+            } else {
+                actionBtnHtml += infoButton; // Add info button even if no other action is present
             }
 
-            if (["Completed", "Completed by Customer", "Canceled", "Refund Denied", "Refund Failed", "Refunded"].includes(order.status) || order.finalRefundStatus) {
-                 if (!actionBtnHtml.includes("View Receipt")) {
-                     actionBtnHtml += printButton;
-                 }
+            if (["Completed", "Completed by Customer", "Canceled", "Refund Denied", "Refund Failed", "Refunded"].includes(order.status) && !actionBtnHtml.includes("View Receipt")) {
+                            actionBtnHtml += printButton;
             }
 
-            if (orderItem.type === "Delivery" && ["Completed", "Completed by Customer"].includes(order.status) && order.proofOfDeliveryURL && order.proofOfDeliveryDocId) {
-                actionBtnHtml += podViewButton;
+            if (orderItem.type === "Delivery" && ["Completed", "Completed by Customer"].includes(order.status) && proofOfDeliveryURL && proofOfDeliveryDocId) {
+                actionBtnHtml += `<button class="pod-view-btn" data-id="${orderId}" data-collection="${orderItem.collection}" data-doc-id="${proofOfDeliveryDocId}">View POD</button>`;
             }
+
 
             tr.innerHTML = `
                 <td>${queue}</td>
@@ -640,6 +652,7 @@ async function showReceiptPopup(orderId, collectionName) {
     }
 }
 
+// --- START: New Function to Show Customer Information ---
 async function showCustomerInfoPopup(orderId, collectionName) {
     const orderRef = doc(db, collectionName, orderId);
     try {
@@ -651,8 +664,10 @@ async function showCustomerInfoPopup(orderId, collectionName) {
         const orderData = orderSnap.data();
         const queueNumber = formatQueueNumber(orderData.queueNumber || orderData.queueNumberNumeric);
         
+        // Prioritize customerDetails map, but fall back to top-level fields
         const customerDetails = orderData.customerDetails || {};
         
+        // Use top-level fields as fallback if customerDetails are missing
         const name = customerDetails.name || orderData.customerName || (customerDetails.firstName && customerDetails.lastName ? `${customerDetails.firstName} ${customerDetails.lastName}` : 'N/A');
         const phone = customerDetails.phone || customerDetails.phoneNumber || orderData.phoneNumber || 'N/A';
         const address = customerDetails.address || customerDetails.deliveryAddress || orderData.address || 'N/A';
@@ -680,7 +695,7 @@ async function showCustomerInfoPopup(orderId, collectionName) {
         customAlert("Failed to load customer information.");
     }
 }
-
+// --- END: New Function to Show Customer Information ---
 
 
 function showRefundAmountPopup(orderId, collectionName, maxRefundable, paymongoPaymentId) {
@@ -888,7 +903,7 @@ async function returnStock(orderItems) {
  * @param {File} file - 
  */
 async function uploadProofOfDelivery(orderId, collectionName, file) {
-    customAlert("Uploading Proof of Delivery... Please wait.");
+    customAlert("Uploading Proof of Delivery... Please wait. **(Uploading...)**");
 
     if (collectionName !== "DeliveryOrders") {
         customAlert("Error: Proof of Delivery is only for Delivery Orders.");
@@ -965,10 +980,10 @@ function showProofOfDeliveryUploadPopup(orderId, collectionName) {
 
             if (uploadUrl) {
                 
-                
+                await updateOrderStatus(orderId, collectionName, "Completed");
                 closePopup();
             } else {
-            
+        
                 showProofOfDeliveryUploadPopup(orderId, collectionName);
             }
 
@@ -981,7 +996,7 @@ function showProofOfDeliveryUploadPopup(orderId, collectionName) {
 }
 
 /**
- *
+ 
  * @param {string} orderId 
  * @param {string} collectionName 
  * @param {string} podDocId 
@@ -1207,11 +1222,13 @@ function attachActionHandlers() {
         });
     });
     
+    // --- START: New Action Handler for View Information Button ---
     document.querySelectorAll(".view-info-btn").forEach(btn => {
         btn.addEventListener("click", e => {
             showCustomerInfoPopup(e.target.dataset.id, e.target.dataset.collection);
         });
     });
+    // --- END: New Action Handler for View Information Button ---
 
     document.querySelectorAll(".pod-upload-btn").forEach(btn => {
         btn.addEventListener("click", e => {
@@ -1241,7 +1258,7 @@ function attachActionHandlers() {
             if (!orderSnap.exists()) return;
 
             const orderData = orderSnap.data();
-            if (!orderData.refundRequest && orderData.finalRefundStatus !== "Pending") {
+            if (!orderData.refundRequest) {
                 customAlert("There is no active refund request for this order.");
                 return;
             }
@@ -1305,4 +1322,3 @@ function checkAdminAuth() {
 
 checkAdminAuth();
 renderOrders();
-
