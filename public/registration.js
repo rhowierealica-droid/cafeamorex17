@@ -26,6 +26,27 @@ const MAIN_VERIFICATION_DURATION = 180;
 // 30 Sec
 const RESEND_COOLDOWN_DURATION = 30; 
 
+const password = document.getElementById("password");
+const confirmPassword = document.getElementById("confirmPassword");
+const passwordError = document.getElementById("passwordError");
+
+const togglePasswordIcons = document.querySelectorAll('.toggle-password');
+
+togglePasswordIcons.forEach(icon => {
+    icon.addEventListener('click', () => {
+        const targetId = icon.getAttribute('data-target');
+        const passwordInput = document.getElementById(targetId);
+
+        if (passwordInput) {
+            const type = passwordInput.getAttribute('type') === 'password' ? 'text' : 'password';
+            passwordInput.setAttribute('type', type);
+            
+            icon.classList.toggle('fa-eye');
+            icon.classList.toggle('fa-eye-slash');
+        }
+    });
+});
+
 
 //  start the 30-second cooldown on the Resend button
 function startResendCooldown() {
@@ -199,7 +220,6 @@ function startVerificationCheck() {
                 clearInterval(verificationCheckInterval); // Stop checking
                 clearInterval(timerInterval); // Stop the countdown
                 
-                // Successful Verification UI Update
                 if (registerButton) {
                     registerButton.disabled = false;
                     registerButton.style.opacity = 1;
@@ -246,7 +266,6 @@ popupOkBtn.addEventListener("click", () => {
 
     if (shouldRedirect) window.location.href = "login.html";
     
-    // Reset default OK button behavior
     popupOkBtn.onclick = () => {
         messagePopup.style.display = "none";
     };
@@ -272,11 +291,15 @@ termsBody.addEventListener("scroll", () => {
     }
 });
 
+
 function openTermsPopup() {
     termsOkBtn.disabled = true;
     termsOkBtn.style.opacity = 0.5;
-    termsBody.scrollTop = 0;
     termsPopup.style.display = "flex";
+    
+    setTimeout(() => {
+        termsBody.scrollTop = 0; 
+    }, 10);
 }
 
 termsCheckbox.addEventListener("change", (e) => {
@@ -371,7 +394,9 @@ if (sendOtpBtn) {
         recaptchaContainer.id = "recaptcha-container";
         document.body.appendChild(recaptchaContainer); 
     }
+    // Set up reCAPTCHA verifier 
     window.recaptchaVerifier = new RecaptchaVerifier(auth, "recaptcha-container", { size: "invisible" });
+    
     sendOtpBtn.addEventListener("click", async () => {
         const phoneNumber = phoneInput.value.trim();
         if (!phoneNumber.startsWith("+63")) {
@@ -418,9 +443,6 @@ if (closeOtpBtn) {
 
 
 const registerForm = document.getElementById("registerForm");
-const password = document.getElementById("password");
-const confirmPassword = document.getElementById("confirmPassword");
-const passwordError = document.getElementById("passwordError");
 
 if (registerForm) {
     const registerButton = document.getElementById("registerButton"); 
@@ -435,7 +457,7 @@ if (registerForm) {
         const email = document.getElementById("email").value.trim();
         const pass = password.value;
         const confirmPass = confirmPassword.value;
-                         
+                                    
         if (!termsCheckbox.checked) {
             showMessage("You must agree to the Terms and Conditions before registering.");
             return;
