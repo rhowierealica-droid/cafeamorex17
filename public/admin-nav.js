@@ -135,7 +135,7 @@ profileCard?.addEventListener("click", () => {
 });
 
 logo?.addEventListener("click", () => {
-  window.location.href = "adminpanel.html";
+  window.location.href = "index.html";
 });
 
 logout?.addEventListener("click", async (e) => {
