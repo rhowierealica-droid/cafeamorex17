@@ -521,7 +521,7 @@ function listenOrders() {
             }
 
             if (currentTab === "To Receive") {
-                // Refund request logic for "To Receive"
+                // Refund request  for "To Receive"
                 if (paymentMethod.includes("e-payment") || paymentMethod === "g" || paymentMethod === "gcash") {
                     const refundBtn = document.createElement("button");
                     refundBtn.textContent = order.refundRequest ? `Refund: ${order.refundStatus || "Requested"}` : "Request Refund";
