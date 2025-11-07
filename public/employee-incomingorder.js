@@ -447,9 +447,7 @@ function renderOrders() {
             const podViewButton = `<button class="pod-view-btn" data-id="${orderId}" data-collection="${orderItem.collection}" data-doc-id="${order.proofOfDeliveryDocId}">View POD</button>`;
 
 
-            // 1. Primary Action (Accept/Complete/Cancel/Set ET)
             if (order.refundRequest) {
-                // If refund is requested, the primary action is to view the request
                 actionBtnHtml = refundButton;
             } else {
                 switch (order.status) {
@@ -473,32 +471,30 @@ function renderOrders() {
                             : `<button class="complete-btn" data-id="${orderId}" data-collection="${orderItem.collection}">Completed</button>`;
                         break;
                     case "Delivery":
-                           actionBtnHtml = order.proofOfDeliveryURL && order.proofOfDeliveryDocId 
+                        actionBtnHtml = order.proofOfDeliveryURL && order.proofOfDeliveryDocId 
                                 ? `<button class="complete-btn" data-id="${orderId}" data-collection="${orderItem.collection}" style="background-color: #4CAF50;">Order Completed</button>`
                                 : podUploadButton;
                         break;
                 }
             }
             
-            // 2. Secondary/Informational Actions
-            // Always show View Information
-            actionBtnHtml += infoButton;
+            
+            if (orderItem.type === "Delivery") {
+                 actionBtnHtml += infoButton;
+            }
 
-            // Always show View Receipt if order has left the active phase
             if (["Completed", "Completed by Customer", "Canceled", "Refund Denied", "Refund Failed", "Refunded"].includes(order.status) || order.finalRefundStatus) {
                  if (!actionBtnHtml.includes("View Receipt")) {
                     actionBtnHtml += printButton;
                 }
             }
 
-            // Show View POD for completed deliveries with POD
             if (orderItem.type === "Delivery" && ["Completed", "Completed by Customer"].includes(order.status) && order.proofOfDeliveryURL && order.proofOfDeliveryDocId) {
                 actionBtnHtml += podViewButton;
             }
             
-            // Show View Refund Request for processing refunds that aren't the primary button
             if (order.finalRefundStatus === "Pending") {
-                 actionBtnHtml += refundButton; // If refund is processing, show the button
+                 actionBtnHtml += refundButton; 
             }
 
             tr.innerHTML = `
@@ -648,7 +644,6 @@ async function showReceiptPopup(orderId, collectionName) {
     }
 }
 
-// --- START: New Function to Show Customer Information ---
 async function showCustomerInfoPopup(orderId, collectionName) {
     const orderRef = doc(db, collectionName, orderId);
     try {
@@ -660,10 +655,8 @@ async function showCustomerInfoPopup(orderId, collectionName) {
         const orderData = orderSnap.data();
         const queueNumber = formatQueueNumber(orderData.queueNumber || orderData.queueNumberNumeric);
         
-        // Prioritize customerDetails map, but fall back to top-level fields
         const customerDetails = orderData.customerDetails || {};
         
-        // Use top-level fields as fallback if customerDetails are missing
         const name = customerDetails.name || orderData.customerName || (customerDetails.firstName && customerDetails.lastName ? `${customerDetails.firstName} ${customerDetails.lastName}` : 'N/A');
         const phone = customerDetails.phone || customerDetails.phoneNumber || orderData.phoneNumber || 'N/A';
         const address = customerDetails.address || customerDetails.deliveryAddress || orderData.address || 'N/A';
@@ -691,7 +684,7 @@ async function showCustomerInfoPopup(orderId, collectionName) {
         customAlert("Failed to load customer information.");
     }
 }
-// --- END: New Function to Show Customer Information ---
+// --- END: Function to Show Customer Information ---
 
 
 function showRefundAmountPopup(orderId, collectionName, maxRefundable, paymongoPaymentId) {
@@ -916,7 +909,7 @@ async function uploadProofOfDelivery(orderId, collectionName, file) {
         const podMetadataRef = doc(collection(db, collectionName, orderId, "proofsOfDelivery"));
         const podDocId = podMetadataRef.id;
 
-        const uploadedBy = 'Admin/Staff Console'; // HARDCODED since auth is removed
+        const uploadedBy = 'Admin/Staff Console'; 
 
         await setDoc(podMetadataRef, {
             imageURL: podUrl,
@@ -1219,13 +1212,11 @@ function attachActionHandlers() {
         });
     });
     
-    // --- START: New Action Handler for View Information Button ---
     document.querySelectorAll(".view-info-btn").forEach(btn => {
         btn.addEventListener("click", e => {
             showCustomerInfoPopup(e.target.dataset.id, e.target.dataset.collection);
         });
     });
-    // --- END: New Action Handler for View Information Button ---
 
     document.querySelectorAll(".pod-upload-btn").forEach(btn => {
         btn.addEventListener("click", e => {
@@ -1310,8 +1301,6 @@ function attachActionHandlers() {
 }
 
 function checkAdminAuth() {
-    // Auth check removed as per user request to simply initialize.
-    // In a real application, you would implement proper user role validation here.
     console.warn("Authentication check skipped. Assuming admin access.");
 }
 
