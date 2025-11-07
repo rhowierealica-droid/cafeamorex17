@@ -24,6 +24,18 @@ let currentPage = 1;
 const itemsPerPage = 10;
 let selectedStatus = "All";
 
+document.getElementById('emailLink').addEventListener('click', function (e) {
+    e.preventDefault();
+    const email = 'cafeamorex17s@gmail.com';
+    const gmailUrl = `https://mail.google.com/mail/?view=cm&fs=1&to=${email}`;
+    const newTab = window.open(gmailUrl, '_blank');
+
+
+    if (!newTab || newTab.closed || typeof newTab.closed === 'undefined') {
+      window.location.href = `mailto:${email}`;
+    }
+  });
+
 onAuthStateChanged(auth, async (user) => {
   if (user) {
     currentUser = user;
