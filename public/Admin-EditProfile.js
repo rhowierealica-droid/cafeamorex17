@@ -7,7 +7,8 @@ import {
     EmailAuthProvider,
     RecaptchaVerifier, 
     signInWithPhoneNumber,
-    verifyBeforeUpdateEmail 
+    verifyBeforeUpdateEmail,
+    reload 
 } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
 
 import {
@@ -15,7 +16,10 @@ import {
     doc,
     getDoc,
     setDoc,
-    updateDoc
+    updateDoc,
+    collection, 
+    where,      
+    getDocs     
 } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 
 import { db } from "./firebase-config.js";
@@ -343,10 +347,10 @@ saveEmailBtn?.addEventListener("click", async (e) => {
     const currentPassword = document.getElementById("currentPassword").value;
     const currentEmailInput = document.getElementById("currentEmailInput").value.trim();
 
-    if (!newEmail) return alert("Please enter a valid new email.");
-    if (!currentPassword) return alert("Please enter your current password to confirm.");
+    if (!newEmail || !currentPassword) return alert("All fields are required.");
 
-    if (currentEmailInput.toLowerCase() !== user.email.toLowerCase()) return alert("The current email confirmation must match your logged-in email.");
+    if (currentEmailInput.toLowerCase() !== user.email.toLowerCase()) 
+        return alert("The current email confirmation must match your logged-in email.");
 
     if (newEmail.toLowerCase() === user.email.toLowerCase()) {
         alert("The new email is the same as your current email. No change needed.");
@@ -357,27 +361,35 @@ saveEmailBtn?.addEventListener("click", async (e) => {
     const credential = EmailAuthProvider.credential(user.email, currentPassword);
 
     try {
+        await reload(user); 
+        
         await reauthenticateWithCredential(user, credential);
         
+        const usersRef = collection(firestore, "users");
+        const q = query(usersRef, where("email", "==", newEmail));
+        const querySnapshot = await getDocs(q);
+        if (!querySnapshot.empty) throw new Error("Email already in use by another account.");
+
+        const userRef = doc(firestore, "users", user.uid);
+        await updateDoc(userRef, { pendingEmail: newEmail }); 
+
         await verifyBeforeUpdateEmail(user, newEmail);
         
-        
-        const userRef = doc(firestore, "users", user.uid);
-        await updateDoc(userRef, { email: newEmail });
-
-      
         showReLoginPopup("Email change verification sent! Please check your new email's inbox. You will be logged out now.");
 
     } catch (error) {
         console.error("Error updating email:", error);
-        if (error.code === 'auth/wrong-password') {
+        
+        if (error.message.includes("Email already in use")) {
+            alert("Failed to update email. The new email is already in use by another account.");
+        } else if (error.code === 'auth/wrong-password') {
             alert("Failed to update email. Wrong current password.");
         } else if (error.code === 'auth/email-already-in-use') {
             alert("Failed to update email. The new email is already in use by another account.");
         } else if (error.code === 'auth/requires-recent-login') {
             alert("Failed to update email. Please sign out and sign back in, then try again immediately.");
         } else if (error.code === 'auth/operation-not-allowed') {
-             alert("Failed to update email. This usually means the email change is pending verification, or the Email Link sign-in provider is disabled in your Firebase console. Please check your new email's inbox, or try enabling Email Link sign-in in Firebase Auth settings.");
+             alert("Failed to update email. This usually means the email change is pending verification. Please check your new email's inbox.");
         } else {
             alert(`Failed to update email: ${error.message}`);
         }
