@@ -269,7 +269,8 @@ function loadProducts(category = activeCategory) {
                 div.classList.add("product-box");
 
                 const stockToDisplay = productMinStock === Number.MAX_SAFE_INTEGER ? '✅' : Math.max(0, productMinStock);
-                const stockText = productMinStock === Number.MAX_SAFE_INTEGER ? 'In Stock' : `Stock: ${stockToDisplay}`;
+                //const stockText = productMinStock === Number.MAX_SAFE_INTEGER ? 'In Stock' : `Stock: ${stockToDisplay}`;
+                const stockText = productMinStock === Number.MAX_SAFE_INTEGER ? 'In Stock' : ``;
                 let stockColor = '#28a745';
                 if (productMinStock > 0 && productMinStock <= 5) {
                     stockColor = '#ffc107';
@@ -380,7 +381,8 @@ function openProductPopup(product, displayName, getInv) {
     (product.sizes || []).forEach((s, i) => {
       const stock = s.stock === Number.MAX_SAFE_INTEGER ? '✅' : Math.max(0, s.stock || 0);
       const stockColor = (s.stock === Number.MAX_SAFE_INTEGER || s.stock > 5) ? 'green' : (s.stock > 0 ? 'orange' : 'red');
-      const stockText = s.available ? `(Available: <span style="font-weight: bold; color: ${stockColor};">${stock}</span>)` : '(Out of Stock)';
+      //const stockText = s.available ? `(Available: <span style="font-weight: bold; color: ${stockColor};">${stock}</span>)` : '(Out of Stock)';
+      const stockText = s.available ? `` : '(Out of Stock)';
 
       const wrapper = document.createElement("div");
       const radio = document.createElement("input");
