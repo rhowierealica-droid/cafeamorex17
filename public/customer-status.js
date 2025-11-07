@@ -18,6 +18,17 @@ let currentUserEmail = null;
 let unsubscribeOrders = null;
 let dateRangeInstance = null; 
 
+document.getElementById('emailLink').addEventListener('click', function (e) {
+    e.preventDefault();
+    const email = 'cafeamorex17s@gmail.com';
+    const gmailUrl = `https://mail.google.com/mail/?view=cm&fs=1&to=${email}`;
+    const newTab = window.open(gmailUrl, '_blank');
+    
+    if (!newTab || newTab.closed || typeof newTab.closed === 'undefined') {
+        window.location.href = `mailto:${email}`;
+    }
+});
+
 function timestampToDate(timestamp) {
     if (!timestamp || !timestamp.seconds) return null;
     return new Date(timestamp.seconds * 1000);
@@ -36,7 +47,10 @@ let popupButtonsContainer = null;
 let popupReceiptContent = null; 
 
 function injectPopupStyles() {
+    if (document.getElementById("status-popup-style")) return;
+
     const style = document.createElement("style");
+    style.id = "status-popup-style";
     style.textContent = `
     .popup {
       display: none;
@@ -74,7 +88,7 @@ function injectPopupStyles() {
       border-top: 1px dashed #ccc;
       padding-top: 15px;
     }
-    #popupButtonsContainer button {
+    #popupButtonsContainer button, .action-btn {
       background-color: #8b5e3c;
       color: #fff;
       border: none;
@@ -85,7 +99,7 @@ function injectPopupStyles() {
       width: 80%;
       font-weight: bold;
     }
-    #popupButtonsContainer button:hover {
+    #popupButtonsContainer button:hover, .action-btn:hover {
       background-color: #6d4428;
     }
     #popupReceiptContent {
@@ -95,7 +109,12 @@ function injectPopupStyles() {
         max-height: 350px; 
         overflow-y: auto;
     }
-    .print-receipt-btn { 
+    .proof-details p {
+        margin: 5px 0;
+        font-size: 14px;
+        line-height: 1.2;
+    }
+    .print-receipt-btn, .view-proof-btn { 
         background-color: #007bff; 
         color: white; 
         margin-top: 5px;
@@ -103,10 +122,12 @@ function injectPopupStyles() {
         border: none;
         border-radius: 6px;
         cursor: pointer;
+        width: 100%;
+        font-weight: bold;
     }
-    .print-receipt-btn:hover { 
-        background-color: #0056b3; 
-    }
+    .view-proof-btn { background-color: #17a2b8; }
+    .print-receipt-btn:hover { background-color: #0056b3; }
+    .view-proof-btn:hover { background-color: #138496; }
     #downloadReceiptBtn { background-color: #28a745; color: white; }
     #downloadReceiptBtn:hover { background-color: #1e7e34; }
     #closeAlertBtn, #closeReceiptBtn { background-color: #6c757d; }
@@ -120,7 +141,7 @@ function injectPopupStyles() {
     .modal-content {
         background: white; padding: 25px; border-radius: 8px; max-width: 90%; max-height: 90vh; overflow-y: auto; position: relative;
     }
-    .close-btn { position: absolute; top: 10px; right: 20px; font-size: 24px; cursor: pointer; }
+    .close-btn { position: absolute; top: 10px; right: 20px; font-size: 24px; cursor: pointer; color:#333; }
     .feedback-item { 
         border: 1px solid #ddd; 
         padding: 15px; 
@@ -154,6 +175,12 @@ function injectPopupStyles() {
     }
     .refund-item { margin-bottom: 10px; }
     .refund-item label { display: block; }
+    #proofImageDisplay {
+        max-width: 100%;
+        height: auto;
+        border-radius: 8px;
+        margin-top: 15px;
+    }
     /* ------------------------------------------------------------------- */
     `;
     document.head.appendChild(style);
@@ -199,7 +226,6 @@ function closePopup() {
 function formatQueueNumber(num) {
     return typeof num === 'string' ? num : (num ? num.toString().padStart(4, "0") : "----");
 }
-
 
 
 // Filter
@@ -360,7 +386,7 @@ function listenOrders() {
                     return false;
                 }
             }
-            //  Filter by Product Name 
+            // Filter by Product Name 
             if (filterableTabs.includes(currentTab) && productSearchTerm) {
                 const itemMatch = order.items?.some(p => {
                     const productName = (p.product || p.name || "").toLowerCase();
@@ -444,6 +470,7 @@ function listenOrders() {
 
             const isFinalState = ["Completed", "Completed by Customer", "Canceled", "Refunded", "Refund Denied", "Refund Failed", "Refundend"].includes(order.status);
 
+            // --- Action Buttons ---
 
             if (currentTab === "Waiting for Payment") {
                 if (order.checkoutUrl) {
@@ -524,23 +551,16 @@ function listenOrders() {
                 }
             }
 
-           /* if (currentTab === "Refund") {
-                const refundBtn = document.createElement("button");
-                refundBtn.textContent = order.finalRefundStatus || order.refundStatus || "Requested";
-                refundBtn.disabled = true;
-                refundBtn.className = "action-btn";
-                refundBtn.style.cursor = "not-allowed";
-
-                if (order.finalRefundStatus === "Pending" || order.refundStatus === "Requested") refundBtn.style.backgroundColor = "orange";
-                else if (order.finalRefundStatus === "Succeeded" || order.finalRefundStatus === "Manual") refundBtn.style.backgroundColor = "green";
-                else if (order.finalRefundStatus === "Denied" || order.finalRefundStatus === "Failed" || order.finalRefundStatus === "API Failed") refundBtn.style.backgroundColor = "red";
-                else refundBtn.style.backgroundColor = "#ccc";
-
-                itemsContainer.appendChild(refundBtn);
+            // VIEW PROOF & RECEIPT BUTTONS 
+            const tabsWithProof = ["To Receive", "To Rate", "Completed", "Canceled", "Refund"];
+            if (tabsWithProof.includes(currentTab) && order.proofOfDeliveryURL) {
+                const proofButton = document.createElement("button");
+                proofButton.textContent = "View Proof of Delivery";
+                proofButton.className = "view-proof-btn";
+                proofButton.addEventListener("click", () => showProofImagePopup(order.id));
+                itemsContainer.appendChild(proofButton);
             }
-                */
-            
-            // Print Receipt button to completed
+
             if (isFinalState || order.status === "Completed by Customer" || (order.status === "Completed" && order.feedback) ) {
                 const printButton = document.createElement("button");
                 printButton.textContent = "View Receipt";
@@ -558,7 +578,7 @@ function listenOrders() {
     });
 }
 
-// RECEIPT FUNCTIONS
+// RECEIPT FUNCTIONS 
 
 function generateReceiptHTML(order) {
     const date = order.createdAt ? timestampToDate(order.createdAt).toLocaleString() : (order.timestamp ? new Date(order.timestamp).toLocaleString() : new Date().toLocaleString());
@@ -635,7 +655,7 @@ function generateReceiptHTML(order) {
 // PDF generation
 async function generateAndDownloadPDF(orderId, collectionName, orderData) {
     if (typeof html2pdf === 'undefined') {
-        customAlert("PDF Library Missing: Please include 'html2pdf.bundle.min.js' in your HTML file to enable PDF printing.");
+        customAlert("PDF Library Missing: Please include 'html22pdf.bundle.min.js' in your HTML file to enable PDF printing.");
         return;
     }
 
@@ -652,7 +672,9 @@ async function generateAndDownloadPDF(orderId, collectionName, orderData) {
     };
 
     customAlert("Generating PDF receipt... Please wait.");
+    document.body.appendChild(element); 
     await html2pdf().set(options).from(element).save();
+    document.body.removeChild(element); 
 
     setTimeout(() => closePopup(), 1500);
 }
@@ -692,6 +714,69 @@ async function showReceiptPopup(orderId, collectionName) {
         customAlert("Failed to load order data for receipt.");
     }
 }
+
+/**
+ * @param {string} orderId 
+ */
+async function showProofImagePopup(orderId) {
+    const orderRef = doc(db, "DeliveryOrders", orderId);
+    try {
+        const orderSnap = await getDoc(orderRef);
+        if (!orderSnap.exists()) {
+            customAlert(`Error: Order ${orderId} not found.`);
+            return;
+        }
+        const orderData = orderSnap.data();
+        const imageUrl = orderData.proofOfDeliveryURL;
+        const proofDocId = orderData.proofOfDeliveryDocId; 
+
+        if (!imageUrl) {
+            customAlert("No Proof of Delivery image found for this order.");
+            return;
+        }
+        
+        let uploadedBy = 'N/A';
+        let uploadedAt = 'N/A';
+        
+        if (proofDocId) {
+            const proofRef = doc(db, "DeliveryOrders", orderId, "proofsOfDelivery", proofDocId);
+            const proofSnap = await getDoc(proofRef);
+            
+            if (proofSnap.exists()) {
+                const proofData = proofSnap.data();
+                uploadedBy = proofData.uploadedBy || 'N/A';
+                uploadedAt = proofData.uploadedAt?.toDate()?.toLocaleString() || 'N/A';
+            } else {
+                 console.warn("Proof subcollection record not found. Showing N/A for metadata.");
+            }
+        } else {
+             console.warn("Proof Document ID (proofOfDeliveryDocId) missing from main order.");
+        }
+        
+        if (!popup) createPopup();
+        popupTitle.textContent = `Proof of Delivery (Order #${formatQueueNumber(orderData.queueNumber || 'N/A')})`;
+        
+        popupReceiptContent.innerHTML = `
+            <div class="proof-details" style="text-align: left; margin-bottom: 15px; border-bottom: 1px solid #ccc; padding-bottom: 10px;">
+                <p><strong>Image proof uploaded:</strong></p>
+            <i class="fas fa-user"></i> By: <strong>${uploadedBy}</strong>
+                <p style="margin-left: 15px;">At: <strong>${uploadedAt}</strong></p>
+            </div>
+            <div style="text-align: center;">
+                <img id="proofImageDisplay" src="${imageUrl}" alt="Proof of Delivery Image">
+            </div>
+        `;
+        
+        popupButtonsContainer.innerHTML = `<button id="closeProofBtn">Close</button>`;
+        popup.style.display = "flex";
+        document.getElementById("closeProofBtn").onclick = closePopup;
+
+    } catch (err) {
+        console.error("Show Proof Error:", err);
+        customAlert("Failed to load Proof of Delivery data.");
+    }
+}
+
 
 async function returnItemsToInventory(orderItems) {
     if (!orderItems || orderItems.length === 0) return;
@@ -753,11 +838,12 @@ async function handleCancelOrder(orderId, orderItems) {
 }
 
 function showConfirmModal(orderId) {
-    const existingModal = document.querySelector(".modal");
+    const existingModal = document.querySelector(".modal#confirm-dynamic-modal");
     if(existingModal) existingModal.remove(); 
 
     const confirmModal = document.createElement("div");
     confirmModal.className = "modal";
+    confirmModal.id = "confirm-dynamic-modal";
     confirmModal.style.display = "flex";
 
     const modalContent = document.createElement("div");
@@ -795,11 +881,27 @@ function showConfirmModal(orderId) {
 }
 
 function openRefundModal(orderId, orderItems) {
-    const modal = document.getElementById("refund-modal"); 
-    if (!modal) {
-        alert("Refund modal structure (id='refund-modal') not found in HTML. Check your HTML file.");
-        return;
-    }
+    let modal = document.querySelector("#refund-dynamic-modal");
+    if (modal) modal.remove();
+    
+    modal = document.createElement("div");
+    modal.className = "modal";
+    modal.id = "refund-dynamic-modal";
+    modal.innerHTML = `
+        <div class="modal-content">
+            <span class="close-btn">&times;</span>
+            <h2>Request Refund</h2>
+            <p>Select the items you wish to request a refund for:</p>
+            <form id="refund-form">
+                <div id="refund-items"></div>
+                <p style="font-weight:bold; margin-top:10px;" id="total-refundable"></p>
+                <textarea id="refund-reason" placeholder="Reason for refund (required)" required style="width:100%; height:80px; margin-top:10px; padding:10px;"></textarea>
+                <button type="submit" class="action-btn" style="width:100%; margin-top:15px; background-color:#dc3545;">Submit Refund Request</button>
+            </form>
+        </div>
+    `;
+    document.body.appendChild(modal);
+
     const refundForm = modal.querySelector("#refund-form");
     const refundItemsDiv = modal.querySelector("#refund-items");
 
@@ -825,20 +927,27 @@ function openRefundModal(orderId, orderItems) {
         refundItemsDiv.appendChild(div);
     });
 
-    modal.querySelector("#total-refundable").textContent = `Total Refundable: ₱${totalRefundable.toFixed(2)}`;
+    modal.querySelector("#total-refundable").textContent = `Total Order Price: ₱${totalRefundable.toFixed(2)}`;
 
     modal.style.display = "flex";
 
-    modal.querySelector(".close-btn").onclick = () => modal.style.display = "none";
-    modal.onclick = e => { if (e.target === modal) modal.style.display = "none"; }
+    modal.querySelector(".close-btn").onclick = () => modal.remove();
+    modal.onclick = e => { if (e.target === modal) modal.remove(); }
 
     refundForm.onsubmit = async (e) => {
         e.preventDefault();
         const selectedIndexes = Array.from(refundForm.querySelectorAll('input[name="refund"]:checked')).map(input => parseInt(input.value));
+        const refundReason = modal.querySelector("#refund-reason").value.trim();
+        
         if (selectedIndexes.length === 0) {
             alert("Please select at least one product to refund.");
             return;
         }
+        if (!refundReason) {
+             alert("Please provide a reason for the refund.");
+             return;
+        }
+
         const selectedItems = selectedIndexes.map(i => orderItems[i]);
 
         const refundAmount = selectedItems.reduce((sum, item) => 
@@ -850,10 +959,11 @@ function openRefundModal(orderId, orderItems) {
                 refundRequest: true,
                 refundStatus: "Requested",
                 refundAmount: refundAmount,
-                refundItems: selectedItems
+                refundItems: selectedItems,
+                refundReason: refundReason
             });
             alert("Refund request submitted. Waiting for admin approval.");
-            modal.style.display = "none";
+            modal.remove();
             listenOrders();
         } catch (err) {
             console.error("Error submitting refund:", err);
@@ -908,8 +1018,9 @@ function openFeedbackModal(orderId, items) {
     submitBtn.type = "submit";
     submitBtn.className = "action-btn";
     submitBtn.textContent = "Submit Feedback";
+    submitBtn.style.width = "100%";
 
-    modalContent.innerHTML = `<h2>Leave Product Feedback</h2>`; // Add modal title
+    modalContent.innerHTML = `<h2>Leave Product Feedback</h2>`; 
     modalContent.appendChild(closeBtn);
     modalContent.appendChild(form);
     form.appendChild(feedbackItemsDiv);
@@ -994,3 +1105,6 @@ function openFeedbackModal(orderId, items) {
         }
     };
 }
+
+window.showReceiptPopup = showReceiptPopup; 
+window.showProofImagePopup = showProofImagePopup; 
