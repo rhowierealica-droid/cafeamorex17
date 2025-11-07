@@ -104,13 +104,13 @@ body {
     padding: 20px;
     border-radius: 15px;
     box-shadow: 0 4px 10px rgba(0,0,0,0.1);
-    overflow-x: auto;
+    overflow-x: auto; 
 }
 
 .orders-section table {
     width: 100%;
     border-collapse: collapse;
-    min-width: 600px;
+    min-width: 600px; 
 }
 
 .orders-section th,
@@ -118,6 +118,7 @@ body {
     padding: 12px 15px;
     text-align: left;
     border-bottom: 1px solid #e0d8d0;
+    white-space: nowrap; 
 }
 
 .orders-section th {
@@ -149,6 +150,8 @@ body {
     font-weight: bold;
     transition: 0.2s;
     font-size: 0.85em;
+    white-space: normal; 
+    line-height: 1.2;
 }
 
 .accept-btn { background-color: #4caf50; color: white; }
@@ -293,7 +296,6 @@ body {
 }
 
 @media (max-width: 768px) {
-    .orders-section table { min-width: 500px; }
     .main-content { padding: 20px; }
     
     .filter-section {
@@ -307,12 +309,38 @@ body {
         min-width: 100%;
         box-sizing: border-box;
     }
+
+    .orders-section button {
+        padding: 5px 10px;
+        font-size: 0.75em;
+        margin-bottom: 5px; 
+    }
+    
 }
 
 @media (max-width: 480px) {
-    .orders-section table { min-width: 400px; }
-    .main-content { padding: 15px; }
-    .orders-section th, .orders-section td { padding: 6px 8px; font-size: 0.8em; }
+    .orders-section table { min-width: 500px; } 
+    .main-content { padding: 15px 10px; } 
+    
+    .orders-section th, .orders-section td { 
+        padding: 8px 10px; 
+        font-size: 0.85em; 
+    }
+    
     .tabs { flex-wrap: wrap; }
-    .tab-btn { margin: 5px 3px; padding: 6px 12px; font-size: 0.8em; }
+    .tab-btn { margin: 5px 3px; padding: 6px 10px; font-size: 0.8em; }
+
+    .orders-section td:last-child {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 5px;
+        align-items: center;
+    }
+    
+    .orders-section button {
+        flex-grow: 1; 
+        min-width: 80px;
+        margin-right: 0;
+        margin-bottom: 0;
+    }
 }
