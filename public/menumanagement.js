@@ -100,14 +100,12 @@ function normalizeCategory(cat) {
 const openPopup = () => D.popup.classList.add("show");
 const closePopup = () => D.popup.classList.remove("show");
 
-//  MANAGE INGREDIENTS IMAGE 
 const openIngredientsPopup = () => D.ingredientsImagePopup.classList.add("show");
 const closeIngredientsPopup = () => D.ingredientsImagePopup.classList.remove("show");
 
 D.cancelBtn?.addEventListener("click", closePopup);
 window.addEventListener("click", e => { 
     if (e.target === D.popup) closePopup(); 
-    // Close ingredients image popup 
     if (e.target === D.ingredientsImagePopup) closeIngredientsPopup(); 
 });
 D.productSubCategory?.addEventListener("change", () => { currentSubCategory = D.productSubCategory.value; });
@@ -537,7 +535,6 @@ D.popupForm?.addEventListener("submit", async e => {
                 });
             }
 
-            // Adds on separation from sizes 
             Object.entries(globalAddonsData).forEach(([addonId, addonData]) => {
                 if (selectedAddons.includes(addonId) && addonData.qty > 0 && addonData.price > 0) {
                     data.addons.push({ id: addonId, name: inventoryMap[addonId]?.name || "", qty: addonData.qty, price: addonData.price });
