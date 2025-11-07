@@ -63,14 +63,14 @@ function injectPopupStyles() {
     .refund-error { background-color: #6c757d; }
     .view-refund-btn { background-color: #795548; color: white; }
     .view-refund-btn:hover { background-color: #5d4037; }
-    .admin-accept-btn { background-color: #4CAF50; }
+    .admin-accept-btn { background-color: #4CAF50; color: white; }
     .admin-accept-btn:hover { background-color: #45a049; }
-    .admin-decline-btn { background-color: #f44336; }
+    .admin-decline-btn { background-color: #f44336; color: white;}
     .admin-decline-btn:hover { background-color: #d32f2f; }
     .print-receipt-btn { background-color: #007bff; color: white; margin-top: 5px;}
     .print-receipt-btn:hover { background-color: #0056b3; }
-    .pod-upload-btn { background-color: #ff9800; }
-    .pod-upload-btn:hover { background-color: #e68a00; }
+    .pod-upload-btn { background-color: #45a049; color:white;}
+    .pod-upload-btn:hover { background-color: #4CAF50; }
     .pod-view-btn { background-color: #5bc0de; }
     .pod-view-btn:hover { background-color: #46b8da; }
     .view-info-btn { background-color: #3f51b5; color: white; margin-top: 5px;}
@@ -447,9 +447,7 @@ function renderOrders() {
             const podViewButton = `<button class="pod-view-btn" data-id="${orderId}" data-collection="${orderItem.collection}" data-doc-id="${order.proofOfDeliveryDocId}">View POD</button>`;
 
 
-            // 1. Primary Action (Accept/Complete/Cancel/Set ET)
             if (order.refundRequest) {
-                // If refund is requested, the primary action is to view the request
                 actionBtnHtml = refundButton;
             } else {
                 switch (order.status) {
@@ -480,25 +478,20 @@ function renderOrders() {
                 }
             }
             
-            // 2. Secondary/Informational Actions
-            // Always show View Information
             actionBtnHtml += infoButton;
 
-            // Always show View Receipt if order has left the active phase
             if (["Completed", "Completed by Customer", "Canceled", "Refund Denied", "Refund Failed", "Refunded"].includes(order.status) || order.finalRefundStatus) {
                  if (!actionBtnHtml.includes("View Receipt")) {
                     actionBtnHtml += printButton;
                 }
             }
 
-            // Show View POD for completed deliveries with POD
             if (orderItem.type === "Delivery" && ["Completed", "Completed by Customer"].includes(order.status) && order.proofOfDeliveryURL && order.proofOfDeliveryDocId) {
                 actionBtnHtml += podViewButton;
             }
             
-            // Show View Refund Request for processing refunds that aren't the primary button
             if (order.finalRefundStatus === "Pending") {
-                 actionBtnHtml += refundButton; // If refund is processing, show the button
+                 actionBtnHtml += refundButton; 
             }
 
             tr.innerHTML = `
@@ -648,7 +641,6 @@ async function showReceiptPopup(orderId, collectionName) {
     }
 }
 
-// --- START: New Function to Show Customer Information ---
 async function showCustomerInfoPopup(orderId, collectionName) {
     const orderRef = doc(db, collectionName, orderId);
     try {
@@ -660,10 +652,8 @@ async function showCustomerInfoPopup(orderId, collectionName) {
         const orderData = orderSnap.data();
         const queueNumber = formatQueueNumber(orderData.queueNumber || orderData.queueNumberNumeric);
         
-        // Prioritize customerDetails map, but fall back to top-level fields
         const customerDetails = orderData.customerDetails || {};
         
-        // Use top-level fields as fallback if customerDetails are missing
         const name = customerDetails.name || orderData.customerName || (customerDetails.firstName && customerDetails.lastName ? `${customerDetails.firstName} ${customerDetails.lastName}` : 'N/A');
         const phone = customerDetails.phone || customerDetails.phoneNumber || orderData.phoneNumber || 'N/A';
         const address = customerDetails.address || customerDetails.deliveryAddress || orderData.address || 'N/A';
@@ -899,7 +889,7 @@ async function returnStock(orderItems) {
  * @param {File} file - 
  */
 async function uploadProofOfDelivery(orderId, collectionName, file) {
-    customAlert("Uploading Proof of Delivery... Please wait. **(Uploading...)**");
+    customAlert("Uploading Proof of Delivery... Please wait.");
 
     if (collectionName !== "DeliveryOrders") {
         customAlert("Error: Proof of Delivery is only for Delivery Orders.");
@@ -1218,13 +1208,11 @@ function attachActionHandlers() {
         });
     });
     
-    // --- START: New Action Handler for View Information Button ---
     document.querySelectorAll(".view-info-btn").forEach(btn => {
         btn.addEventListener("click", e => {
             showCustomerInfoPopup(e.target.dataset.id, e.target.dataset.collection);
         });
     });
-    // --- END: New Action Handler for View Information Button ---
 
     document.querySelectorAll(".pod-upload-btn").forEach(btn => {
         btn.addEventListener("click", e => {
