@@ -71,7 +71,7 @@ function injectPopupStyles() {
     .print-receipt-btn:hover { background-color: #0056b3; }
     .pod-upload-btn { background-color: #45a049; color:white;}
     .pod-upload-btn:hover { background-color: #4CAF50; }
-    .pod-view-btn { background-color: #5bc0de; }
+    .pod-view-btn { background-color: #5bc0de; color: white;}
     .pod-view-btn:hover { background-color: #46b8da; }
     .view-info-btn { background-color: #3f51b5; color: white; margin-top: 5px;}
     .view-info-btn:hover { background-color: #303f9f; }
@@ -1305,3 +1305,4 @@ function checkAdminAuth() {
 
 checkAdminAuth();
 renderOrders();
+
