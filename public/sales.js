@@ -208,7 +208,7 @@ function renderDashboard() {
         const total = order.total || 0;
         const deliveryFee = order.deliveryFee || 0;
 
-       
+        
         if (order.collection === "DeliveryOrders" && deliveryFee > 0) {
             return total - deliveryFee;
         }
@@ -262,7 +262,6 @@ function renderHourlyChart(orders) {
         const deliveryFee = o.deliveryFee || 0;
         let netTotal = total;
         
-        // Deduct delivery fee for chart data
         if (o.collection === "DeliveryOrders" && deliveryFee > 0) {
             netTotal = total - deliveryFee;
         }
@@ -304,7 +303,6 @@ function renderTopSellers(orders) {
         (o) => o.status && o.status.toLowerCase().includes("completed")
     );
     completedOrders.forEach((o) => {
-        // Calculate the ratio of product excluding delivery fee
         const orderTotal = o.total || 0;
         const deliveryFee = o.deliveryFee || 0;
         let orderNetTotal = orderTotal;
@@ -322,30 +320,39 @@ function renderTopSellers(orders) {
 
         (o.products || o.items || []).forEach((p) => {
             const name = p.product || "Unnamed Product";
+            const sizeName = p.size && typeof p.size === "string" ? ` [${p.size}]` : "";
+            const productDisplay = name + sizeName;
             const qty = p.qty || 1;
             
             const lineTotal =
                 p.total || (p.qty || 1) * (p.basePrice || 0) + (p.addonsPrice || 0);
             
-         
+            
             const netLineTotal = lineTotal * salesAdjustmentRatio;
 
+            const unitPrice = qty > 0 ? lineTotal / qty : 0;
 
-            if (!productSales[name]) productSales[name] = { qty: 0, total: 0 };
-            productSales[name].qty += qty;
-            productSales[name].total += netLineTotal; 
+
+            if (!productSales[productDisplay]) productSales[productDisplay] = { qty: 0, total: 0, priceSum: 0 };
+            productSales[productDisplay].qty += qty;
+            productSales[productDisplay].total += netLineTotal; 
+            productSales[productDisplay].priceSum += unitPrice * qty; 
         });
     });
 
     const topProducts = Object.entries(productSales)
         .sort((a, b) => b[1].total - a[1].total)
-        .slice(0, 5);
+        .slice(0, 5)
+        .map(([name, data]) => {
+            const averagePrice = data.qty > 0 ? data.priceSum / data.qty : 0;
+            return { name, qty: data.qty, total: data.total, price: averagePrice };
+        });
 
     bestSellersTable.innerHTML = "";
-    topProducts.forEach(([name, data]) => {
+    topProducts.forEach((data) => {
         const tr = document.createElement("tr");
         tr.innerHTML = `
-        <td>${name}</td>
+        <td>${data.name}</td>
         <td style="text-align:center;">${data.qty}</td>
         <td style="text-align:right;">${formatCurrency(data.total)}</td>
         `;
@@ -364,7 +371,7 @@ function getMonthYear(date) {
 }
 
 /**
- 
+ *
  * @param {object} order 
  * @returns {number} 
  */
@@ -381,6 +388,8 @@ const getNetTotal = (order) => {
 function generateSalesPdf() {
     if (typeof jsPDF === "undefined") return;
 
+    const pdfFormatNumber = (amount) => formatNumber(amount);
+    
     const doc = new jsPDF({ orientation: "portrait" });
     const today = new Date().toLocaleDateString();
 
@@ -394,7 +403,7 @@ function generateSalesPdf() {
     const currentYear = now.getFullYear();
     const yearlyCompletedOrders = allOrders.filter(
         (o) => o.status && o.status.toLowerCase().includes("completed") && 
-               (o.createdAt.toDate ? o.createdAt.toDate().getFullYear() : o.createdAt.getFullYear()) === currentYear
+                (o.createdAt.toDate ? o.createdAt.toDate().getFullYear() : o.createdAt.getFullYear()) === currentYear
     );
     
     let totalSalesYear = 0;
@@ -462,13 +471,15 @@ function generateSalesPdf() {
 
     let cashTotalFilter = 0;
     let ePayTotalFilter = 0;
+    let grandTotalSalesFilter = 0;
+
     orders.forEach((o) => {
         const netTotal = getNetTotal(o);
+        grandTotalSalesFilter += netTotal;
         if (o.paymentMethod === "Cash") cashTotalFilter += netTotal;
         if (o.paymentMethod === "E-Payment") ePayTotalFilter += netTotal;
     });
 
-    const grandTotalSalesFilter = cashTotalFilter + ePayTotalFilter;
     let currentY = 20; 
 
 
@@ -508,11 +519,11 @@ function generateSalesPdf() {
     const summaryHead = [["Metric", "Value"]]; 
     const summaryBody = [
         ["Total Products", allProductsSet.size.toLocaleString()],
-        ["Cash Payment ", (cashTotalFilter)],
-        ["E-Payment ", (ePayTotalFilter)],
-        ["Total Sales for the Year", (totalSalesYear)], 
+        ["Cash Payment ", pdfFormatNumber(cashTotalFilter)],
+        ["E-Payment ", pdfFormatNumber(ePayTotalFilter)],
+        ["Total Sales for the Year", pdfFormatNumber(totalSalesYear)], 
         ["Total Items Sold for the Year", totalItemsSoldYear.toLocaleString()],
-        ["Month with Highest Total Sales", highestSalesMonth ? `${highestSalesMonth.month} (${(highestSalesMonth.sales)})` : 'N/A'],
+        ["Month with Highest Total Sales", highestSalesMonth ? `${highestSalesMonth.month} (${pdfFormatNumber(highestSalesMonth.sales)})` : 'N/A'],
         ["Month with Highest Item Sold", highestItemsMonth ? `${highestItemsMonth.month} (${highestItemsMonth.items.toLocaleString()} items)` : 'N/A'],
         ["Most Sold Product ", mostSoldProduct ? `${mostSoldProduct[0]} (${mostSoldProduct[1].qty.toLocaleString()} Sold)` : 'N/A'],
     ];
@@ -546,7 +557,7 @@ function generateSalesPdf() {
     doc.text(`Monthly Sales Breakdown (${currentYear})`, 14, currentY);
     currentY += 5;
 
-    const monthlyHead = [["Month", "Total Sales (₱)", "Total Items Sold"]];
+    const monthlyHead = [["Month", "Total Sales", "Total Items Sold"]];
     const monthlyBody = Object.entries(monthlySales)
         .sort((a, b) => {
             const dateA = new Date(a[0]);
@@ -555,7 +566,7 @@ function generateSalesPdf() {
         })
         .map(([month, data]) => [
             month,
-            formatNumber(data.sales),
+            pdfFormatNumber(data.sales),
             data.items.toLocaleString()
         ]);
 
@@ -563,20 +574,23 @@ function generateSalesPdf() {
         startY: currentY,
         head: monthlyHead,
         body: monthlyBody, 
-        theme: "striped",
+        theme: "striped", 
         styles: {
             fontSize: 9,
             cellPadding: 3,
+            lineColor: [230, 230, 230], 
+            lineWidth: 0.1, 
         },
         headStyles: {
-            fillColor: [75, 54, 33],
-            textColor: 255,
+            fillColor: [75, 54, 33], 
+            textColor: 255, 
+            fontStyle: "bold",
         },
-        alternateRowStyles: { fillColor: [250, 245, 235] },
+        alternateRowStyles: { fillColor: [250, 245, 235] }, 
         columnStyles: {
-            0: { halign: "left" }, 
-            1: { halign: "right" }, 
-            2: { halign: "right" }, 
+            0: { cellWidth: 80, halign: "left" }, 
+            1: { cellWidth: 50, halign: "right" }, 
+            2: { cellWidth: 50, halign: "right" }, 
         },
     });
     
@@ -588,7 +602,8 @@ function generateSalesPdf() {
         currentY = 20;
     }
 
-
+    // --- Start of Product Detailed Breakdown Table ---
+    
     doc.setFont("helvetica", "bold");
     doc.setFontSize(14);
     doc.text("Detailed Product Sales Breakdown (Filtered Range)", 14, currentY);
@@ -614,45 +629,76 @@ function generateSalesPdf() {
             const sizeName = item.size && typeof item.size === "string" ? ` [${item.size}]` : "";
             const productDisplay = productName + sizeName;
             
-            const key = productDisplay; 
+            let currentAddOnsText = "None";
+            let addOnKey = "None"; 
+            if (item.addons && item.addons.length > 0) {
+                const sortedAddOns = item.addons
+                    .sort((a, b) => (a.name || "").localeCompare(b.name || ""))
+                    .map(addon => 
+                        `${addon.name} (${pdfFormatNumber(addon.price)})`
+                    );
+                currentAddOnsText = sortedAddOns.join("\n"); 
+                addOnKey = sortedAddOns.join("|"); 
+            }
+            
+            
+            const uniqueKey = productDisplay + "::" + addOnKey;
+            
             const qty = item.qty || 1;
-            const basePrice = item.basePrice || 0; 
             
             const lineTotal =
                 item.total ||
                 (item.qty || 1) * (item.basePrice || 0) + (item.addonsPrice || 0);
             const netLineTotal = lineTotal * salesAdjustmentRatio;
-
-            if (!simpleProductSales[key]) {
-                simpleProductSales[key] = {
+            
+            const unitPrice = qty > 0 ? lineTotal / qty : 0;
+            
+            
+            if (!simpleProductSales[uniqueKey]) {
+                simpleProductSales[uniqueKey] = {
                     product: productDisplay,
+                    addOnsDisplay: currentAddOnsText, 
                     qty: 0,
                     sales: 0,
-                    price: basePrice, 
+                    priceSum: 0, 
                 };
             }
-            simpleProductSales[key].qty += qty;
-            simpleProductSales[key].sales += netLineTotal;
+            
+            simpleProductSales[uniqueKey].qty += qty;
+            simpleProductSales[uniqueKey].sales += netLineTotal;
+            simpleProductSales[uniqueKey].priceSum += unitPrice * qty; 
         });
     });
+    
+    const finalProductSales = Object.values(simpleProductSales).map(data => {
+        const averagePrice = data.qty > 0 ? data.priceSum / data.qty : 0;
+        return {
+            ...data,
+            averagePrice: averagePrice,
+        };
+    });
 
-    const head = [["Product", "Qty", "Price", "Net Sales"]]; 
 
-    const detailedBody = Object.values(simpleProductSales)
+    const head = [["Product", "Price","Qty",  "Add-ons & Price", "Net Sales"]]; 
+
+    const detailedBody = finalProductSales
         .sort((a, b) => b.sales - a.sales) 
-        .map((item) => [
-            item.product,
-            item.qty, 
-            formatNumber(item.price), 
-            formatNumber(item.sales), 
-        ]);
+        .map((item) => {
+            return [
+                item.product,
+                pdfFormatNumber(item.averagePrice), 
+                item.qty, 
+                item.addOnsDisplay, 
+                pdfFormatNumber(item.sales), 
+            ];
+        });
 
 
     const foot = [
         [
             {
                 content: "GRAND TOTAL (NET SALES)",
-                colSpan: 2, 
+                colSpan: 4, 
                 styles: {
                     fontStyle: "bold",
                     halign: "left", 
@@ -661,15 +707,7 @@ function generateSalesPdf() {
                 },
             },
             {
-                //  Price column 
-                content: "", 
-                styles: {
-                    fillColor: [240, 240, 240],
-                },
-            },
-            {
-                //  Sales value column
-                content: formatNumber(grandTotalSalesFilter),
+                content: pdfFormatNumber(grandTotalSalesFilter),
                 styles: {
                     fontStyle: "bold",
                     halign: "right", 
@@ -687,30 +725,31 @@ function generateSalesPdf() {
         foot: foot,
         theme: "striped",
         styles: {
-            fontSize: 9,
-            cellPadding: 3,
+            fontSize: 8, 
+            cellPadding: 2,
             lineColor: [230, 230, 230],
             lineWidth: 0.1,
         },
         headStyles: {
             fillColor: [75, 54, 33],
             textColor: 255,
-            fontSize: 10,
+            fontSize: 9,
             fontStyle: "bold",
         },
         alternateRowStyles: { fillColor: [250, 245, 235] },
         columnStyles: {
-            0: { cellWidth: 80, halign: "left" }, // Product 
-            1: { cellWidth: 20, halign: "center" }, // Qty
-            2: { cellWidth: 40, halign: "right" }, // Price
-            3: { cellWidth: 50, halign: "right" }, // Sales 
+            0: { cellWidth: 50, halign: "left" },    // Product 
+            1: { cellWidth: 15, halign: "center" },  // Qty
+            2: { cellWidth: 25, halign: "right" },   // Avg. Price 
+            3: { cellWidth: 60, halign: "left" },    // Add-ons & Price 
+            4: { cellWidth: 30, halign: "right" },   // Net Sales 
         },
     });
 
     currentY = doc.lastAutoTable.finalY + 10;
     
     
-    const sortedFilteredSales = Object.values(simpleProductSales).sort((a, b) => a.sales - b.sales);
+    const sortedFilteredSales = Object.values(finalProductSales).sort((a, b) => a.sales - b.sales);
     const highestSalesItem = sortedFilteredSales.length > 0 ? sortedFilteredSales[sortedFilteredSales.length - 1] : null;
     const inStoreOrdersCount = orders.filter(o => o.channel === 'In-store').length;
     const deliveryOrdersCount = orders.filter(o => o.channel === 'Online').length;
@@ -729,7 +768,7 @@ function generateSalesPdf() {
     doc.setFontSize(10);
 
     const totalOrdersText = orders.length.toLocaleString();
-    const totalSalesText = (grandTotalSalesFilter);
+    const totalSalesText = pdfFormatNumber(grandTotalSalesFilter); 
     const dateRangeText = rangeText;
 
     let channelSummary = "";
@@ -746,7 +785,7 @@ function generateSalesPdf() {
 
     let productHighlight = "";
     if (highestSalesItem) {
-        productHighlight = `The top-selling product was the ${highestSalesItem.product}, which generated a substantial net sales revenue of ${(highestSalesItem.sales)}.`;
+        productHighlight = `The top-selling product was the ${highestSalesItem.product}, which generated a substantial net sales revenue of ${pdfFormatNumber(highestSalesItem.sales)}.`;
     } else {
         productHighlight = `Product-specific data for the best seller was unavailable for detailed analysis.`;
     }
