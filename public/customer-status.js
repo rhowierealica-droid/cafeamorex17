@@ -114,7 +114,7 @@ function injectPopupStyles() {
         font-size: 14px;
         line-height: 1.2;
     }
-  .print-receipt-btn, .view-proof-btn { 
+ .print-receipt-btn, .view-proof-btn { 
     background-color: #007bff; 
     color: white; 
     margin: 5px 0; 
@@ -122,7 +122,7 @@ function injectPopupStyles() {
     border: none;
     border-radius: 6px;
     cursor: pointer;
-    width: 30%;  
+    width: 30%;   
     font-weight: bold;
     display: block; 
 }
@@ -521,7 +521,7 @@ function listenOrders() {
             }
 
             if (currentTab === "To Receive") {
-                // Refund request  for "To Receive"
+                // Refund request  for "To Receive"
                 if (paymentMethod.includes("e-payment") || paymentMethod === "g" || paymentMethod === "gcash") {
                     const refundBtn = document.createElement("button");
                     refundBtn.textContent = order.refundRequest ? `Refund: ${order.refundStatus || "Requested"}` : "Request Refund";
@@ -748,10 +748,10 @@ async function showProofImagePopup(orderId) {
                 uploadedBy = proofData.uploadedBy || 'N/A';
                 uploadedAt = proofData.uploadedAt?.toDate()?.toLocaleString() || 'N/A';
             } else {
-                 console.warn("Proof subcollection record not found. Showing N/A for metadata.");
+                console.warn("Proof subcollection record not found. Showing N/A for metadata.");
             }
         } else {
-             console.warn("Proof Document ID (proofOfDeliveryDocId) missing from main order.");
+            console.warn("Proof Document ID (proofOfDeliveryDocId) missing from main order.");
         }
         
         if (!popup) createPopup();
@@ -896,7 +896,6 @@ function openRefundModal(orderId, orderItems) {
             <form id="refund-form">
                 <div id="refund-items"></div>
                 <p style="font-weight:bold; margin-top:10px;" id="total-refundable"></p>
-                <textarea id="refund-reason" placeholder="Reason for refund (required)" required style="width:100%; height:80px; margin-top:10px; padding:10px;"></textarea>
                 <button type="submit" class="action-btn" style="width:100%; margin-top:15px; background-color:#dc3545;">Submit Refund Request</button>
             </form>
         </div>
@@ -938,17 +937,12 @@ function openRefundModal(orderId, orderItems) {
     refundForm.onsubmit = async (e) => {
         e.preventDefault();
         const selectedIndexes = Array.from(refundForm.querySelectorAll('input[name="refund"]:checked')).map(input => parseInt(input.value));
-        const refundReason = modal.querySelector("#refund-reason").value.trim();
         
         if (selectedIndexes.length === 0) {
             alert("Please select at least one product to refund.");
             return;
         }
-        if (!refundReason) {
-             alert("Please provide a reason for the refund.");
-             return;
-        }
-
+        
         const selectedItems = selectedIndexes.map(i => orderItems[i]);
 
         const refundAmount = selectedItems.reduce((sum, item) => 
@@ -961,7 +955,6 @@ function openRefundModal(orderId, orderItems) {
                 refundStatus: "Requested",
                 refundAmount: refundAmount,
                 refundItems: selectedItems,
-                refundReason: refundReason
             });
             alert("Refund request submitted. Waiting for admin approval.");
             modal.remove();
@@ -1108,4 +1101,4 @@ function openFeedbackModal(orderId, items) {
 }
 
 window.showReceiptPopup = showReceiptPopup; 
-window.showProofImagePopup = showProofImagePopup; 
+window.showProofImagePopup = showProofImagePopup;
