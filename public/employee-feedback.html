@@ -5,10 +5,13 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Admin - Customer Feedback</title>
   <link rel="stylesheet" href="admin-feedback.css">
+      <link rel="stylesheet" href="AdminNotification.css">
+
   <link rel="stylesheet" href="admin-nav.css">
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
 </head>
 <body>
+
   <aside class="sidebar" id="sidebar">
     <div class="logo">
       <img src="logo.png" alt="Café Amore Logo">
@@ -19,15 +22,16 @@
       <div class="close-btn" id="closeBtn"><i class="fas fa-times"></i></div>
       <ul>
         <li><i class="fas fa-clipboard-list"></i> Orders</li>
-        <li><i class="fas fa-inbox"></i> Incoming Orders</li>
-        <li class="active" ><i class="fas fa-comment"></i> Feedback</li>
+        <li ><i class="fas fa-inbox"></i> Incoming Orders</li>
+        <li class="active"><i class="fas fa-comment"></i> Feedback</li>
       </ul>
     </nav>
 
-    <div class="profile-card" id="profileCard">
+    <div class="profile-card">
       <div class="profile-avatar"><i class="fas fa-user-circle"></i></div>
       <div class="profile-info">
-        <p class="profile-name" id="profileName">Cashier</p> 
+        <p class="profile-name">Admin</p>
+        <p class="edit-text">Edit Profile</p>
       </div>
     </div>
 
@@ -35,16 +39,20 @@
   </aside>
 
   <div class="hamburger" id="hamburger"><i class="fas fa-bars"></i></div>
-  <div class="container">
-    <h1>Customer Feedback / Reviews</h1>
+
+  <div class="main-content">
+    <h2>Customer Feedback</h2>
     <div id="feedback-container">
     </div>
   </div>
 
-  <script type="module" src="employee-nav.js"></script>
-  <script type="module" src="AutoCancel.js"></script>
   <script type="module" src="employee-feedback.js"></script>
+  <script type="module" src="AutoCancel.js"></script>
+  <script type="module" src="AdminNotification.js"></script>
   <script src="Cashier-nav.js"></script>
+  <script src="AccessCashier.js"></script>
+
+
 
 
 </body>
