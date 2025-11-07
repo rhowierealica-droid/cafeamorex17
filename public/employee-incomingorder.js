@@ -893,7 +893,7 @@ async function returnStock(orderItems) {
  * @param {File} file - 
  */
 async function uploadProofOfDelivery(orderId, collectionName, file) {
-    customAlert("Uploading Proof of Delivery... Please wait. **(Uploading...)**");
+    customAlert("Uploading Proof of Delivery... Please wait. ");
 
     if (collectionName !== "DeliveryOrders") {
         customAlert("Error: Proof of Delivery is only for Delivery Orders.");
