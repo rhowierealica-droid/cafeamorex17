@@ -2,12 +2,12 @@ import {
     getAuth,
     onAuthStateChanged,
     signOut,
-    updateEmail,
     updatePassword,
     reauthenticateWithCredential,
     EmailAuthProvider,
     RecaptchaVerifier, 
-    signInWithPhoneNumber 
+    signInWithPhoneNumber,
+    verifyBeforeUpdateEmail 
 } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
 
 import {
@@ -113,6 +113,8 @@ function maskEmail(email) {
 }
 
 /**
+ * @param {string} phone
+ * @returns {string} 
  */
 function maskPhone(phone) {
     const cleanPhone = phone.replace(/[^\d+]/g, ''); 
@@ -198,24 +200,39 @@ onAuthStateChanged(auth, async (user) => {
                 phoneNumber: "", 
                 role: "Admin"
             });
-            return;
+            const updatedUserSnap = await getDoc(userRef);
+            if (updatedUserSnap.exists()) {
+                const data = updatedUserSnap.data();
+                const fullName = data.fullname || "Admin User";
+                const [firstName, ...lastParts] = fullName.split(" ");
+                const lastName = lastParts.join(" ");
+                const rawPhone = data.phoneNumber || ""; 
+                
+                firstNameInput.value = firstName || "";
+                lastNameInput.value = lastName || "";
+                emailInput.value = maskEmail(data.email || user.email || "");
+                phoneInput.value = maskPhone(rawPhone);
+            }
+        } else {
+
+            const data = userSnap.data();
+            const fullName = data.fullname || "Admin User";
+            const [firstName, ...lastParts] = fullName.split(" ");
+            const lastName = lastParts.join(" ");
+            
+            const rawPhone = data.phoneNumber || ""; 
+
+            firstNameInput.value = firstName || "";
+            lastNameInput.value = lastName || "";
+            emailInput.value = maskEmail(data.email || user.email || "");
+            
+
+            phoneInput.value = maskPhone(rawPhone);
         }
 
-        const data = userSnap.data();
-        const fullName = data.fullname || "Admin User";
-        const [firstName, ...lastParts] = fullName.split(" ");
-        const lastName = lastParts.join(" ");
-        
-        const rawPhone = data.phoneNumber || ""; 
-
-        firstNameInput.value = firstName || "";
-        lastNameInput.value = lastName || "";
-        emailInput.value = maskEmail(data.email || user.email || "");
-        
-
-        phoneInput.value = maskPhone(rawPhone);
         profileCard.style.display = "flex";
         logoutBtn.style.display = "flex";
+
     } else {
         window.location.href = "login.html";
     }
@@ -328,37 +345,39 @@ saveEmailBtn?.addEventListener("click", async (e) => {
 
     if (!newEmail) return alert("Please enter a valid new email.");
     if (!currentPassword) return alert("Please enter your current password to confirm.");
-    if (currentEmailInput !== user.email) return alert("The current email confirmation must match your logged-in email.");
 
+    if (currentEmailInput.toLowerCase() !== user.email.toLowerCase()) return alert("The current email confirmation must match your logged-in email.");
+
+    if (newEmail.toLowerCase() === user.email.toLowerCase()) {
+        alert("The new email is the same as your current email. No change needed.");
+        cancelEmailBtn?.click();
+        return;
+    }
+    
     const credential = EmailAuthProvider.credential(user.email, currentPassword);
 
     try {
         await reauthenticateWithCredential(user, credential);
-
-        await updateEmail(user, newEmail);
-
+        
+        await verifyBeforeUpdateEmail(user, newEmail);
+        
+        
         const userRef = doc(firestore, "users", user.uid);
         await updateDoc(userRef, { email: newEmail });
 
-        alert("Email updated successfully! You may need to verify your new email.");
-
-        emailInput.value = maskEmail(newEmail);
-        document.getElementById("newEmail").value = "";
-        document.getElementById("currentEmailInput").value = "";
-        document.getElementById("currentPassword").value = "";
-        emailEditFields.style.display = "none";
-        editEmailBtn.style.display = "inline-block";
-        saveEmailBtn.style.display = "none";
-        cancelEmailBtn.style.display = "none";
+      
+        showReLoginPopup("Email change verification sent! Please check your new email's inbox. You will be logged out now.");
 
     } catch (error) {
         console.error("Error updating email:", error);
         if (error.code === 'auth/wrong-password') {
             alert("Failed to update email. Wrong current password.");
         } else if (error.code === 'auth/email-already-in-use') {
-            alert("Failed to update email. The new email is already in use.");
+            alert("Failed to update email. The new email is already in use by another account.");
         } else if (error.code === 'auth/requires-recent-login') {
             alert("Failed to update email. Please sign out and sign back in, then try again immediately.");
+        } else if (error.code === 'auth/operation-not-allowed') {
+             alert("Failed to update email. This usually means the email change is pending verification, or the Email Link sign-in provider is disabled in your Firebase console. Please check your new email's inbox, or try enabling Email Link sign-in in Firebase Auth settings.");
         } else {
             alert(`Failed to update email: ${error.message}`);
         }
@@ -390,15 +409,7 @@ savePasswordBtn?.addEventListener("click", async (e) => {
 
         await updatePassword(user, newPassword);
         
-        alert("Password updated successfully! Please re-login with your new password on your next session.");
-
-        passwordInput.value = "";
-        document.getElementById("confirmPassword").value = "";
-        document.getElementById("currentPasswordForChange").value = "";
-        passwordEditFields.style.display = "none";
-        editPasswordBtn.style.display = "inline-block";
-        savePasswordBtn.style.display = "none";
-        cancelPasswordBtn.style.display = "none";
+        showReLoginPopup("Password updated successfully! Please login again with your new password.");
 
     } catch (error) {
         console.error("Error updating password:", error);
@@ -476,17 +487,6 @@ savePhoneBtn?.addEventListener("click", async (e) => {
                     otpPopup.style.display = "none";
                     showReLoginPopup("Phone number updated successfully! Please login again.");
                     
-                    phoneInput.value = maskPhone(newPhone);
-                    document.getElementById("newPhone").value = "";
-                    document.getElementById("currentPhoneInput").value = "";
-                    document.getElementById("currentPhonePassword").value = "";
-                    phoneEditFields.style.display = "none";
-                    editPhoneBtn.style.display = "inline-block";
-                    savePhoneBtn.style.display = "none";
-                    cancelPhoneBtn.style.display = "none";
-
-                    resolve();
-
                 } catch (e) {
                     console.error("OTP confirmation error:", e);
                     showOtpError("Wrong OTP. Please try again.");
