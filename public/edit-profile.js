@@ -60,6 +60,17 @@ const provinceInput = document.getElementById("province");
 const cityInput = document.getElementById("city");
 const editingAddressIdInput = document.getElementById("editingAddressId");
 
+document.getElementById('emailLink').addEventListener('click', function (e) {
+    e.preventDefault();
+    const email = 'cafeamorex17s@gmail.com';
+    const gmailUrl = `https://mail.google.com/mail/?view=cm&fs=1&to=${email}`;
+    const newTab = window.open(gmailUrl, '_blank');
+
+    if (!newTab || newTab.closed || typeof newTab.closed === 'undefined') {
+        window.location.href = `mailto:${email}`;
+    }
+});
+
 let addressSavedListEl = document.getElementById("address-saved-list");
 if (!addressSavedListEl) {
     const addressTab = document.getElementById("addressTab");
@@ -138,11 +149,9 @@ if (newPhoneInput) {
 }
 
 /**
- * ☕ Calculates a hypothetical delivery fee based on the barangay.
- * This should ideally come from a Firestore collection or a robust distance matrix API.
- * For this example, we use a simple lookup.
+ 
  * @param {string} barangay 
- * @returns {number} The delivery fee in PHP.
+ * @returns {number} 
  */
 function calculateDeliveryFee(barangay) {
     const fees = {
@@ -159,7 +168,6 @@ function calculateDeliveryFee(barangay) {
         "Ligas III": 80,
         "Zapote 1": 90
     };
-    // Default fee for areas not listed or addresses outside the main delivery zone
     return fees[barangay] || 100; 
 }
 
@@ -185,9 +193,7 @@ async function loadUserData() {
         provinceInput.value = data.province || "Cavite";
         cityInput.value = data.city || "Bacoor";
 
-        // Calculate and display fee for the default address
         const defaultFee = calculateDeliveryFee(data.barangay);
-        // You'll need an element for this in your HTML, e.g., <p id="defaultAddressFee"></p>
         const feeEl = document.getElementById("defaultAddressFee");
         if (feeEl) feeEl.textContent = ` (Delivery Fee: ₱${defaultFee})`;
 
@@ -600,12 +606,9 @@ setupEditSaveCancel(
 );
 
 function formatAddress(data = {}) {
-    // Add delivery fee to the address data object before passing it to formatAddress, 
-    // or calculate it here if the data has the necessary info (barangay)
     const fee = data.barangay ? calculateDeliveryFee(data.barangay) : null;
     let addressParts = [data.houseNumber, data.barangay, data.city, data.province, data.region].filter(Boolean);
     
-    // Append the delivery fee information to the formatted string
     if (fee !== null) {
         addressParts.push(`(Fee: ₱${fee})`);
     }
@@ -658,12 +661,11 @@ function handleAddressEditClick(data, addressId, cardElement) {
     if (addressEditContainer) {
         cardElement.appendChild(addressEditContainer);
         addressEditContainer.style.display = "block";
-        cardElement.classList.add('active-edit'); // Add this line which was the end of Part 2
+        cardElement.classList.add('active-edit'); 
     }
     
     populateAddressForm(data, addressId);
 
-    // Ensure save/cancel buttons are shown (part of your original logic)
     document.getElementById("saveAddressBtn").style.display = "inline-block";
     document.getElementById("cancelAddressBtn").style.display = "inline-block";
 }
@@ -684,17 +686,14 @@ async function promoteAddressToDefault(savedAddressId, savedAddressData, default
         region: defaultAddressData.region || "",
     };
 
-    // Update the saved address with the old default address data
     await setDoc(savedAddressDocRef, newSavedAddressData);
 
-    // Update the default address with the new data (from the saved address)
     await updateDoc(userDocRef, {
         houseNumber: savedAddressData.houseNumber,
         barangay: savedAddressData.barangay,
         city: savedAddressData.city,
         province: savedAddressData.province,
         region: savedAddressData.region,
-        // Crucially, you must also update the deliveryFee if you save it to the user's root document
         deliveryFee: calculateDeliveryFee(savedAddressData.barangay) 
     });
 
@@ -732,7 +731,7 @@ async function loadAddressesIntoAddressTab() {
                 region: userData.region
             };
 
-            const defaultFee = calculateDeliveryFee(userData.barangay); // Calculate fee
+            const defaultFee = calculateDeliveryFee(userData.barangay); 
             const defaultAddressStr = formatAddress({ ...defaultAddressData, deliveryFee: defaultFee });
 
             if (defaultAddressStr) {
@@ -756,7 +755,7 @@ async function loadAddressesIntoAddressTab() {
             snapshot.forEach(docSnap => {
                 const id = docSnap.id;
                 const data = docSnap.data();
-                const fee = calculateDeliveryFee(data.barangay); // Calculate fee for saved address
+                const fee = calculateDeliveryFee(data.barangay); 
                 const full = formatAddress(data);
                 index++;
 
@@ -851,7 +850,6 @@ setupEditSaveCancel(
             region: regionInput.value,
             province: provinceInput.value,
             city: cityInput.value,
-            // Calculate and save the delivery fee
             deliveryFee: calculateDeliveryFee(barangayInput.value) 
         };
 
@@ -863,15 +861,11 @@ setupEditSaveCancel(
             });
             alert("Default Address updated successfully! (Barangay/House Number/Fee changed)");
         } else {
-            // Update an existing saved address
             if (addressId) {
                 await updateDoc(doc(db, "users", user.uid, "addresses", addressId), addressData);
                 alert("Saved Address updated successfully! (Barangay/House Number/Fee changed)");
             } else {
-                // Add a new saved address (assuming the logic is to add one if no ID is present, 
-                // but your setup seems focused on editing the default or saved ones).
-                // To ADD a new one, you'd use addDoc(collection(db, "users", user.uid, "addresses"), addressData);
-                // For now, let's assume this save button is strictly for editing as per your provided logic.
+                
                 throw new Error("Cannot save: Unknown address ID. Please use the edit buttons.");
             }
         }
@@ -879,14 +873,12 @@ setupEditSaveCancel(
         await loadAddressesIntoAddressTab();
     },
     () => {
-        // onEditExtra
         editingAddressIdInput.value = 'default';
         if (addressEditContainer) {
             document.getElementById("addressTab").appendChild(addressEditContainer);
         }
     },
     () => {
-        // onCancelExtra
         editingAddressIdInput.value = '';
     }
 );
