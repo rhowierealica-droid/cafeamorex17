@@ -1,12 +1,9 @@
-// AutoCancel.js
 import { db } from './firebase-config.js';
 import { collection, doc, onSnapshot, updateDoc, getDoc } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 
-// Time before auto-cancel (5 minutes)
 const AUTO_CANCEL_DELAY = 5 * 60 * 1000; 
 const pendingTimers = {};
 
-// Listen for changes in both In-Store and Delivery orders
 onSnapshot(collection(db, "InStoreOrders"), snapshot => handleOrdersSnapshot(snapshot, "InStoreOrders"));
 onSnapshot(collection(db, "DeliveryOrders"), snapshot => handleOrdersSnapshot(snapshot, "DeliveryOrders"));
 
@@ -19,7 +16,6 @@ function handleOrdersSnapshot(snapshot, collectionName) {
             data: { ...docSnap.data() }
         };
 
-        // Clear timer if order removed
         if (change.type === "removed") {
             if (pendingTimers[docSnap.id]) {
                 clearTimeout(pendingTimers[docSnap.id]);
@@ -28,7 +24,6 @@ function handleOrdersSnapshot(snapshot, collectionName) {
             return;
         }
 
-        // Set auto-cancel timer if order is in specified statuses
         if (["Pending", "Waiting for Payment", "Wait for Admin to Accept"].includes(order.data.status)) {
             if (!pendingTimers[order.id]) {
                 pendingTimers[order.id] = setTimeout(async () => {
@@ -37,7 +32,6 @@ function handleOrdersSnapshot(snapshot, collectionName) {
                         if (!currentSnap.exists()) return;
 
                         const currentStatus = currentSnap.data().status;
-                        // Only cancel if still in the same statuses
                         if (["Pending", "Waiting for Payment", "Wait for Admin to Accept"].includes(currentStatus)) {
                             await updateDoc(doc(db, collectionName, order.id), {
                                 status: "Canceled"
@@ -52,7 +46,6 @@ function handleOrdersSnapshot(snapshot, collectionName) {
                 }, AUTO_CANCEL_DELAY);
             }
         } else {
-            // Clear any existing timer if order changed to other status
             if (pendingTimers[order.id]) {
                 clearTimeout(pendingTimers[order.id]);
                 delete pendingTimers[order.id];
