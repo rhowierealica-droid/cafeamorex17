@@ -1,84 +1,51 @@
-.sidebar {
-    position: fixed;
-    top: 0;
-    left: 0;
-    width: 240px;
-    height: 100%;
-    background: #f3e9dc;
-    padding-top: 20px;
-    z-index: 2000;
-    display: flex;
-    flex-direction: column;
-    transition: transform 0.3s ease;
-    box-sizing: border-box;
-}
+document.addEventListener('DOMContentLoaded', () => {
+    const profileNameElement = document.querySelector('.profile-name');
+    const hamburgerButton = document.getElementById('hamburger');
+    const sidebar = document.getElementById('sidebar');
+    const profileCard = document.getElementById('profileCard');
 
+    const employeeName = localStorage.getItem('employeeName') || 'Guest';
+    const employeeRole = localStorage.getItem('employeeRole') || 'User';
 
-.hamburger {
-    position: fixed;
-    top: 15px;
-    left: 15px;
-    font-size: 2em;
-    color: #552915;
-    cursor: pointer;
-    z-index: 2003; 
-    display: none; 
-    transition: color 0.3s ease; 
-}
+    if (profileNameElement) {
+        profileNameElement.textContent = employeeName;
 
-
-.top-bar {
-    display: none;
-    width: 100%;
-    padding: 10px 20px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    position: fixed;
-    top: 0;
-    left: 0;
-    z-index: 2002;
-    border-bottom: 2px solid #704225;
-    background-color: #fff8f0;
-    box-sizing: border-box;
-}
-
-.top-bar .hamburger {
-    position: absolute; 
-    left: 15px;
-    font-size: 1.8em;
-    color: #552915;
-    cursor: pointer;
-    top: auto; 
-}
-
-.top-bar .mobile-logo {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-}
-
-.top-bar .mobile-logo img {
-    width: 40px;
-    height: 40px;
-}
-
-
-@media (max-width: 1024px) {
-    .hamburger {
-        display: block; 
+        const editTextElement = document.querySelector('.edit-text');
+        if (editTextElement) {
+            editTextElement.textContent = employeeRole;
+        }
     }
 
-    .sidebar {
-        transform: translateX(-240px);
-        padding-top: 20px;
+    if (hamburgerButton && sidebar) {
+        hamburgerButton.addEventListener('click', () => {
+            sidebar.classList.toggle('open');
+        });
     }
 
-    .sidebar.open {
-        transform: translateX(0);
+    if (profileCard) {
+        profileCard.style.cursor = 'pointer'; 
+        profileCard.addEventListener('click', () => {
+            window.location.href = "Employee-EditProfile.html"; 
+        });
     }
 
-    .top-bar {
-        display: flex;
+    const deliveriesLink = document.getElementById('deliveriesLink');
+    if (deliveriesLink) {
+        deliveriesLink.style.cursor = 'pointer'; 
+        deliveriesLink.addEventListener('click', () => {
+            window.location.href = "driver.html"; 
+        });
     }
-}
+
+    const logoutBtn = document.querySelector('.logout');
+    if (logoutBtn) {
+        logoutBtn.addEventListener('click', () => {
+            localStorage.removeItem('employeeName');
+            localStorage.removeItem('employeeRole');
+    
+            setTimeout(() => {
+                window.location.href = "login.html";
+            }, 10); 
+        });
+    }
+});
