@@ -1,93 +1,181 @@
 import { db } from './firebase-config.js';
 
 import {
-    collection, getDocs, query, orderBy, doc, getDoc
+  collection,
+  getDocs,
+  query,
+  orderBy,
+  doc,
+  getDoc 
 } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+
+
 
 const feedbackContainer = document.getElementById('feedback-container');
 
-document.addEventListener("DOMContentLoaded", () => {
-    loadFeedback();
-});
+const style = document.createElement('style');
+style.textContent = `
+  .rating-stars { 
+    color: gold;
+    font-size: 1.2em;
+    margin-left: 5px;
+  }
+  .feedback-card {
+    border: 1px solid #ccc;
+    padding: 15px;
+    margin-bottom: 15px;
+    border-radius: 8px;
+    background-color: #f9f9f9;
+    transition: box-shadow 0.3s;
+  }
+  .feedback-card:hover {
+    box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+  }
+  .order-info {
+    font-size: 0.9em;
+    color: #555;
+    margin-bottom: 10px;
+    border-bottom: 1px solid #eee;
+    padding-bottom: 5px;
+  }
+  .item-rating-info {
+    display: flex;
+    align-items: center;
+    font-weight: bold;
+    margin-bottom: 5px;
+  }
+  .feedback-text p {
+    margin: 5px 0 0 0;
+    font-style: italic;
+    color: #333;
+  }
+  .no-feedback {
+    text-align: center;
+    padding: 20px;
+    color: #777;
+  }
+`;
+document.head.appendChild(style);
 
+loadFeedback();
 
 function getStarHtml(rating) {
-    const maxStars = 5;
-    let starsHtml = '';
-    for (let i = 1; i <= maxStars; i++) {
-        starsHtml += i <= rating ? '★' : '☆';
-    }
-    return `<span class="rating-stars">${starsHtml}</span>`;
+  const maxStars = 5;
+  let starsHtml = '';
+
+  for (let i = 1; i <= rating; i++) {
+    starsHtml += '★';
+  }
+  for (let i = rating + 1; i <= maxStars; i++) {
+    starsHtml += '☆';
+  }
+
+  return `<span class="rating-stars">${starsHtml}</span>`;
 }
 
-
 function maskEmail(email) {
-    if (typeof email !== 'string' || !email.includes('@') || email.length < 5) {
-        return "No Email Found";
+  if (typeof email !== 'string' || !email.includes('@') || email.length < 5) {
+    return "(Email unavailable)";
+  }
+
+  const atIndex = email.indexOf('@');
+  const localPart = email.substring(0, atIndex);
+  const domainPart = email.substring(atIndex);
+
+  if (localPart.length <= 3) {
+    const firstChar = localPart.substring(0, 1);
+    const mask = '*'.repeat(localPart.length - 1);
+    return `${firstChar}${mask}${domainPart}`;
+  }
+
+  const firstThree = localPart.substring(0, 3);
+  const maskLength = localPart.length - 3;
+  const mask = '*'.repeat(maskLength);
+
+  return `${firstThree}${mask}${domainPart}`;
+}
+
+/**
+ * @param {object} feedback 
+ * @returns {{text: string, rating: number, email: string | null}}
+ */
+function getCleanFeedbackData(feedback) {
+  let text = '*(No text feedback provided)*';
+  let rating = 0;
+  let email = null; 
+
+  if (feedback && typeof feedback === 'object' && feedback !== null) {
+    if (feedback.comment && typeof feedback.comment === 'string') {
+      text = feedback.comment.trim() || '*(No text feedback provided)*';
     }
+    if (feedback.rating != null) {
+      rating = Number(feedback.rating) || 0;
+    }
+    if (feedback.customerEmail && typeof feedback.customerEmail === 'string') {
+      email = feedback.customerEmail;
+    }
+  } else if (typeof feedback === 'string') {
+    text = feedback.trim() || '*(No text feedback provided)*';
+  }
 
-    const atIndex = email.indexOf('@');
-    const localPart = email.substring(0, atIndex);
-    const domainPart = email.substring(atIndex);
-
-    const firstThree = localPart.substring(0, Math.min(localPart.length, 3));
-
-    return `${firstThree}****${domainPart}`;
+  return { text, rating, email };
 }
 
 async function loadFeedback() {
-    feedbackContainer.innerHTML = '';
-    const ordersRef = collection(db, "DeliveryOrders");
-    const q = query(ordersRef, orderBy("createdAt", "desc"));
-    const snapshot = await getDocs(q);
+  feedbackContainer.innerHTML = '';
 
-    let hasFeedback = false;
+  const ordersRef = collection(db, "DeliveryOrders");
+  const q = query(ordersRef, orderBy("createdAt", "desc"));
+  const snapshot = await getDocs(q);
 
-    snapshot.forEach(docSnap => {
-        const order = docSnap.data();
+  let hasFeedback = false;
 
-        if (order.feedback && order.feedback.length > 0 && order.items?.length > 0) {
-            hasFeedback = true;
+  snapshot.forEach(docSnap => {
+    const order = docSnap.data();
+    const feedbackArray = order.feedback || [];
+    const items = order.items || [];
 
-            let emailToMask = order.customerEmail;
-            let customerName = order.customerName || "Unknown Customer";
+    if (feedbackArray.length === 0) return;
 
-            if ((!emailToMask || !emailToMask.includes('@')) && customerName.includes('@')) {
-                emailToMask = customerName;
-                customerName = "Customer";
-            }
+    const displayCustomerName = order.customerName || "Customer";
+    const orderEmail = order.customerEmail || "";
 
-            const maskedEmail = maskEmail(emailToMask);
+    feedbackArray.forEach((fb, index) => {
+      const { text: cleanFeedbackText, rating: itemRating, email: feedbackEmail } = getCleanFeedbackData(fb);
+      const hasValidData = (cleanFeedbackText !== '*(No text feedback provided)*') || (itemRating > 0);
 
-            const ratings = order.feedbackRating || [];
+      if (hasValidData) {
+        hasFeedback = true;
 
-            order.items.forEach((item, index) => {
-                const feedbackText = order.feedback[index];
-                const itemRating = ratings[index] || 0;
-                const ratingHtml = getStarHtml(itemRating);
-
-                if (feedbackText) {
-                    const card = document.createElement('div');
-                    card.className = 'feedback-card';
-
-                    card.innerHTML = `
-                        <div class="order-info">
-                          Order #${order.queueNumber || docSnap.id} - ${customerName} - ${maskedEmail}
-                        </div>
-                        <div class="item-rating-info">
-                          <strong>${item.product}</strong> ${ratingHtml}
-                        </div>
-                        <div class="feedback-text">
-                          <p>💬 ${feedbackText}</p>
-                        </div>
-                    `;
-                    feedbackContainer.appendChild(card);
-                }
-            });
+        let emailToMask = orderEmail;
+        if (!emailToMask && feedbackEmail) {
+          emailToMask = feedbackEmail;
         }
-    });
 
-    if (!hasFeedback) {
-        feedbackContainer.innerHTML = '<p class="no-feedback">No feedback available yet.</p>';
-    }
+        const maskedEmail = maskEmail(emailToMask);
+        const ratingHtml = getStarHtml(itemRating);
+        const productName = fb.productName || items[index]?.product || 'Unnamed Item';
+
+        const card = document.createElement('div');
+        card.className = 'feedback-card';
+        card.innerHTML = `
+          <div class="order-info">
+            Order #${order.queueNumber || docSnap.id} - (${maskedEmail})
+          </div>
+          <div class="item-rating-info">
+            Item: <strong>${productName}</strong> ${ratingHtml}
+          </div>
+          <div class="feedback-text">
+            <p>💬 ${cleanFeedbackText}</p>
+          </div>
+        `;
+
+        feedbackContainer.appendChild(card);
+      }
+    });
+  });
+
+  if (!hasFeedback) {
+    feedbackContainer.innerHTML = '<p class="no-feedback">No feedback available yet.</p>';
+  }
 }
