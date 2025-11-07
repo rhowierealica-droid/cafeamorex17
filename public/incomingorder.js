@@ -433,7 +433,7 @@ function renderOrders() {
             if (finalRefundStatus && ["Succeeded", "Manual", "Refunded", "Pending"].includes(finalRefundStatus)) {
                 mainStatusDisplay = finalRefundStatus === "Pending" ? "Refunded (Processing)" : "Refunded";
             } else if (mainStatus === "Refunded" || mainStatus === "Refund Denied") {
-                   mainStatusDisplay = mainStatus;
+                    mainStatusDisplay = mainStatus;
             }
 
 
@@ -442,20 +442,23 @@ function renderOrders() {
             let actionBtnHtml = "";
             const printButton = `<button class="print-receipt-btn" data-id="${orderId}" data-collection="${orderItem.collection}">View Receipt</button>`;
             const infoButton = `<button class="view-info-btn" data-id="${orderId}" data-collection="${orderItem.collection}">View Information</button>`;
+            const refundButton = `<button class="view-refund-btn" data-id="${orderId}" data-collection="${orderItem.collection}">View Refund Request</button>`;
+            const podUploadButton = `<button class="pod-upload-btn" data-id="${orderId}" data-collection="${orderItem.collection}">Upload POD</button>`;
+            const podViewButton = `<button class="pod-view-btn" data-id="${orderId}" data-collection="${orderItem.collection}" data-doc-id="${order.proofOfDeliveryDocId}">View POD</button>`;
 
-            const proofOfDeliveryURL = order.proofOfDeliveryURL;
-            const proofOfDeliveryDocId = order.proofOfDeliveryDocId;
 
+            // 1. Primary Action (Accept/Complete/Cancel/Set ET)
             if (order.refundRequest) {
-                actionBtnHtml = `<button class="view-refund-btn" data-id="${orderId}" data-collection="${orderItem.collection}">View Refund Request</button>`;
+                // If refund is requested, the primary action is to view the request
+                actionBtnHtml = refundButton;
             } else {
                 switch (order.status) {
                     case "Wait for Admin to Accept":
                         actionBtnHtml = `<button class="admin-accept-btn" data-id="${orderId}" data-collection="${orderItem.collection}">Accept Order</button>
-                                             <button class="admin-decline-btn" data-id="${orderId}" data-collection="${orderItem.collection}">Decline Order</button>`;
+                                         <button class="admin-decline-btn" data-id="${orderId}" data-collection="${orderItem.collection}">Decline Order</button>`;
                         break;
                     case "Waiting for Payment":
-                        actionBtnHtml = "";
+                        actionBtnHtml = ""; 
                         break;
                     case "Pending":
                         actionBtnHtml = orderItem.type === "Delivery"
@@ -470,40 +473,33 @@ function renderOrders() {
                             : `<button class="complete-btn" data-id="${orderId}" data-collection="${orderItem.collection}">Completed</button>`;
                         break;
                     case "Delivery":
-                        if (proofOfDeliveryURL && proofOfDeliveryDocId) {
-                             actionBtnHtml = `<button class="complete-btn" data-id="${orderId}" data-collection="${orderItem.collection}" style="background-color: #4CAF50;">Order Completed</button>`;
-                        } else {
-                            actionBtnHtml = `<button class="pod-upload-btn" data-id="${orderId}" data-collection="${orderItem.collection}">Upload POD</button>`;
-                        }
-                        break;
-                    case "Refund Pending":
-                        actionBtnHtml = `<button class="view-refund-btn" disabled>Refund Processing...</button>`;
-                        break;
-                    case "Completed":
-                    case "Completed by Customer":
-                    case "Canceled":
-                    case "Refund Denied":
-                    case "Refund Failed":
-                    case "Refunded":
-                        actionBtnHtml = printButton;
+                         actionBtnHtml = order.proofOfDeliveryURL && order.proofOfDeliveryDocId 
+                             ? `<button class="complete-btn" data-id="${orderId}" data-collection="${orderItem.collection}" style="background-color: #4CAF50;">Order Completed</button>`
+                             : podUploadButton;
                         break;
                 }
             }
+            
+            // 2. Secondary/Informational Actions
+            // Always show View Information
+            actionBtnHtml += infoButton;
 
-            if (actionBtnHtml) {
-                actionBtnHtml += infoButton;
-            } else {
-                actionBtnHtml += infoButton; // Add info button even if no other action is present
+            // Always show View Receipt if order has left the active phase
+            if (["Completed", "Completed by Customer", "Canceled", "Refund Denied", "Refund Failed", "Refunded"].includes(order.status) || order.finalRefundStatus) {
+                 if (!actionBtnHtml.includes("View Receipt")) {
+                    actionBtnHtml += printButton;
+                }
             }
 
-            if (["Completed", "Completed by Customer", "Canceled", "Refund Denied", "Refund Failed", "Refunded"].includes(order.status) && !actionBtnHtml.includes("View Receipt")) {
-                            actionBtnHtml += printButton;
+            // Show View POD for completed deliveries with POD
+            if (orderItem.type === "Delivery" && ["Completed", "Completed by Customer"].includes(order.status) && order.proofOfDeliveryURL && order.proofOfDeliveryDocId) {
+                actionBtnHtml += podViewButton;
             }
-
-            if (orderItem.type === "Delivery" && ["Completed", "Completed by Customer"].includes(order.status) && proofOfDeliveryURL && proofOfDeliveryDocId) {
-                actionBtnHtml += `<button class="pod-view-btn" data-id="${orderId}" data-collection="${orderItem.collection}" data-doc-id="${proofOfDeliveryDocId}">View POD</button>`;
+            
+            // Show View Refund Request for processing refunds that aren't the primary button
+            if (order.finalRefundStatus === "Pending") {
+                 actionBtnHtml += refundButton; // If refund is processing, show the button
             }
-
 
             tr.innerHTML = `
                 <td>${queue}</td>
@@ -983,7 +979,7 @@ function showProofOfDeliveryUploadPopup(orderId, collectionName) {
                 await updateOrderStatus(orderId, collectionName, "Completed");
                 closePopup();
             } else {
-        
+            
                 showProofOfDeliveryUploadPopup(orderId, collectionName);
             }
 
@@ -996,7 +992,7 @@ function showProofOfDeliveryUploadPopup(orderId, collectionName) {
 }
 
 /**
- 
+ *
  * @param {string} orderId 
  * @param {string} collectionName 
  * @param {string} podDocId 
@@ -1258,7 +1254,7 @@ function attachActionHandlers() {
             if (!orderSnap.exists()) return;
 
             const orderData = orderSnap.data();
-            if (!orderData.refundRequest) {
+            if (!orderData.refundRequest && orderData.finalRefundStatus !== "Pending") {
                 customAlert("There is no active refund request for this order.");
                 return;
             }
