@@ -1,8 +1,10 @@
 import { db } from './firebase-config.js';
 import {
-    collection, doc, onSnapshot, updateDoc, getDocs, getDoc,
-    deleteField, increment
+    collection, doc, onSnapshot, updateDoc, getDocs, getDoc, setDoc,
+    deleteField, increment, arrayUnion, query, where
 } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+import { getStorage, ref, uploadBytes, getDownloadURL } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-storage.js";
+const storage = getStorage();
 
 const ordersBody = document.getElementById("ordersBody");
 const tabButtons = document.querySelectorAll(".tab-btn");
@@ -13,8 +15,8 @@ const customRangeInput = document.getElementById("customRange");
 const productSearchInput = document.getElementById("productSearch");
 
 let ordersData = [];
-let selectedTab = "Order Approval"; 
-let currentOrderType = "All"; 
+let selectedTab = "Order Approval";
+let currentOrderType = "All";
 let dateRangeFilter = "all";
 let productSearchTerm = "";
 let customDateStart = null;
@@ -40,7 +42,7 @@ const dateRangePicker = flatpickr(customRangeInput, {
         }
     }
 });
-customRangeInput.style.display = 'none'; 
+customRangeInput.style.display = 'none';
 
 function injectPopupStyles() {
     const style = document.createElement("style");
@@ -65,6 +67,10 @@ function injectPopupStyles() {
     .admin-decline-btn:hover { background-color: #d32f2f; }
     .print-receipt-btn { background-color: #007bff; color: white; margin-top: 5px;}
     .print-receipt-btn:hover { background-color: #0056b3; }
+    .pod-upload-btn { background-color: #ff9800; }
+    .pod-upload-btn:hover { background-color: #e68a00; }
+    .pod-view-btn { background-color: #5bc0de; }
+    .pod-view-btn:hover { background-color: #46b8da; }
     `;
     document.head.appendChild(style);
 }
@@ -120,11 +126,41 @@ function formatQueueNumber(num) {
     return typeof num === 'string' ? num : (num ? num.toString().padStart(4, "0") : "----");
 }
 
-function toggleFilterVisibility() {
-    const isVisible = selectedTab === "Completed" || selectedTab === "Canceled" ;
+/**
+ * @param {object|number} timestamp 
+ * @returns {string} 
+ */
+function formatPODTimestamp(timestamp) {
+    if (!timestamp) return 'N/A';
 
-    if (isVisible) {
-        filterContainer.style.display = 'flex'; 
+    let date;
+    if (timestamp.seconds !== undefined) {
+        date = timestamp.toDate();
+    } else if (timestamp instanceof Date) {
+        date = timestamp;
+    } else {
+        date = new Date(timestamp);
+    }
+
+    if (isNaN(date.getTime())) return 'Invalid Date';
+
+    return date.toLocaleString('en-US', {
+        month: 'numeric',
+        day: 'numeric',
+        year: 'numeric',
+        hour: 'numeric',
+        minute: '2-digit',
+        second: '2-digit',
+        hour12: true, 
+    });
+}
+
+
+function toggleFilterVisibility() {
+    const isFilteredTab = selectedTab === "Completed" || selectedTab === "Canceled" ;
+
+    if (isFilteredTab) {
+        filterContainer.style.display = 'flex';
     } else {
         filterContainer.style.display = 'none';
 
@@ -141,15 +177,13 @@ function toggleFilterVisibility() {
     }
 }
 
-
-
 tabButtons.forEach(btn => {
     btn.addEventListener("click", () => {
         tabButtons.forEach(b => b.classList.remove("active"));
         btn.classList.add("active");
         selectedTab = btn.dataset.status;
 
-        toggleFilterVisibility(); 
+        toggleFilterVisibility();
 
         renderOrders();
     });
@@ -170,7 +204,7 @@ dateFilterSelect.addEventListener("change", () => {
 
     if (dateRangeFilter === 'custom') {
         customRangeInput.style.display = 'inline-block';
-        dateRangePicker.open(); 
+        dateRangePicker.open();
     } else {
         customRangeInput.style.display = 'none';
         customDateStart = null;
@@ -212,6 +246,7 @@ function isDateInFilter(timestamp) {
             return true;
     }
 }
+
 
 onSnapshot(collection(db, "InStoreOrders"), s => handleOrderSnapshot(s, "In-Store", "InStoreOrders"));
 onSnapshot(collection(db, "DeliveryOrders"), s => handleOrderSnapshot(s, "Delivery", "DeliveryOrders"));
@@ -269,7 +304,7 @@ function handleOrderSnapshot(snapshot, type, collectionName) {
 function renderOrders() {
     ordersBody.innerHTML = "";
 
-    toggleFilterVisibility(); 
+    toggleFilterVisibility();
 
     const isFilteredTab = selectedTab === "Completed" || selectedTab === "Canceled" ;
 
@@ -284,7 +319,7 @@ function renderOrders() {
                     tabMatch = status === "Wait for Admin to Accept";
                     break;
                 case "Pending":
-                    tabMatch = status === "Pending" || status === "Waiting for Payment" || o.data.refundRequest || status === "Refund Pending";
+                    tabMatch = status === "Pending" || status === "Waiting for Payment" || o.data.refundRequest;
                     break;
                 case "Preparing":
                     tabMatch = status === "Preparing";
@@ -293,7 +328,7 @@ function renderOrders() {
                     tabMatch = status === "Delivery";
                     break;
                 case "Completed":
-                    tabMatch = status === "Completed" || ["Succeeded", "Manual", "Refunded"].includes(finalRefundStatus) || status === "Refunded";
+                    tabMatch = status === "Completed" || status === "Completed by Customer" || ["Succeeded", "Manual", "Refunded"].includes(finalRefundStatus) || status === "Refunded";
                     break;
                 case "Canceled":
                     tabMatch = status === "Canceled" || ["Failed", "API Failed", "Denied", "Canceled"].includes(finalRefundStatus) || status === "Refund Failed" || status === "Refund Denied";
@@ -362,10 +397,12 @@ function renderOrders() {
             const finalRefundStatus = order.finalRefundStatus;
             let mainStatusDisplay = mainStatus;
             let refundBadgeHtml = "";
+            let badgeClass = '';
+
 
             if (finalRefundStatus) {
                 const badgeText = finalRefundStatus;
-                let badgeClass = 'refund-error';
+                badgeClass = 'refund-error';
 
                 switch (badgeText) {
                     case "Succeeded": case "Manual": case "Refunded":
@@ -374,7 +411,7 @@ function renderOrders() {
                         break;
                     case "Pending":
                         badgeClass = 'refund-pending';
-                        mainStatusDisplay = "Refund Pending";
+                        mainStatusDisplay = "Refunded (Processing)";
                         break;
                     case "Failed": case "API Failed": case "Denied": case "Canceled":
                         badgeClass = 'refund-failed';
@@ -387,11 +424,20 @@ function renderOrders() {
                 refundBadgeHtml = ` <span class="refund-badge ${badgeClass}">${badgeText}</span>`;
             }
 
+            if (finalRefundStatus && ["Succeeded", "Manual", "Refunded", "Pending"].includes(finalRefundStatus)) {
+                mainStatusDisplay = finalRefundStatus === "Pending" ? "Refunded (Processing)" : "Refunded";
+            } else if (mainStatus === "Refunded" || mainStatus === "Refund Denied") {
+                 mainStatusDisplay = mainStatus;
+            }
+
+
             const statusBadge = `<td>${mainStatusDisplay}${refundBadgeHtml}</td>`;
 
             let actionBtnHtml = "";
-            const printButton = `<button class="print-receipt-btn" data-id="${orderId}" data-collection="${orderItem.collection}">Print Receipt</button>`;
+            const printButton = `<button class="print-receipt-btn" data-id="${orderId}" data-collection="${orderItem.collection}">View Receipt</button>`;
 
+            const proofOfDeliveryURL = order.proofOfDeliveryURL;
+            const proofOfDeliveryDocId = order.proofOfDeliveryDocId;
 
             if (order.refundRequest) {
                 actionBtnHtml = `<button class="view-refund-btn" data-id="${orderId}" data-collection="${orderItem.collection}">View Refund Request</button>`;
@@ -399,7 +445,7 @@ function renderOrders() {
                 switch (order.status) {
                     case "Wait for Admin to Accept":
                         actionBtnHtml = `<button class="admin-accept-btn" data-id="${orderId}" data-collection="${orderItem.collection}">Accept Order</button>
-                                         <button class="admin-decline-btn" data-id="${orderId}" data-collection="${orderItem.collection}">Decline Order</button>`;
+                                             <button class="admin-decline-btn" data-id="${orderId}" data-collection="${orderItem.collection}">Decline Order</button>`;
                         break;
                     case "Waiting for Payment":
                         actionBtnHtml = "";
@@ -417,12 +463,18 @@ function renderOrders() {
                             : `<button class="complete-btn" data-id="${orderId}" data-collection="${orderItem.collection}">Completed</button>`;
                         break;
                     case "Delivery":
-                        actionBtnHtml = `<button class="complete-btn" data-id="${orderId}" data-collection="${orderItem.collection}">Completed</button>`;
+                        
+                        if (proofOfDeliveryURL && proofOfDeliveryDocId) {
+                             actionBtnHtml = `<button class="complete-btn" data-id="${orderId}" data-collection="${orderItem.collection}" style="background-color: #4CAF50;">Order Completed</button>`;
+                        } else {
+                            actionBtnHtml = `<button class="pod-upload-btn" data-id="${orderId}" data-collection="${orderItem.collection}">Upload POD</button>`;
+                        }
                         break;
                     case "Refund Pending":
                         actionBtnHtml = `<button class="view-refund-btn" disabled>Refund Processing...</button>`;
                         break;
                     case "Completed":
+                    case "Completed by Customer":
                     case "Canceled":
                     case "Refund Denied":
                     case "Refund Failed":
@@ -432,10 +484,14 @@ function renderOrders() {
                 }
             }
 
-            // Add Print Receipt button
-            if (["Completed", "Canceled", "Refund Denied", "Refund Failed", "Refunded"].includes(order.status) && !actionBtnHtml.includes("Print Receipt")) {
-                    actionBtnHtml += printButton;
+            if (["Completed", "Completed by Customer", "Canceled", "Refund Denied", "Refund Failed", "Refunded"].includes(order.status) && !actionBtnHtml.includes("View Receipt")) {
+                     actionBtnHtml += printButton;
             }
+
+            if (orderItem.type === "Delivery" && ["Completed", "Completed by Customer"].includes(order.status) && proofOfDeliveryURL && proofOfDeliveryDocId) {
+                actionBtnHtml += `<button class="pod-view-btn" data-id="${orderId}" data-collection="${orderItem.collection}" data-doc-id="${proofOfDeliveryDocId}">View POD</button>`;
+            }
+
 
             tr.innerHTML = `
                 <td>${queue}</td>
@@ -495,7 +551,7 @@ function generateReceiptHTML(order) {
                 <p>Order ID: ${order.id}</p>
                 <p>Queue #: ${formatQueueNumber(order.queueNumber || order.queueNumberNumeric)}</p>
                 <p>Date: ${date}</p>
-                <p>Type: ${order.type}</p>
+                <p>Type: ${order.orderType}</p>
                 <p>Status: ${order.status}</p>
             </div>
 
@@ -558,7 +614,7 @@ async function showReceiptPopup(orderId, collectionName) {
         const orderData = orderSnap.data();
         const orderType = collectionName === "InStoreOrders" ? "In-Store" : "Delivery";
 
-        const receiptHtml = generateReceiptHTML({ id: orderId, type: orderType, ...orderData });
+        const receiptHtml = generateReceiptHTML({ id: orderId, orderType: orderType, ...orderData });
 
         if (!popup) createPopup();
         popupTitle.textContent = `Receipt for Queue #${formatQueueNumber(orderData.queueNumber || orderData.queueNumberNumeric)}`;
@@ -566,7 +622,7 @@ async function showReceiptPopup(orderId, collectionName) {
         popupReceiptContent.innerHTML = receiptHtml;
 
         popupButtonsContainer.innerHTML = `
-            <button id="downloadReceiptBtn" data-id="${orderId}" data-collection="${collectionName}" data-type="${orderType}">Download Receipt (PDF)</button>
+            <button id="downloadReceiptBtn" data-id="${orderId}" data-collection="${collectionName}" data-type="${orderType}">Download Receipt</button>
             <button id="closeReceiptBtn">Close</button>
         `;
         popup.style.display = "flex";
@@ -584,117 +640,6 @@ async function showReceiptPopup(orderId, collectionName) {
     }
 }
 
-function attachActionHandlers() {
-    document.querySelectorAll(".admin-accept-btn").forEach(btn => {
-        btn.addEventListener("click", e => updateOrderStatus(e.target.dataset.id, e.target.dataset.collection, "Waiting for Payment"));
-    });
-
-    document.querySelectorAll(".admin-decline-btn").forEach(btn => {
-        btn.addEventListener("click", e => updateOrderStatus(e.target.dataset.id, e.target.dataset.collection, "Canceled"));
-    });
-
-    document.querySelectorAll(".accept-btn").forEach(btn => {
-        btn.addEventListener("click", e => {
-            const id = e.target.dataset.id;
-            const collection = e.target.dataset.collection;
-            const type = e.target.dataset.type;
-
-            if (type === "Delivery") {
-                showETPopup("Select ET for Preparing", eta => updateOrderStatus(id, collection, "Preparing", eta));
-            } else {
-                updateOrderStatus(id, collection, "Preparing");
-            }
-        });
-    });
-
-    document.querySelectorAll(".eta-btn").forEach(btn => {
-        btn.addEventListener("click", e => {
-            const id = e.target.dataset.id;
-            const collection = e.target.dataset.collection;
-            const status = e.target.dataset.status;
-            showETPopup(`Select ET for ${status}`, eta => updateOrderStatus(id, collection, status, eta));
-        });
-    });
-
-    document.querySelectorAll(".cancel-btn").forEach(btn => {
-        btn.addEventListener("click", e => updateOrderStatus(e.target.dataset.id, e.target.dataset.collection, "Canceled"));
-    });
-
-    document.querySelectorAll(".complete-btn").forEach(btn => {
-        btn.addEventListener("click", e => updateOrderStatus(e.target.dataset.id, e.target.dataset.collection, "Completed"));
-    });
-
-    document.querySelectorAll(".print-receipt-btn").forEach(btn => {
-        btn.addEventListener("click", e => {
-            showReceiptPopup(e.target.dataset.id, e.target.dataset.collection);
-        });
-    });
-
-    document.querySelectorAll(".view-refund-btn").forEach(btn => {
-        btn.addEventListener("click", async e => {
-            const orderId = e.target.dataset.id;
-            const collectionName = e.target.dataset.collection;
-            const orderRef = doc(db, collectionName, orderId);
-            const orderSnap = await getDoc(orderRef);
-            if (!orderSnap.exists()) return;
-
-            const orderData = orderSnap.data();
-            if (!orderData.refundRequest) {
-                customAlert("There is no active refund request for this order.");
-                return;
-            }
-
-            const orderProducts = orderData.products || orderData.items || [];
-
-            const maxRefundable = orderProducts.reduce((sum, p) =>
-                sum + (p.total || ((p.sizePrice || 0) + (p.addonsPrice || 0)) * (p.qty || p.quantity || 1))
-            , 0);
-
-            const grandTotal = orderData.total || 0;
-            const deliveryFee = orderData.deliveryFee || 0;
-            const deliveryFeeHtml = deliveryFee > 0
-                ? `<div style="font-weight: bold; margin-top: 10px; border-top: 1px dashed #ccc; padding-top: 5px;">Delivery Fee: ₱${deliveryFee.toFixed(2)}</div>`
-                : '';
-
-            let productsHtml = orderProducts.map(p => {
-                const addons = p.addons?.length ? ` (Add-ons: ${p.addons.map(a => `${a.name}:₱${(a.price || 0).toFixed(2)}`).join(", ")})` : "";
-                const sizeText = p.size ? (typeof p.size === "string" ? ` [${p.size}]` : ` [${p.size.name}]`) : "";
-                const qty = p.qty || p.quantity || 1;
-                const totalPrice = (p.total || ((p.sizePrice || 0) + (p.addonsPrice || 0)) * qty).toFixed(2);
-                return `<div>${qty} x ${p.product}${sizeText}${addons} - ₱${totalPrice}</div>`;
-            }).join("");
-
-
-            if (!popup) createPopup();
-            popupTitle.textContent = "Order Details";
-            popupReceiptContent.innerHTML = "";
-
-            popupButtonsContainer.innerHTML = `
-                <h3>Refund Request for Queue #${formatQueueNumber(orderData.queueNumber || orderData.queueNumberNumeric)}</h3>
-                <div style="text-align: left; margin-bottom: 15px; width: 90%; max-width: 350px;">
-                    ${productsHtml}
-                    ${deliveryFeeHtml}
-                </div>
-                <div style="font-weight: bold; margin-bottom: 5px; border-top: 1px solid #ccc; padding-top: 5px;">Grand Total: ₱${grandTotal.toFixed(2)}</div>
-                <div style="font-weight: bold; color: #dc3545; margin-bottom: 15px;">Max Refundable (Products Only): ₱${maxRefundable.toFixed(2)}</div>
-                <button class="admin-accept-btn" id="acceptRefundBtn">Accept Refund</button>
-                <button class="admin-decline-btn" id="denyRefundBtn">Deny Refund</button>
-                <button id="closeDetailsBtn">Close</button>
-            `;
-            popup.style.display = "flex";
-
-            document.getElementById("acceptRefundBtn").onclick = () => {
-                closePopup();
-                showRefundAmountPopup(orderId, collectionName, maxRefundable, orderData.paymongoPaymentId);
-            };
-            document.getElementById("denyRefundBtn").onclick = () => {
-                closePopup();
-                handleRefundAction(orderId, collectionName, "Denied");
-            };
-            document.getElementById("closeDetailsBtn").onclick = closePopup;
-        });
-    });
-}
 
 function showRefundAmountPopup(orderId, collectionName, maxRefundable, paymongoPaymentId) {
     if (!popup) createPopup();
@@ -723,7 +668,7 @@ function showRefundAmountPopup(orderId, collectionName, maxRefundable, paymongoP
         }
 
         closePopup();
-        handleRefundAction(orderId, collectionName, "Accepted", refundAmount, isEPayment);
+        handleRefundAction(orderId, collectionName, "Accepted", refundAmount, isEPayment, paymongoPaymentId);
     };
 
     document.getElementById("cancelRefundBtn").onclick = () => {
@@ -731,7 +676,7 @@ function showRefundAmountPopup(orderId, collectionName, maxRefundable, paymongoP
     };
 }
 
-async function handleRefundAction(orderId, collectionName, action, refundAmount = 0, isEPayment = false) {
+async function handleRefundAction(orderId, collectionName, action, refundAmount = 0, isEPayment = false, paymongoPaymentId = null) {
     const orderRef = doc(db, collectionName, orderId);
     let originalStatus;
 
@@ -743,110 +688,94 @@ async function handleRefundAction(orderId, collectionName, action, refundAmount 
         originalStatus = orderData.status;
 
         if (action === "Accepted") {
-            const orderProducts = orderData.products || orderData.items;
+            const refundItems = orderData.refundItems || [];
+            const needsStockReturn = originalStatus === "Wait for Admin to Accept" || originalStatus === "Pending" || originalStatus === "Waiting for Payment";
 
-            if (originalStatus === "Wait for Admin to Accept" || originalStatus === "Pending" || originalStatus === "Waiting for Payment") {
-                await returnStock(orderProducts);
+            if (needsStockReturn) {
+                await returnStock(refundItems);
+            }
+
+            if (isEPayment) {
+                //const endpoint = "http://localhost:3000/refund-payment";
+                const endpoint = "/.netlify/functions/refund-payment";
+
+                if (paymongoPaymentId && !paymongoPaymentId.startsWith('pay_')) {
+                    console.error(`PayMongo Refund Error: Expected a 'pay_' ID but received '${paymongoPaymentId}'.`);
+                    customAlert("Configuration Error: The stored PayMongo ID is incorrect. Status reverted.");
+                    await updateDoc(orderRef, {
+                        finalRefundStatus: "API Failed",
+                        status: originalStatus,
+                        refundRequest: false
+                    });
+                    return;
+                }
 
                 await updateDoc(orderRef, {
+                    status: "Refunded",
                     refundRequest: deleteField(),
-                    finalRefundStatus: isEPayment ? "Pending" : "Manual",
-                    status: "Canceled"
+                    finalRefundStatus: "Refunded",
+                    refundAmount: refundAmount
+                });
+                customAlert("PayMongo refund initiated. Status is set to 'Refunded'. Please confirm success on PayMongo dashboard.");
+
+                const refundAmountInCentavos = Math.round(refundAmount * 100);
+
+                const response = await fetch(endpoint, {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({
+                        paymongoPaymentId: paymongoPaymentId,
+                        amount: refundAmountInCentavos,
+                        orderId: orderId,
+                        collectionName: collectionName
+                    })
                 });
 
-                customAlert(`Refund accepted: Order #${orderData.queueNumber || orderData.queueNumberNumeric || 'N/A'} canceled and stock returned.`);
-            }
-            else if (originalStatus === "Completed" || originalStatus === "Preparing" || originalStatus === "Delivery") {
+                const data = await response.json();
 
-                if (isEPayment) {
-                    const endpoint = "http://localhost:3000/refund-payment";
+                if (data.error || !response.ok) {
+                    console.error("PayMongo Refund failed:", data.details || data.error || "Unknown server error");
+                    customAlert(`PayMongo Refund failed: ${data.details || data.error || 'Server error'}. Status reverted to 'Refund Failed'.`);
 
                     await updateDoc(orderRef, {
-                        status: "Refund Pending",
-                        refundRequest: deleteField(),
-                        finalRefundStatus: "Pending"
+                        finalRefundStatus: "API Failed",
+                        status: "Refund Failed",
+                        refundRequest: false
                     });
-                    customAlert("PayMongo refund initiated. Status is 'Refund Pending'.");
-
-                    const response = await fetch(endpoint, {
-                        method: "POST",
-                        headers: { "Content-Type": "application/json" },
-                        body: JSON.stringify({ paymongoPaymentId: orderData.paymongoPaymentId, amount: refundAmount * 100 })
-                    });
-
-                    const data = await response.json();
-
-                    if (data.error) {
-                        customAlert(`PayMongo Refund failed: ${data.details || data.error}. Please check the PayMongo dashboard.`);
-                        await updateDoc(orderRef, {
-                            finalRefundStatus: "API Failed",
-                            status: "Refund Failed"
-                        });
-                        return;
-                    }
-                } else {
-                    await updateDoc(orderRef, {
-                        refundRequest: deleteField(),
-                        finalRefundStatus: "Manual",
-                        status: "Refunded"
-                    });
-                    customAlert(`Manual refund completed: Order #${orderData.queueNumber || orderData.queueNumberNumeric || 'N/A'} marked as Refunded.`);
+                    return;
                 }
+         
+
+            } else {
+                // Manual Refund (Cash)
+                await updateDoc(orderRef, {
+                    status: "Refunded",
+                    refundRequest: deleteField(),
+                    finalRefundStatus: "Manual",
+                    refundAmount: refundAmount
+                });
+                customAlert(`Manual Refund of ₱${refundAmount.toFixed(2)} completed. Status updated to 'Refunded (Manual)'.`);
             }
-            else {
-                if (isEPayment) {
-                    const endpoint = "http://localhost:3000/refund-payment";
 
-                    await updateDoc(orderRef, {
-                        status: "Refund Pending",
-                        refundRequest: deleteField(),
-                        finalRefundStatus: "Pending"
-                    });
-                    customAlert("PayMongo refund initiated. Status is 'Refund Pending'.");
-
-                    const response = await fetch(endpoint, {
-                        method: "POST",
-                        headers: { "Content-Type": "application/json" },
-                        body: JSON.stringify({ paymongoPaymentId: orderData.paymongoPaymentId, amount: refundAmount * 100 })
-                    });
-
-                    const data = await response.json();
-
-                    if (data.error) {
-                        customAlert(`PayMongo Refund failed: ${data.details || data.error}. Please check the PayMongo dashboard.`);
-                        await updateDoc(orderRef, {
-                            finalRefundStatus: "API Failed",
-                            status: "Refund Failed"
-                        });
-                        return;
-                    }
-                } else {
-                    await updateDoc(orderRef, {
-                        refundRequest: deleteField(),
-                        finalRefundStatus: "Manual",
-                        status: "Canceled"
-                    });
-                    customAlert(`Manual refund accepted: Order #${orderData.queueNumber || orderData.queueNumberNumeric || 'N/A'} was canceled and marked as Manual Refund.`);
-                }
-            }
         } else if (action === "Denied") {
             await updateDoc(orderRef, {
+                status: "Refund Denied",
                 refundRequest: deleteField(),
-                finalRefundStatus: "Denied",
-                status: "Refund Denied"
+                finalRefundStatus: "Denied"
             });
-            customAlert(`Refund request for Order #${orderData.queueNumber || orderData.queueNumberNumeric || 'N/A'} has been denied. Status updated.`);
+            customAlert("Refund request denied. Status updated to 'Refund Denied'.");
         }
 
         renderOrders();
     } catch (err) {
-        console.error("Refund Action Handler Error:", err);
-        customAlert("A critical error occurred while processing the refund action.");
+        console.error("Refund Action Error:", err);
+        customAlert(`Failed to process refund: ${err.message}.`);
         try {
             if (originalStatus) {
                 await updateDoc(orderRef, {
                     status: originalStatus,
-                    refundRequest: true
+                    refundRequest: true,
+                    finalRefundStatus: deleteField()
                 });
             }
         } catch (resetErr) {
@@ -854,6 +783,7 @@ async function handleRefundAction(orderId, collectionName, action, refundAmount 
         }
     }
 }
+
 
 async function returnStock(orderItems) {
     const returnItem = async (id, amount) => {
@@ -911,6 +841,177 @@ async function returnStock(orderItems) {
     }
 }
 
+
+/**
+ * @param {string} orderId 
+ * @param {string} collectionName 
+ * @param {File} file 
+ */
+async function uploadProofOfDelivery(orderId, collectionName, file) {
+    customAlert("Uploading Proof of Delivery... Please wait. **(Uploading...)**");
+
+    if (collectionName !== "DeliveryOrders") {
+        customAlert("Error: Proof of Delivery is only for Delivery Orders.");
+        return null;
+    }
+
+    try {
+        const filePath = `proofsOfDelivery/${orderId}/${file.name}_${new Date().getTime()}`;
+        const imageRef = ref(storage, filePath);
+        const snapshot = await uploadBytes(imageRef, file);
+        const podUrl = await getDownloadURL(snapshot.ref);
+
+
+        const podMetadataRef = doc(collection(db, collectionName, orderId, "proofsOfDelivery"));
+        const podDocId = podMetadataRef.id;
+
+        
+        const uploadedBy = 'Admin/Staff Console (Auth Removed)';
+
+        await setDoc(podMetadataRef, {
+            imageURL: podUrl,
+            uploadedAt: new Date(),
+            uploadedBy: uploadedBy,
+            filePath: filePath
+        });
+
+
+        await updateDoc(doc(db, collectionName, orderId), {
+            proofOfDeliveryURL: podUrl, 
+            proofOfDeliveryDocId: podDocId, 
+        });
+
+
+        customAlert("Proof of Delivery uploaded successfully! You can now click 'Order Completed'.");
+
+        renderOrders();
+        return podUrl;
+    } catch (error) {
+        console.error("POD Upload Error:", error);
+        customAlert(`POD upload failed: ${error.message}. Please try again.`);
+        return null;
+    }
+}
+
+function showProofOfDeliveryUploadPopup(orderId, collectionName) {
+    if (!popup) createPopup();
+
+    const orderItem = ordersData.find(o => o.id === orderId);
+    const queueNumber = orderItem ? formatQueueNumber(orderItem.data.queueNumber || orderItem.data.queueNumberNumeric) : '----';
+
+    popupTitle.textContent = `Upload POD: Queue #${queueNumber}`;
+
+    popupReceiptContent.innerHTML = `
+        <input type="file" id="podFileInput" accept="image/*, application/pdf" style="margin-bottom: 15px;">
+        <p style="font-size: 14px; color: #6d4428;">Please upload a clear photo or PDF proof of delivery.</p>
+    `;
+
+    popupButtonsContainer.innerHTML = `
+        <button id="confirmUploadCompleteBtn" disabled>Upload & Complete</button>
+        <button id="cancelUploadBtn">Cancel</button>
+    `;
+    popup.style.display = "flex";
+
+    const fileInput = document.getElementById("podFileInput");
+    const confirmBtn = document.getElementById("confirmUploadCompleteBtn");
+
+    fileInput.onchange = () => {
+        confirmBtn.disabled = fileInput.files.length === 0;
+    };
+
+    confirmBtn.onclick = async () => {
+        if (fileInput.files.length > 0) {
+            const file = fileInput.files[0];
+
+            const uploadUrl = await uploadProofOfDelivery(orderId, collectionName, file);
+
+            if (uploadUrl) {
+                
+                await updateOrderStatus(orderId, collectionName, "Completed");
+                closePopup();
+            } else {
+                
+                showProofOfDeliveryUploadPopup(orderId, collectionName);
+            }
+
+        } else {
+            customAlert("Please select a file to upload.");
+        }
+    };
+
+    document.getElementById("cancelUploadBtn").onclick = closePopup;
+}
+
+/**
+
+ * @param {string} orderId 
+ * @param {string} collectionName 
+ * @param {string} podDocId 
+ */
+async function showProofOfDeliveryPopup(orderId, collectionName, podDocId) {
+    if (collectionName !== "DeliveryOrders") {
+        customAlert("POD is only supported for Delivery Orders.");
+        return;
+    }
+
+    const orderRef = doc(db, collectionName, orderId);
+    const podMetadataRef = doc(db, collectionName, orderId, "proofsOfDelivery", podDocId);
+
+    try {
+        const orderSnap = await getDoc(orderRef);
+        const podSnap = await getDoc(podMetadataRef);
+
+        if (!orderSnap.exists() || !podSnap.exists()) {
+            customAlert("Order or Proof of Delivery metadata not found.");
+            return;
+        }
+
+        const orderData = orderSnap.data();
+        const podData = podSnap.data();
+
+        const podUrl = orderData.proofOfDeliveryURL || podData.imageURL;
+        const uploadedBy = podData.uploadedBy || 'N/A';
+        const uploadedAt = formatPODTimestamp(podData.uploadedAt);
+        const queueNumber = formatQueueNumber(orderData.queueNumber || orderData.queueNumberNumeric);
+
+        if (!podUrl) {
+            customAlert("No Proof of Delivery URL found for this order.");
+            return;
+        }
+
+        if (!popup) createPopup();
+
+        popupTitle.textContent = `Proof of Delivery (Order #${queueNumber})`;
+
+        popupReceiptContent.innerHTML = `
+            <div style="text-align: center; font-size: 15px; margin-bottom: 20px;">
+                Image proof uploaded:
+                <div style="margin-top: 10px; font-weight: bold;">
+                    <span style="margin-right: 5px;">👤</span> By: ${uploadedBy}
+                </div>
+                <div style="margin-top: 5px;">
+                    <span style="margin-right: 5px;">⌚</span> At: ${uploadedAt}
+                </div>
+            </div>
+
+            <div style="max-height: 250px; overflow-y: auto; padding: 10px; ">
+                <img src="${podUrl}" alt="Proof of Delivery" style="width: 100%; height: auto; display: block;">
+            </div>
+        `;
+
+        popupButtonsContainer.innerHTML = `
+            <button id="closePodBtn" style="background-color: #8b5e3c; color: #fff; width: 80%;">Close</button>
+        `;
+        popup.style.display = "flex";
+
+        document.getElementById("closePodBtn").onclick = closePopup;
+
+    } catch (err) {
+        console.error("Show POD Error:", err);
+        customAlert("Failed to load Proof of Delivery details.");
+    }
+}
+
 async function updateOrderStatus(orderId, collectionName, newStatus, eta = "") {
     if (!orderId || !collectionName) return;
 
@@ -938,16 +1039,26 @@ async function updateOrderStatus(orderId, collectionName, newStatus, eta = "") {
             timestamp: new Date().toISOString()
         };
 
-        if (originalStatus === "Wait for Admin to Accept" && newStatus === "Waiting for Payment") {
+        if ((newStatus === "Completed" || newStatus === "Completed by Customer") && collectionName === "DeliveryOrders") {
+            if (!orderData.proofOfDeliveryURL || !orderData.proofOfDeliveryDocId) {
+                customAlert("Action Blocked: A Proof of Delivery (POD) must be uploaded before completing a Delivery Order.");
+                showProofOfDeliveryUploadPopup(orderId, collectionName);
+                return; 
+            }
+            updatePayload.finalRefundStatus = deleteField();
+            updatePayload.refundRequest = deleteField();
+        }
+
+        else if (originalStatus === "Wait for Admin to Accept" && newStatus === "Waiting for Payment") {
             if (!orderData.paymentMetadata || !orderData.total) {
                 customAlert("Error: Cannot accept. Payment metadata is missing from the order.");
                 return;
             }
 
-            const endpoint = "http://localhost:3000/generate-paymongo-link";
-            customAlert("Generating secure payment link... Please wait. Do not navigate away.");
 
-            await updateDoc(orderRef, { status: "Processing" });
+            //const endpoint = "http://localhost:3000/generate-paymongo-link";
+            const endpoint = "/.netlify/functions/generate-paymongo-link";
+            customAlert("Generating secure payment link... Please wait. Do not navigate away.");
 
             const response = await fetch(endpoint, {
                 method: "POST",
@@ -991,26 +1102,152 @@ async function updateOrderStatus(orderId, collectionName, newStatus, eta = "") {
             updatePayload.refundRequest = deleteField();
         }
 
-        if (newStatus === "Preparing" || newStatus === "Delivery" || newStatus === "Completed" || newStatus === "Waiting for Payment") {
-            updatePayload.refundRequest = deleteField();
-            if (newStatus === "Completed") {
-                updatePayload.finalRefundStatus = deleteField();
-            }
+        if (newStatus === "Preparing" || newStatus === "Delivery") {
+             updatePayload.refundRequest = deleteField();
         }
 
         await updateDoc(orderRef, updatePayload);
+
         renderOrders();
     } catch (e) {
         console.error(`Error updating status for ${orderId}:`, e);
         customAlert(`A critical error occurred while updating the order status: ${e.message}`);
 
         if (originalStatus && originalStatus !== "Processing") {
-              await updateDoc(orderRef, { status: originalStatus }).catch(err => console.error("Failed to revert status:", err));
+             await updateDoc(orderRef, { status: originalStatus }).catch(err => console.error("Failed to revert status:", err));
         }
     }
 }
 
 
-document.addEventListener("DOMContentLoaded", () => {
-    renderOrders(); 
-});
+function attachActionHandlers() {
+    document.querySelectorAll(".admin-accept-btn").forEach(btn => {
+        btn.addEventListener("click", e => updateOrderStatus(e.target.dataset.id, e.target.dataset.collection, "Waiting for Payment"));
+    });
+
+    document.querySelectorAll(".admin-decline-btn").forEach(btn => {
+        btn.addEventListener("click", e => updateOrderStatus(e.target.dataset.id, e.target.dataset.collection, "Canceled"));
+    });
+
+    document.querySelectorAll(".accept-btn").forEach(btn => {
+        btn.addEventListener("click", e => {
+            const id = e.target.dataset.id;
+            const collection = e.target.dataset.collection;
+            const type = e.target.dataset.type;
+
+            if (type === "Delivery") {
+                showETPopup("Select ET for Preparing", eta => updateOrderStatus(id, collection, "Preparing", eta));
+            } else {
+                updateOrderStatus(id, collection, "Preparing");
+            }
+        });
+    });
+
+    document.querySelectorAll(".eta-btn").forEach(btn => {
+        btn.addEventListener("click", e => {
+            const id = e.target.dataset.id;
+            const collection = e.target.dataset.collection;
+            const status = e.target.dataset.status;
+            showETPopup(`Select ET for ${status}`, eta => updateOrderStatus(id, collection, status, eta));
+        });
+    });
+
+    document.querySelectorAll(".cancel-btn").forEach(btn => {
+        btn.addEventListener("click", e => updateOrderStatus(e.target.dataset.id, e.target.dataset.collection, "Canceled"));
+    });
+
+    document.querySelectorAll(".complete-btn").forEach(btn => {
+        btn.addEventListener("click", e => {
+            updateOrderStatus(e.target.dataset.id, e.target.dataset.collection, "Completed");
+        });
+    });
+
+    document.querySelectorAll(".print-receipt-btn").forEach(btn => {
+        btn.addEventListener("click", e => {
+            showReceiptPopup(e.target.dataset.id, e.target.dataset.collection);
+        });
+    });
+
+    document.querySelectorAll(".pod-upload-btn").forEach(btn => {
+        btn.addEventListener("click", e => {
+            showProofOfDeliveryUploadPopup(e.target.dataset.id, e.target.dataset.collection);
+        });
+    });
+
+    document.querySelectorAll(".pod-view-btn").forEach(btn => {
+        btn.addEventListener("click", e => {
+            const podDocId = e.target.dataset.docId;
+            const orderId = e.target.dataset.id;
+            const collectionName = e.target.dataset.collection;
+            if (podDocId) {
+                showProofOfDeliveryPopup(orderId, collectionName, podDocId);
+            } else {
+                customAlert("Proof of Delivery Document ID is missing.");
+            }
+        });
+    });
+
+    document.querySelectorAll(".view-refund-btn").forEach(btn => {
+        btn.addEventListener("click", async e => {
+            const orderId = e.target.dataset.id;
+            const collectionName = e.target.dataset.collection;
+            const orderRef = doc(db, collectionName, orderId);
+            const orderSnap = await getDoc(orderRef);
+            if (!orderSnap.exists()) return;
+
+            const orderData = orderSnap.data();
+            if (!orderData.refundRequest) {
+                customAlert("There is no active refund request for this order.");
+                return;
+            }
+
+            const refundItems = orderData.refundItems || [];
+            const maxRefundable = refundItems.reduce((sum, p) =>
+                sum + (p.total || ((p.sizePrice || 0) + (p.addonsPrice || 0)) * (p.qty || p.quantity || 1))
+            , 0);
+            const paymongoPaymentId = orderData.paymongoPaymentId || null;
+
+            let productsHtml = refundItems.map(p => {
+                const addons = p.addons?.length ? ` (Add-ons: ${p.addons.map(a => `${a.name}:₱${(a.price || 0).toFixed(2)}`).join(", ")})` : "";
+                const sizeText = p.size ? (typeof p.size === "string" ? ` [${p.size}]` : ` [${p.size.name}]`) : "";
+                const qty = p.qty || p.quantity || 1;
+                const totalPrice = (p.total || ((p.sizePrice || 0) + (p.addonsPrice || 0)) * qty).toFixed(2);
+                return `<div>${qty} x ${p.product}${sizeText}${addons} - ₱${totalPrice}</div>`;
+            }).join("");
+
+            if (refundItems.length === 0) {
+                 productsHtml = '<div>No specific items selected for refund (Full Order Refund assumed if amount is max).</div>';
+            }
+
+            if (!popup) createPopup();
+            popupTitle.textContent = `Refund Request: Queue #${formatQueueNumber(orderData.queueNumber || orderData.queueNumberNumeric)}`;
+
+            popupReceiptContent.innerHTML = `
+                <div style="text-align: left; margin-bottom: 15px; width: 100%;">
+                    <div style="font-weight: bold; margin-bottom: 5px; border-bottom: 1px dashed #aaa; padding-bottom: 5px;">Requested Items:</div>
+                    ${productsHtml}
+                </div>
+            `;
+
+            popupButtonsContainer.innerHTML = `
+                <div style="font-weight: bold; color: #dc3545; margin-bottom: 15px;">Max Refundable Amount (Products Only): ₱${maxRefundable.toFixed(2)}</div>
+                <button class="admin-accept-btn" id="acceptRefundBtn">Refund</button>
+                <button class="admin-decline-btn" id="denyRefundBtn">Decline Refund</button>
+                <button id="closeDetailsBtn">Close</button>
+            `;
+            popup.style.display = "flex";
+
+            document.getElementById("acceptRefundBtn").onclick = () => {
+                closePopup();
+                showRefundAmountPopup(orderId, collectionName, maxRefundable, paymongoPaymentId);
+            };
+            document.getElementById("denyRefundBtn").onclick = () => {
+                closePopup();
+                handleRefundAction(orderId, collectionName, "Denied");
+            };
+            document.getElementById("closeDetailsBtn").onclick = closePopup;
+        });
+    });
+}
+
+renderOrders();
