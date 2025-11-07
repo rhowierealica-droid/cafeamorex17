@@ -328,11 +328,13 @@ body {
 }
 
 .terms-body {
-    max-height: 55vh;
+    flex-grow: 1; 
+    max-height: 55vh; 
     overflow-y: auto;
     padding-right: 10px;
     line-height: 1.7;
     font-size: 0.95em;
+    scroll-behavior: smooth; 
 }
 
 .terms-body h3, 
@@ -358,6 +360,7 @@ body {
     display: flex;
     justify-content: flex-end;
     gap: 12px;
+    flex-shrink: 0; 
 }
 .message-content button, 
 .terms-actions button {
