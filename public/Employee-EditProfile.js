@@ -74,7 +74,6 @@ closeBtn?.addEventListener("click", () => {
 
 async function loadDriverProfile(email) {
     if (!email) {
-        alert("Session Expired or Invalid. Please log in.");
         window.location.href = "login.html"; 
         return;
     }
@@ -172,7 +171,7 @@ passwordForm?.addEventListener("submit", async (e) => {
     if (newPassword.length < 6) { 
         return alert("New password must be at least 6 characters long.");
     }
-  
+ 
     try {
         const userDocRef = doc(db, "users", currentDriverUID);
         
@@ -192,9 +191,6 @@ passwordForm?.addEventListener("submit", async (e) => {
 
 
 logoutBtn?.addEventListener("click", () => {
-    const confirmLogout = confirm("Are you sure you want to log out?");
-    if (!confirmLogout) return;
-
     sessionStorage.clear();
     window.location.href = "login.html";
 });
