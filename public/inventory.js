@@ -126,7 +126,7 @@ function getStockSortOrder(status) {
     if (status === "Out of Stock") return 1;
     if (status === "Low Stock") return 2;
     if (status === "In Stock") return 3;
-    return 4; // Default/Other
+    return 4; 
 }
 
 function getStatusColor(status) {
@@ -504,7 +504,6 @@ window.generateLowStockPDF = async () => {
         doc.text(`Report Generated: ${today}`, 14, finalY);
         finalY += 10;
 
-        // Full Inventory Status Header
         doc.setFontSize(14);
         doc.setTextColor(75, 54, 33);
         doc.text("Full Inventory Status", 14, finalY);
@@ -516,7 +515,6 @@ window.generateLowStockPDF = async () => {
         doc.text("This table shows the current stock of all inventoried items.", 14, finalY);
         finalY += 4;
 
-        // Full Inventory Table Data
         const fullInventoryTableData = allInventoryItems.map(item => [
             item.name,
             item.category,
@@ -524,7 +522,6 @@ window.generateLowStockPDF = async () => {
             item.status
         ]);
 
-        // Sorting the table data
         fullInventoryTableData.sort((a, b) => {
             const statusA = a[3];
             const statusB = b[3];
@@ -537,7 +534,6 @@ window.generateLowStockPDF = async () => {
             return a[0].localeCompare(b[0]);
         });
 
-        // Main inventory table
         doc.autoTable({
             head: [['Item Name', 'Category', 'Current Stock', 'Status']],
             body: fullInventoryTableData,
@@ -573,7 +569,6 @@ window.generateLowStockPDF = async () => {
 
         // Low Stock & Out of Stock Items
         if (lowStockItems.length > 0) {
-            // Header
             doc.setFont("helvetica", "bold");
             doc.setFontSize(14);
             doc.setTextColor(192, 57, 43);
@@ -628,7 +623,6 @@ window.generateLowStockPDF = async () => {
             finalY = doc.autoTable.previous.finalY + 10;
         }
 
-        // Impact Map for affected products
         const allImpactMap = new Map();
 
         lowStockItems.forEach(item => {
@@ -646,26 +640,22 @@ window.generateLowStockPDF = async () => {
             }
         });
 
-        // Impact analysis
         if (allImpactMap.size > 0) {
             if (finalY > 260) {
                 doc.addPage();
                 finalY = 20;
             }
 
-            // Impact Header
             doc.setFont("helvetica", "bold");
             doc.setFontSize(16);
             doc.setTextColor(75, 54, 33);
             doc.text("Product Impact Analysis", 14, finalY);
             finalY += 8;
 
-            // Impact description
             doc.setTextColor(0, 0, 0);
             doc.setFontSize(9);
             doc.setFont("helvetica", "normal");
 
-            // Sort impact keys
             const sortedImpactKeys = Array.from(allImpactMap.keys()).sort((a, b) => {
                 const isAOut = a.includes("Out of Stock");
                 const isBOut = b.includes("Out of Stock");
@@ -674,12 +664,10 @@ window.generateLowStockPDF = async () => {
                 return a.localeCompare(b);
             });
 
-            // --- START OF NEW ESSAY FORMATTING ---
             let essayText = "Immediate action is required as several inventory items are critically low or out of stock, directly impacting product availability. ";
             let outOfStockItems = [];
             let lowStockItemsList = [];
 
-            // Group by status for the narrative
             sortedImpactKeys.forEach(mapKey => {
                 const productNames = Array.from(allImpactMap.get(mapKey)).sort();
                 const [ingredientName, status] = mapKey.match(/^(.*) \((.*)\)$/).slice(1);
@@ -711,7 +699,6 @@ window.generateLowStockPDF = async () => {
                 essayText += ". ";
             }
 
-            // Replace bold markers with actual styling
             const boldMarkers = [];
             essayText = essayText.replace(/\*\*(.*?)\*\*/g, (match, p1) => {
                 const marker = `__BOLD_MARKER_${boldMarkers.length}__`;
@@ -726,7 +713,6 @@ window.generateLowStockPDF = async () => {
                 let currentX = 14;
                 let lineParts = [line];
 
-                // Replace markers back for rendering
                 boldMarkers.forEach((text, index) => {
                     const marker = `__BOLD_MARKER_${index}__`;
                     lineParts = lineParts.flatMap(part => {
@@ -748,11 +734,10 @@ window.generateLowStockPDF = async () => {
                     doc.text(text, currentX, finalY + 4);
                     currentX += textWidth;
                 });
-                finalY += 5; // line height
+                finalY += 5; 
             });
 
-            finalY += 5; // space after paragraph
-            // --- END OF NEW ESSAY FORMATTING ---
+            finalY += 5; 
         }
 
         // High Priority Products
@@ -769,7 +754,6 @@ window.generateLowStockPDF = async () => {
             doc.text(`High-Priority Products Affected (Top 5 Last 7 Days)`, 14, finalY);
             finalY += 8;
 
-            // List affected top sellers
             doc.setFontSize(9);
             doc.setFont("helvetica", "normal");
             doc.setTextColor(0, 0, 0);
