@@ -121,7 +121,7 @@ logout?.addEventListener('click', async (e) => {
 });
 
 logo?.addEventListener('click', () => {
-  window.location.href = "menu.html";
+  window.location.href = "index.html";
 });
 
 onAuthStateChanged(auth, async (user) => {
