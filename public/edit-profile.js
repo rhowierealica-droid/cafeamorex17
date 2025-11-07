@@ -590,7 +590,7 @@ setupEditSaveCancel(
         if (currentPhoneInput) {
             currentPhoneInput.disabled = false;
             currentPhoneInput.value = "";
-            currentPhoneInput.placeholder = "Enter your current full phone number (e.g., +639XXXXXXXXX)";
+            currentPhoneInput.placeholder = "Enter your current phone number ";
         }
     },
     () => {
