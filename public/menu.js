@@ -358,7 +358,7 @@ function loadProductsRealtime() {
               (async () => {
                 const orderSnapshot = await getDocs(collection(db, "DeliveryOrders"));
                 let totalRating = 0, count = 0;
-                const productFeedbacks = []; acks
+                const productFeedbacks = []; 
 
                 orderSnapshot.forEach(docSnap => {
                   const order = docSnap.data();
@@ -373,7 +373,6 @@ function loadProductsRealtime() {
                 let avgRating = count ? totalRating / count : 0;
                 starsInner.style.width = `${(avgRating / 5) * 100}%`;
                 ratingNumber.textContent = count ? `(${avgRating.toFixed(1)})` : '';
-                // Store feedbacks on the card for the popup
                 card.dataset.feedbacks = JSON.stringify(productFeedbacks);
 
               })();
@@ -471,8 +470,8 @@ function openCartPopup(product, stockInfo = []) {
     stockInfo.forEach(size => {
       const label = document.createElement('label'); label.classList.add('size-btn');
       const availableQty = size.stock || 0;
-      
-      label.textContent = `${size.name} - ₱${(size.price || 0).toFixed(2)} (Stock: ${availableQty})`;
+
+      label.textContent = `${size.name} - ₱${(size.price || 0).toFixed(2)}`;
       
       const input = document.createElement('input'); input.type = 'radio'; input.name = 'size';
       
@@ -516,7 +515,8 @@ function openCartPopup(product, stockInfo = []) {
       
       const label = document.createElement('label'); 
       label.classList.add('addon-btn'); 
-      label.textContent = `${addon.name} - ₱${(addon.price || 0).toFixed(2)} (Stock: ${stock})`;
+
+      label.textContent = `${addon.name} - ₱${(addon.price || 0).toFixed(2)}`;
       
       const input = document.createElement('input'); 
       input.type = 'checkbox';
@@ -616,11 +616,12 @@ function showReviewsPopup(productName, feedbacks) {
   
   if (feedbacks.length) {
     feedbacks.forEach(f => {
+      
       let emailMasked = f.customerEmail || "Anonymous";
       
       if (emailMasked !== "Anonymous" && emailMasked.includes('@')) { 
         const [name, domain] = emailMasked.split('@'); 
-        // Mask the name part
+        // Mask the name '
         emailMasked = `${name.slice(0,3)}****@${domain}`; 
       }
 
