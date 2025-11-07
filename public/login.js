@@ -182,7 +182,7 @@ if (loginForm) {
         } catch (error) {
             console.error("Login error:", error);
             if (error.code === 'auth/wrong-password' || error.code === 'auth/invalid-credential') {
-                showMessage("Wrong password.");
+                showMessage("Invalid Email or Password");
             } else if (error.code === 'auth/user-not-found') {
                 showMessage("Account not found or email pending verification.");
             } else {
