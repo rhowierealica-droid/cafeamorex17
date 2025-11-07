@@ -9,8 +9,39 @@
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css" />
     <link rel="stylesheet" href="Admin-EditProfile.css" />
     <link rel="stylesheet" href="edit-profile.css" />
-
     <link rel="stylesheet" href="admin-nav.css" />
+
+    <style>
+        .password-input-wrapper {
+            position: relative; 
+        }
+
+        .password-input-wrapper input[type="password"],
+        .password-input-wrapper input[type="text"] {
+            padding-right: 40px; 
+            margin-bottom: 0; 
+        }
+
+        .toggle-password {
+            position: absolute;
+            right: 15px; 
+            top: 50%;
+            transform: translateY(-50%); 
+            cursor: pointer;
+            color: #777; 
+            z-index: 10;
+            font-size: 1.1em;
+            transition: color 0.2s;
+        }
+
+        .toggle-password:hover {
+            color: #333;
+        }
+
+        .input-group {
+            margin-bottom: 15px; 
+        }
+    </style>
 </head>
 
 <body>
@@ -97,9 +128,13 @@
                             <label for="newEmail">Enter New Email</label>
                             <input type="email" id="newEmail" placeholder="Enter new email" required />
                         </div>
+                        
                         <div class="input-group">
                             <label for="currentPassword">Enter Current Password</label>
-                            <input type="password" id="currentPassword" placeholder="Enter current password" required />
+                            <div class="password-input-wrapper">
+                                <input type="password" id="currentPassword" class="password-field" placeholder="Enter current password" required />
+                                <i class="fas fa-eye toggle-password" data-target="currentPassword"></i>
+                            </div>
                         </div>
                     </div>
 
@@ -121,18 +156,29 @@
                     </div>
 
                     <div class="password-edit-fields" id="passwordEditFields" style="display:none;">
+                        
                         <div class="input-group">
                             <label for="currentPasswordForChange">Enter Current Password</label>
-                            <input type="password" id="currentPasswordForChange" placeholder="Enter current password"
-                                required />
+                            <div class="password-input-wrapper">
+                                <input type="password" id="currentPasswordForChange" class="password-field" placeholder="Enter current password" required />
+                                <i class="fas fa-eye toggle-password" data-target="currentPasswordForChange"></i>
+                            </div>
                         </div>
+
                         <div class="input-group">
                             <label for="password">New Password</label>
-                            <input type="password" id="password" placeholder="Enter new password" required />
+                            <div class="password-input-wrapper">
+                                <input type="password" id="password" class="password-field" placeholder="Enter new password" required />
+                                <i class="fas fa-eye toggle-password" data-target="password"></i>
+                            </div>
                         </div>
+
                         <div class="input-group">
                             <label for="confirmPassword">Confirm Password</label>
-                            <input type="password" id="confirmPassword" placeholder="Confirm new password" required />
+                            <div class="password-input-wrapper">
+                                <input type="password" id="confirmPassword" class="password-field" placeholder="Confirm new password" required />
+                                <i class="fas fa-eye toggle-password" data-target="confirmPassword"></i>
+                            </div>
                         </div>
                     </div>
 
@@ -166,10 +212,13 @@
                                 pattern="^\+63\s?9\d{9}$"
                                 title="Phone number must start with +63 9 followed by 9 digits (e.g., +63 9123456789 or +639123456789)" />
                         </div>
+
                         <div class="input-group">
                             <label for="currentPhonePassword">Enter Current Password</label>
-                            <input type="password" id="currentPhonePassword" placeholder="Enter current password"
-                                required />
+                            <div class="password-input-wrapper">
+                                <input type="password" id="currentPhonePassword" class="password-field" placeholder="Enter current password" required />
+                                <i class="fas fa-eye toggle-password" data-target="currentPhonePassword"></i>
+                            </div>
                         </div>
                     </div>
 
@@ -202,7 +251,30 @@
     <script type="module" src="Admin-EditProfile.js"></script>
     <script type="module" src="admin-nav.js"></script>
     <script type="module" src="AutoCancel.js"></script>
-        <script type="module" src="AccessAdmin.js"></script>
+    <script type="module" src="AccessAdmin.js"></script>
+    
+    <script>
+        function setupPasswordToggle(inputElementId, toggleElementId) {
+            const passwordInput = document.getElementById(inputElementId);
+            const toggleIcon = document.querySelector(`[data-target="${inputElementId}"]`);
+
+            if (toggleIcon && passwordInput) {
+                toggleIcon.addEventListener('click', function () {
+                    const type = passwordInput.getAttribute('type') === 'password' ? 'text' : 'password';
+                    passwordInput.setAttribute('type', type);
+                    this.classList.toggle('fa-eye-slash');
+                });
+            }
+        }
+
+        document.addEventListener('DOMContentLoaded', () => {
+            setupPasswordToggle('currentPassword');
+            setupPasswordToggle('currentPasswordForChange');
+            setupPasswordToggle('password');
+            setupPasswordToggle('confirmPassword');
+            setupPasswordToggle('currentPhonePassword');
+        });
+    </script>
 
 
 </body>
