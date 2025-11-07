@@ -3,9 +3,11 @@ import {
     collection, doc, onSnapshot, updateDoc, getDocs, getDoc, setDoc,
     deleteField, increment, arrayUnion, query, where
 } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+// import { getAuth, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js"; // REMOVED AUTH IMPORT
 import { getStorage, ref, uploadBytes, getDownloadURL } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-storage.js";
 const storage = getStorage();
 
+// const auth = getAuth(); // REMOVED AUTH INITIALIZATION
 const ordersBody = document.getElementById("ordersBody");
 const tabButtons = document.querySelectorAll(".tab-btn");
 const filterContainer = document.getElementById("filterContainer");
@@ -71,6 +73,8 @@ function injectPopupStyles() {
     .pod-upload-btn:hover { background-color: #e68a00; }
     .pod-view-btn { background-color: #5bc0de; }
     .pod-view-btn:hover { background-color: #46b8da; }
+    .view-info-btn { background-color: #3f51b5; color: white; margin-top: 5px;}
+    .view-info-btn:hover { background-color: #303f9f; }
     `;
     document.head.appendChild(style);
 }
@@ -127,7 +131,7 @@ function formatQueueNumber(num) {
 }
 
 /**
- * @param {object|number} timestamp 
+ * @param {object|number} timestamp -
  * @returns {string} 
  */
 function formatPODTimestamp(timestamp) {
@@ -360,6 +364,7 @@ function renderOrders() {
             if (a.data.refundRequest && !b.data.refundRequest) return -1;
             if (!a.data.refundRequest && b.data.refundRequest) return 1;
 
+            // newest/highest number
             const queueA = a.data.queueNumberNumeric || 0;
             const queueB = b.data.queueNumberNumeric || 0;
             return queueB - queueA;
@@ -382,6 +387,7 @@ function renderOrders() {
                 return `<div>${qty} × ${p.product}${sizeText}${addons} — ₱${total.toFixed(2)}</div>`;
             }).join("");
 
+            // Dlivery fee show
             const deliveryFee = order.deliveryFee || 0;
             const deliveryFeeHtml = deliveryFee > 0
                 ? `<div style="margin-top: 5px; border-top: 1px dashed #ccc; padding-top: 5px;">Delivery Fee: ₱${deliveryFee.toFixed(2)}</div>`
@@ -427,7 +433,7 @@ function renderOrders() {
             if (finalRefundStatus && ["Succeeded", "Manual", "Refunded", "Pending"].includes(finalRefundStatus)) {
                 mainStatusDisplay = finalRefundStatus === "Pending" ? "Refunded (Processing)" : "Refunded";
             } else if (mainStatus === "Refunded" || mainStatus === "Refund Denied") {
-                 mainStatusDisplay = mainStatus;
+                    mainStatusDisplay = mainStatus;
             }
 
 
@@ -435,20 +441,24 @@ function renderOrders() {
 
             let actionBtnHtml = "";
             const printButton = `<button class="print-receipt-btn" data-id="${orderId}" data-collection="${orderItem.collection}">View Receipt</button>`;
+            const infoButton = `<button class="view-info-btn" data-id="${orderId}" data-collection="${orderItem.collection}">View Information</button>`;
+            const refundButton = `<button class="view-refund-btn" data-id="${orderId}" data-collection="${orderItem.collection}">View Refund Request</button>`;
+            const podUploadButton = `<button class="pod-upload-btn" data-id="${orderId}" data-collection="${orderItem.collection}">Upload POD</button>`;
+            const podViewButton = `<button class="pod-view-btn" data-id="${orderId}" data-collection="${orderItem.collection}" data-doc-id="${order.proofOfDeliveryDocId}">View POD</button>`;
 
-            const proofOfDeliveryURL = order.proofOfDeliveryURL;
-            const proofOfDeliveryDocId = order.proofOfDeliveryDocId;
 
+            // 1. Primary Action (Accept/Complete/Cancel/Set ET)
             if (order.refundRequest) {
-                actionBtnHtml = `<button class="view-refund-btn" data-id="${orderId}" data-collection="${orderItem.collection}">View Refund Request</button>`;
+                // If refund is requested, the primary action is to view the request
+                actionBtnHtml = refundButton;
             } else {
                 switch (order.status) {
                     case "Wait for Admin to Accept":
                         actionBtnHtml = `<button class="admin-accept-btn" data-id="${orderId}" data-collection="${orderItem.collection}">Accept Order</button>
-                                             <button class="admin-decline-btn" data-id="${orderId}" data-collection="${orderItem.collection}">Decline Order</button>`;
+                                         <button class="admin-decline-btn" data-id="${orderId}" data-collection="${orderItem.collection}">Decline Order</button>`;
                         break;
                     case "Waiting for Payment":
-                        actionBtnHtml = "";
+                        actionBtnHtml = ""; 
                         break;
                     case "Pending":
                         actionBtnHtml = orderItem.type === "Delivery"
@@ -463,35 +473,33 @@ function renderOrders() {
                             : `<button class="complete-btn" data-id="${orderId}" data-collection="${orderItem.collection}">Completed</button>`;
                         break;
                     case "Delivery":
-                        
-                        if (proofOfDeliveryURL && proofOfDeliveryDocId) {
-                             actionBtnHtml = `<button class="complete-btn" data-id="${orderId}" data-collection="${orderItem.collection}" style="background-color: #4CAF50;">Order Completed</button>`;
-                        } else {
-                            actionBtnHtml = `<button class="pod-upload-btn" data-id="${orderId}" data-collection="${orderItem.collection}">Upload POD</button>`;
-                        }
-                        break;
-                    case "Refund Pending":
-                        actionBtnHtml = `<button class="view-refund-btn" disabled>Refund Processing...</button>`;
-                        break;
-                    case "Completed":
-                    case "Completed by Customer":
-                    case "Canceled":
-                    case "Refund Denied":
-                    case "Refund Failed":
-                    case "Refunded":
-                        actionBtnHtml = printButton;
+                           actionBtnHtml = order.proofOfDeliveryURL && order.proofOfDeliveryDocId 
+                                ? `<button class="complete-btn" data-id="${orderId}" data-collection="${orderItem.collection}" style="background-color: #4CAF50;">Order Completed</button>`
+                                : podUploadButton;
                         break;
                 }
             }
+            
+            // 2. Secondary/Informational Actions
+            // Always show View Information
+            actionBtnHtml += infoButton;
 
-            if (["Completed", "Completed by Customer", "Canceled", "Refund Denied", "Refund Failed", "Refunded"].includes(order.status) && !actionBtnHtml.includes("View Receipt")) {
-                     actionBtnHtml += printButton;
+            // Always show View Receipt if order has left the active phase
+            if (["Completed", "Completed by Customer", "Canceled", "Refund Denied", "Refund Failed", "Refunded"].includes(order.status) || order.finalRefundStatus) {
+                 if (!actionBtnHtml.includes("View Receipt")) {
+                    actionBtnHtml += printButton;
+                }
             }
 
-            if (orderItem.type === "Delivery" && ["Completed", "Completed by Customer"].includes(order.status) && proofOfDeliveryURL && proofOfDeliveryDocId) {
-                actionBtnHtml += `<button class="pod-view-btn" data-id="${orderId}" data-collection="${orderItem.collection}" data-doc-id="${proofOfDeliveryDocId}">View POD</button>`;
+            // Show View POD for completed deliveries with POD
+            if (orderItem.type === "Delivery" && ["Completed", "Completed by Customer"].includes(order.status) && order.proofOfDeliveryURL && order.proofOfDeliveryDocId) {
+                actionBtnHtml += podViewButton;
             }
-
+            
+            // Show View Refund Request for processing refunds that aren't the primary button
+            if (order.finalRefundStatus === "Pending") {
+                 actionBtnHtml += refundButton; // If refund is processing, show the button
+            }
 
             tr.innerHTML = `
                 <td>${queue}</td>
@@ -640,6 +648,51 @@ async function showReceiptPopup(orderId, collectionName) {
     }
 }
 
+// --- START: New Function to Show Customer Information ---
+async function showCustomerInfoPopup(orderId, collectionName) {
+    const orderRef = doc(db, collectionName, orderId);
+    try {
+        const orderSnap = await getDoc(orderRef);
+        if (!orderSnap.exists()) {
+            customAlert(`Error: Order ${orderId} not found.`);
+            return;
+        }
+        const orderData = orderSnap.data();
+        const queueNumber = formatQueueNumber(orderData.queueNumber || orderData.queueNumberNumeric);
+        
+        // Prioritize customerDetails map, but fall back to top-level fields
+        const customerDetails = orderData.customerDetails || {};
+        
+        // Use top-level fields as fallback if customerDetails are missing
+        const name = customerDetails.name || orderData.customerName || (customerDetails.firstName && customerDetails.lastName ? `${customerDetails.firstName} ${customerDetails.lastName}` : 'N/A');
+        const phone = customerDetails.phone || customerDetails.phoneNumber || orderData.phoneNumber || 'N/A';
+        const address = customerDetails.address || customerDetails.deliveryAddress || orderData.address || 'N/A';
+        
+        if (!popup) createPopup();
+        popupTitle.textContent = `Customer Info (Queue #${queueNumber})`;
+
+        popupReceiptContent.innerHTML = `
+            <div style="text-align: left; width: 100%; font-size: 16px;">
+                <p style="margin-bottom: 10px;"><strong>Name:</strong> ${name}</p>
+                <p style="margin-bottom: 10px;"><strong>Phone Number:</strong> ${phone}</p>
+                <p style="margin-bottom: 10px;"><strong>Address:</strong> ${address}</p>
+            </div>
+        `;
+
+        popupButtonsContainer.innerHTML = `
+            <button id="closeInfoBtn">Close</button>
+        `;
+        popup.style.display = "flex";
+
+        document.getElementById("closeInfoBtn").onclick = closePopup;
+
+    } catch (err) {
+        console.error("Show Customer Info Error:", err);
+        customAlert("Failed to load customer information.");
+    }
+}
+// --- END: New Function to Show Customer Information ---
+
 
 function showRefundAmountPopup(orderId, collectionName, maxRefundable, paymongoPaymentId) {
     if (!popup) createPopup();
@@ -675,6 +728,7 @@ function showRefundAmountPopup(orderId, collectionName, maxRefundable, paymongoP
         closePopup();
     };
 }
+
 
 async function handleRefundAction(orderId, collectionName, action, refundAmount = 0, isEPayment = false, paymongoPaymentId = null) {
     const orderRef = doc(db, collectionName, orderId);
@@ -744,10 +798,8 @@ async function handleRefundAction(orderId, collectionName, action, refundAmount 
                     });
                     return;
                 }
-         
 
             } else {
-                // Manual Refund (Cash)
                 await updateDoc(orderRef, {
                     status: "Refunded",
                     refundRequest: deleteField(),
@@ -845,7 +897,7 @@ async function returnStock(orderItems) {
 /**
  * @param {string} orderId 
  * @param {string} collectionName 
- * @param {File} file 
+ * @param {File} file - 
  */
 async function uploadProofOfDelivery(orderId, collectionName, file) {
     customAlert("Uploading Proof of Delivery... Please wait. **(Uploading...)**");
@@ -861,12 +913,10 @@ async function uploadProofOfDelivery(orderId, collectionName, file) {
         const snapshot = await uploadBytes(imageRef, file);
         const podUrl = await getDownloadURL(snapshot.ref);
 
-
         const podMetadataRef = doc(collection(db, collectionName, orderId, "proofsOfDelivery"));
         const podDocId = podMetadataRef.id;
 
-        
-        const uploadedBy = 'Admin/Staff Console (Auth Removed)';
+        const uploadedBy = 'Admin/Staff Console'; // HARDCODED since auth is removed
 
         await setDoc(podMetadataRef, {
             imageURL: podUrl,
@@ -930,7 +980,7 @@ function showProofOfDeliveryUploadPopup(orderId, collectionName) {
                 await updateOrderStatus(orderId, collectionName, "Completed");
                 closePopup();
             } else {
-                
+            
                 showProofOfDeliveryUploadPopup(orderId, collectionName);
             }
 
@@ -943,7 +993,7 @@ function showProofOfDeliveryUploadPopup(orderId, collectionName) {
 }
 
 /**
-
+ *
  * @param {string} orderId 
  * @param {string} collectionName 
  * @param {string} podDocId 
@@ -987,14 +1037,15 @@ async function showProofOfDeliveryPopup(orderId, collectionName, podDocId) {
             <div style="text-align: center; font-size: 15px; margin-bottom: 20px;">
                 Image proof uploaded:
                 <div style="margin-top: 10px; font-weight: bold;">
-                    <span style="margin-right: 5px;">👤</span> By: ${uploadedBy}
+                <i class="fas fa-user"></i> By: <strong>${uploadedBy}</strong>
+                    
                 </div>
                 <div style="margin-top: 5px;">
-                    <span style="margin-right: 5px;">⌚</span> At: ${uploadedAt}
+                <i class="fas fa-clock"></i> At: ${uploadedAt}
                 </div>
             </div>
 
-            <div style="max-height: 250px; overflow-y: auto; padding: 10px; ">
+            <div style="max-height: 250px; padding: 10px;">
                 <img src="${podUrl}" alt="Proof of Delivery" style="width: 100%; height: auto; display: block;">
             </div>
         `;
@@ -1167,6 +1218,14 @@ function attachActionHandlers() {
             showReceiptPopup(e.target.dataset.id, e.target.dataset.collection);
         });
     });
+    
+    // --- START: New Action Handler for View Information Button ---
+    document.querySelectorAll(".view-info-btn").forEach(btn => {
+        btn.addEventListener("click", e => {
+            showCustomerInfoPopup(e.target.dataset.id, e.target.dataset.collection);
+        });
+    });
+    // --- END: New Action Handler for View Information Button ---
 
     document.querySelectorAll(".pod-upload-btn").forEach(btn => {
         btn.addEventListener("click", e => {
@@ -1175,7 +1234,7 @@ function attachActionHandlers() {
     });
 
     document.querySelectorAll(".pod-view-btn").forEach(btn => {
-        btn.addEventListener("click", e => {
+        btn.addEventListener("click", async e => {
             const podDocId = e.target.dataset.docId;
             const orderId = e.target.dataset.id;
             const collectionName = e.target.dataset.collection;
@@ -1196,7 +1255,7 @@ function attachActionHandlers() {
             if (!orderSnap.exists()) return;
 
             const orderData = orderSnap.data();
-            if (!orderData.refundRequest) {
+            if (!orderData.refundRequest && orderData.finalRefundStatus !== "Pending") {
                 customAlert("There is no active refund request for this order.");
                 return;
             }
@@ -1250,4 +1309,11 @@ function attachActionHandlers() {
     });
 }
 
+function checkAdminAuth() {
+    // Auth check removed as per user request to simply initialize.
+    // In a real application, you would implement proper user role validation here.
+    console.warn("Authentication check skipped. Assuming admin access.");
+}
+
+checkAdminAuth();
 renderOrders();
