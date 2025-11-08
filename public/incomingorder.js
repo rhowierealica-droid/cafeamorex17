@@ -442,7 +442,6 @@ function renderOrders() {
             let actionBtnHtml = "";
             const printButton = `<button class="print-receipt-btn" data-id="${orderId}" data-collection="${orderItem.collection}">View Receipt</button>`;
             
-            // ⭐️ CONDITIONAL VIEW INFO BUTTON
             const infoButton = orderItem.type === "Delivery" 
                 ? `<button class="view-info-btn" data-id="${orderId}" data-collection="${orderItem.collection}">View Information</button>` 
                 : '';
@@ -668,10 +667,8 @@ async function showCustomerInfoPopup(orderId, collectionName) {
         const orderData = orderSnap.data();
         const queueNumber = formatQueueNumber(orderData.queueNumber || orderData.queueNumberNumeric);
         
-        // Prioritize customerDetails map, but fall back to top-level fields
         const customerDetails = orderData.customerDetails || {};
         
-        // Use top-level fields as fallback if customerDetails are missing
         const name = customerDetails.name || orderData.customerName || (customerDetails.firstName && customerDetails.lastName ? `${customerDetails.firstName} ${customerDetails.lastName}` : 'N/A');
         const phone = customerDetails.phone || customerDetails.phoneNumber || orderData.phoneNumber || 'N/A';
         const address = customerDetails.address || customerDetails.deliveryAddress || orderData.address || 'N/A';
@@ -699,7 +696,6 @@ async function showCustomerInfoPopup(orderId, collectionName) {
         customAlert("Failed to load customer information.");
     }
 }
-// --- END: New Function to Show Customer Information ---
 
 
 function showRefundAmountPopup(orderId, collectionName, maxRefundable, paymongoPaymentId) {
@@ -1325,3 +1321,4 @@ function checkAdminAuth() {
 
 checkAdminAuth();
 renderOrders();
+
