@@ -118,7 +118,6 @@ body {
     padding: 12px 15px;
     text-align: left;
     border-bottom: 1px solid #e0d8d0;
-    /* IMPORTANT: Allow content to wrap in the Action column */
     white-space: normal; 
 }
 
@@ -153,13 +152,11 @@ body {
     font-size: 0.85em;
     white-space: normal; 
     line-height: 1.2;
-    /* Reset flex/grow/shrink defaults for buttons within the new structure */
     flex-shrink: 0;
 }
 
-/* Specific styles for buttons in the action column to ensure they flow nicely */
 .orders-section td:last-child {
-    display: block; /* Important: Allows the internal divs to flow vertically */
+    display: block; 
 }
 
 
@@ -325,19 +322,18 @@ body {
         margin-bottom: 5px; 
     }
     
-    /* Ensure the grouped buttons display nicely on smaller screens */
     .action-group {
         margin-bottom: 5px;
         gap: 5px;
     }
     
     .action-row {
-        flex-direction: column; /* Stack the two subgroups vertically */
+        flex-direction: column; 
         gap: 5px;
     }
     
     .action-subgroup {
-        width: 100%; /* Take full width when stacked */
+        width: 100%;
     }
 }
 
@@ -353,7 +349,6 @@ body {
     .tabs { flex-wrap: wrap; }
     .tab-btn { margin: 5px 3px; padding: 6px 10px; font-size: 0.8em; }
 
-    /* The core fix: let the action column content flow as a block */
     .orders-section td:last-child {
         display: block;
         padding: 8px 10px;
@@ -366,9 +361,9 @@ body {
         margin-bottom: 0;
     }
     
-    /* Ensure the nested button containers take full width for better stacking */
     .action-group, .action-row, .action-subgroup {
         width: 100%;
         box-sizing: border-box;
     }
 }
+
