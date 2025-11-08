@@ -758,7 +758,7 @@ window.generateLowStockPDF = async () => {
             doc.setFont("helvetica", "normal");
             doc.setTextColor(0, 0, 0);
             affectedTopSellers.forEach(seller => {
-                const formattedSales = formatCurrency(seller.total);
+                const formattedSales = (seller.total);
                 const text = `Top ${seller.rank}. ${seller.name} (${seller.qty} sold) - ${formattedSales} Sales`;
                 doc.text(text, 14, finalY);
                 finalY += 4.5;
@@ -783,3 +783,4 @@ window.generateLowStockPDF = async () => {
         });
     }
 };
+
