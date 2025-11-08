@@ -91,28 +91,24 @@ function injectPopupStyles() {
     #closeAlertBtn, #closeReceiptBtn, #closeProofBtn { background-color: #6c757d; }
     #closeAlertBtn:hover, #closeReceiptBtn:hover, #closeProofBtn:hover { background-color: #5a6268; }
     
-    /* MODIFICATION START: Use Flexbox for side-by-side buttons */
     .order-actions {
         display: flex; 
         gap: 10px; 
         flex-wrap: wrap;
-        justify-content: center; /* Center the action buttons */
+        justify-content: center; 
         padding-top: 10px;
     }
-    /* Set equal width and margin for buttons in action area */
     .order-actions .print-receipt-btn, 
     .order-actions .view-proof-btn, 
     .order-actions .call-btn, 
     .order-actions .complete-btn { 
-        width: calc(50% - 5px); /* Set to ~half width minus gap */
-        margin-top: 0; /* Remove top margin that caused stacking */
+        width: calc(50% - 5px); 
+        margin-top: 0; 
         min-width: 130px; 
     }
-    /* Ensure upload/complete button takes full width when alone */
     .order-actions .complete-btn { 
         width: 100%;
     }
-    /* MODIFICATION END */
     
     #proofImageContainer img {
         max-width: 100%;
@@ -710,3 +706,4 @@ async function initializeDeliveryPage() {
 }
 
 initializeDeliveryPage();
+
