@@ -114,9 +114,8 @@ function getStockStatus(item) {
     if (["Ingredients", "Adds-on", "Others"].includes(item.category)) {
         if (["g", "ml"].includes(item.unit))
             return qty === 0 ? "Out of Stock" : qty < 50 ? "Low Stock" : "In Stock";
-        if (["slice", "piece", "squeeze"].includes(item.unit))
+        if (["slice", "Piece", "squeeze", "scoop"].includes(item.unit)) 
             return qty === 0 ? "Out of Stock" : qty < 10 ? "Low Stock" : "In Stock";
-        if (item.unit === "scoop") return qty === 0 ? "Out of Stock" : qty < 5 ? "Low Stock" : "In Stock";
     }
     if (item.category === "Sizes") return qty === 0 ? "Out of Stock" : qty < 30 ? "Low Stock" : "In Stock";
     return qty === 0 ? "Out of Stock" : qty <= 5 ? "Low Stock" : "In Stock";
@@ -504,6 +503,61 @@ window.generateLowStockPDF = async () => {
         doc.text(`Report Generated: ${today}`, 14, finalY);
         finalY += 10;
 
+        if (lowStockItems.length > 0) {
+            doc.setFont("helvetica", "bold");
+            doc.setFontSize(14);
+            doc.setTextColor(192, 57, 43);
+            doc.text("Action Required: Low Stock & Out of Stock Items", 14, finalY);
+            finalY += 6;
+
+            // Description
+            doc.setFontSize(9);
+            doc.setTextColor(0, 0, 0);
+            doc.setFont("helvetica", "normal");
+            doc.text("The following items require immediate attention for restocking.", 14, finalY);
+            finalY += 4;
+
+            // Low stock table data
+            const lowStockTableData = lowStockItems.map(item => [
+                item.name,
+                item.category,
+                `${item.quantity} ${item.unit}`,
+                item.status,
+                item.usedIn.length > 0 ? item.usedIn.join(', ') : 'N/A'
+            ]);
+
+            // Low stock table
+            doc.autoTable({
+                head: [['Item Name', 'Category', 'Current Stock', 'Status', 'Used In Products']],
+                body: lowStockTableData,
+                startY: finalY,
+                theme: 'striped',
+                styles: { fontSize: 8, cellPadding: 1.5, lineColor: [230, 230, 230], lineWidth: 0.1 },
+                headStyles: { fillColor: [192, 57, 43], textColor: 255, fontSize: 9, fontStyle: 'bold' },
+                alternateRowStyles: { fillColor: [250, 245, 235] },
+                columnStyles: {
+                    0: { cellWidth: 40, halign: 'left' },
+                    1: { cellWidth: 20, halign: 'center' },
+                    2: { cellWidth: 25, halign: 'right' },
+                    3: { cellWidth: 20, halign: 'center', fontStyle: 'bold' },
+                    4: { cellWidth: 75, halign: 'left' }
+                },
+                didParseCell: (data) => {
+                    if (data.section === 'body' && data.column.index === 3) {
+                        const status = data.cell.raw;
+                        if (status === "Out of Stock") {
+                            data.cell.styles.fillColor = [240, 150, 150];
+                            data.cell.styles.textColor = [150, 0, 0];
+                        } else if (status === "Low Stock") {
+                            data.cell.styles.fillColor = [255, 230, 150];
+                            data.cell.styles.textColor = [150, 80, 0];
+                        }
+                    }
+                }
+            });
+            finalY = doc.autoTable.previous.finalY + 10;
+        }
+
         doc.setFontSize(14);
         doc.setTextColor(75, 54, 33);
         doc.text("Full Inventory Status", 14, finalY);
@@ -567,62 +621,6 @@ window.generateLowStockPDF = async () => {
 
         finalY = doc.autoTable.previous.finalY + 10;
 
-        // Low Stock & Out of Stock Items
-        if (lowStockItems.length > 0) {
-            doc.setFont("helvetica", "bold");
-            doc.setFontSize(14);
-            doc.setTextColor(192, 57, 43);
-            doc.text("Action Required: Low Stock & Out of Stock Items", 14, finalY);
-            finalY += 6;
-
-            // Description
-            doc.setFontSize(9);
-            doc.setTextColor(0, 0, 0);
-            doc.setFont("helvetica", "normal");
-            doc.text("The following items require immediate attention for restocking.", 14, finalY);
-            finalY += 4;
-
-            // Low stock table data
-            const lowStockTableData = lowStockItems.map(item => [
-                item.name,
-                item.category,
-                `${item.quantity} ${item.unit}`,
-                item.status,
-                item.usedIn.length > 0 ? item.usedIn.join(', ') : 'N/A'
-            ]);
-
-            // Low stock table
-            doc.autoTable({
-                head: [['Item Name', 'Category', 'Current Stock', 'Status', 'Used In Products']],
-                body: lowStockTableData,
-                startY: finalY,
-                theme: 'striped',
-                styles: { fontSize: 8, cellPadding: 1.5, lineColor: [230, 230, 230], lineWidth: 0.1 },
-                headStyles: { fillColor: [192, 57, 43], textColor: 255, fontSize: 9, fontStyle: 'bold' },
-                alternateRowStyles: { fillColor: [250, 245, 235] },
-                columnStyles: {
-                    0: { cellWidth: 40, halign: 'left' },
-                    1: { cellWidth: 20, halign: 'center' },
-                    2: { cellWidth: 25, halign: 'right' },
-                    3: { cellWidth: 20, halign: 'center', fontStyle: 'bold' },
-                    4: { cellWidth: 75, halign: 'left' }
-                },
-                didParseCell: (data) => {
-                    if (data.section === 'body' && data.column.index === 3) {
-                        const status = data.cell.raw;
-                        if (status === "Out of Stock") {
-                            data.cell.styles.fillColor = [240, 150, 150];
-                            data.cell.styles.textColor = [150, 0, 0];
-                        } else if (status === "Low Stock") {
-                            data.cell.styles.fillColor = [255, 230, 150];
-                            data.cell.styles.textColor = [150, 80, 0];
-                        }
-                    }
-                }
-            });
-            finalY = doc.autoTable.previous.finalY + 10;
-        }
-
         const allImpactMap = new Map();
 
         lowStockItems.forEach(item => {
@@ -670,7 +668,10 @@ window.generateLowStockPDF = async () => {
 
             sortedImpactKeys.forEach(mapKey => {
                 const productNames = Array.from(allImpactMap.get(mapKey)).sort();
-                const [ingredientName, status] = mapKey.match(/^(.*) \((.*)\)$/).slice(1);
+                const match = mapKey.match(/^(.*) \((.*)\)$/);
+                if (!match) return; 
+
+                const [ingredientName, status] = match.slice(1);
 
                 const productListString = productNames.length > 2
                     ? productNames.slice(0, -1).join(', ') + `, and ${productNames[productNames.length - 1]}`
@@ -707,8 +708,7 @@ window.generateLowStockPDF = async () => {
             });
 
             const lines = doc.splitTextToSize(essayText, 180);
-            const lineYStart = finalY;
-
+            
             lines.forEach((line, lineIndex) => {
                 let currentX = 14;
                 let lineParts = [line];
@@ -724,19 +724,62 @@ window.generateLowStockPDF = async () => {
                     });
                 });
 
-                lineParts.forEach(part => {
+                lineParts = lineParts.flatMap(part => {
                     const text = typeof part === 'string' ? part : part.text;
                     const isBold = typeof part === 'object' && part.bold;
+                    
+                    let partsInLine = [];
+                    let remainingText = text;
 
-                    doc.setFont("helvetica", isBold ? "bold" : "normal");
-                    doc.setTextColor(isBold ? 75 : 0, isBold ? 54 : 0, isBold ? 33 : 0);
-                    const textWidth = doc.getStringUnitWidth(text) * doc.internal.getFontSize() / doc.internal.scaleFactor;
-                    doc.text(text, currentX, finalY + 4);
-                    currentX += textWidth;
+                    while (remainingText.length > 0) {
+                        const remainingWidth = doc.internal.pageSize.width - currentX - 14; 
+                        let fitText = remainingText;
+                        let textWidth = doc.getStringUnitWidth(fitText) * doc.internal.getFontSize() / doc.internal.scaleFactor;
+
+                        if (textWidth > remainingWidth && remainingWidth > 0) {
+                            let breakPos = remainingText.length;
+                            while (breakPos > 0) {
+                                let testText = remainingText.substring(0, breakPos);
+                                textWidth = doc.getStringUnitWidth(testText) * doc.internal.getFontSize() / doc.internal.scaleFactor;
+                                if (textWidth <= remainingWidth) {
+                                    fitText = testText;
+                                    break;
+                                }
+                                breakPos--;
+                            }
+                            remainingText = remainingText.substring(breakPos);
+                            partsInLine.push({ text: fitText, bold: isBold });
+                            currentX = 14; 
+                            finalY += 5; 
+                            
+                            if (finalY > 280) { 
+                                doc.addPage();
+                                finalY = 20;
+                            }
+                        } else {
+                            partsInLine.push({ text: remainingText, bold: isBold });
+                            remainingText = "";
+                        }
+                    }
+                    return partsInLine;
                 });
+                
+                let currentLineX = 14;
+                lineParts.forEach(part => {
+                    doc.setFont("helvetica", part.bold ? "bold" : "normal");
+                    doc.setTextColor(part.bold ? 75 : 0, part.bold ? 54 : 0, part.bold ? 33 : 0);
+                    const textWidth = doc.getStringUnitWidth(part.text) * doc.internal.getFontSize() / doc.internal.scaleFactor;
+                    doc.text(part.text, currentLineX, finalY + 4);
+                    currentLineX += textWidth;
+                });
+                
                 finalY += 5; 
+                if (finalY > 280) { 
+                    doc.addPage();
+                    finalY = 20;
+                }
             });
-
+            
             finalY += 5; 
         }
 
@@ -783,4 +826,3 @@ window.generateLowStockPDF = async () => {
         });
     }
 };
-
