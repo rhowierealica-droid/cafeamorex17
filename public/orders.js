@@ -138,7 +138,25 @@ function setupOrderListener() {
 }
 
 /**
- 
+ * @param {Object} product 
+ * @returns {boolean} 
+ */
+function checkSeasonalAvailability(product) {
+    if (!product.is_seasonal || !product.season_start_date || !product.season_end_date) {
+        return true; 
+    }
+
+    const now = new Date();
+    const startDate = new Date(product.season_start_date);
+    const endDate = new Date(product.season_end_date);
+    
+    startDate.setHours(0, 0, 0, 0); 
+    endDate.setHours(23, 59, 59, 999); 
+
+    return now >= startDate && now <= endDate;
+}
+
+/**
  * @param {object} component 
  * @param {function} getInv 
  * @returns {number}
@@ -155,10 +173,13 @@ function calculateComponentLimit(component, getInv) {
     const internalMaterials = [...(inv.ingredients || []), ...(inv.others || [])]; 
     for (const mat of internalMaterials) {
         const matInv = getInv(mat.id);
-        if (!matInv || matInv.available === false || (matInv.quantity / (mat.qty || 1)) <= 0) return 0;
+        if (!matInv || matInv.available === false) return 0;
 
         const matRequiredQty = Math.max(Number(mat.qty || 1), 1);
-        componentLimit = Math.min(componentLimit, Math.floor(Number(matInv.quantity || 0) / matRequiredQty));
+        const matLimit = Math.floor(Number(matInv.quantity || 0) / matRequiredQty);
+        componentLimit = Math.min(componentLimit, matLimit);
+
+        if (componentLimit === 0) return 0;
     }
 
     return componentLimit;
@@ -197,12 +218,21 @@ function loadProducts(category = activeCategory) {
                 const displayName = product.name || product.flavor;
                 if (!displayName) return;
                 
+                // Check seasonal availability first
+                const isSeasonallyAvailable = checkSeasonalAvailability(product);
+                
+                // If the product is seasonal but currently inactive
+                if (product.is_seasonal && !isSeasonallyAvailable) {
+                    return; 
+                }
+
                 let available = true;
                 let baseMinStock = Number.MAX_SAFE_INTEGER;
                 let productMinStock = 0;
                 
                 if (product.available === false) available = false;
 
+                // Check ingredient/other stock
                 if (available) {
                     const rawMaterials = [...(product.ingredients || []), ...(product.others || [])];
                     for (const mat of rawMaterials) {
@@ -264,12 +294,14 @@ function loadProducts(category = activeCategory) {
                 } else {
                     productMinStock = 0;
                 }
+                
+                if (!available) {
+                }
 
                 const div = document.createElement("div");
                 div.classList.add("product-box");
 
                 const stockToDisplay = productMinStock === Number.MAX_SAFE_INTEGER ? '✅' : Math.max(0, productMinStock);
-                //const stockText = productMinStock === Number.MAX_SAFE_INTEGER ? 'In Stock' : `Stock: ${stockToDisplay}`;
                 const stockText = productMinStock === Number.MAX_SAFE_INTEGER ? 'In Stock' : ``;
                 let stockColor = '#28a745';
                 if (productMinStock > 0 && productMinStock <= 5) {
@@ -295,7 +327,7 @@ function loadProducts(category = activeCategory) {
                         showMessage(`${displayName} is currently out of stock.`, "error");
                         return;
                     }
-                    openProductPopup(product, displayName, getInv, baseMinStock); 
+                    openProductPopup(product, displayName, getInv); 
                 });
 
                 productList.appendChild(div);
@@ -305,7 +337,6 @@ function loadProducts(category = activeCategory) {
 }
 
 /**
- 
  * @param {string} sizeName 
  * @param {function} getInv 
  */
@@ -381,7 +412,6 @@ function openProductPopup(product, displayName, getInv) {
     (product.sizes || []).forEach((s, i) => {
       const stock = s.stock === Number.MAX_SAFE_INTEGER ? '✅' : Math.max(0, s.stock || 0);
       const stockColor = (s.stock === Number.MAX_SAFE_INTEGER || s.stock > 5) ? 'green' : (s.stock > 0 ? 'orange' : 'red');
-      //const stockText = s.available ? `(Available: <span style="font-weight: bold; color: ${stockColor};">${stock}</span>)` : '(Out of Stock)';
       const stockText = s.available ? `` : '(Out of Stock)';
 
       const wrapper = document.createElement("div");
@@ -549,7 +579,6 @@ function renderOrder() {
 }
 
 /**
- 
  * @param {Array<object>} order 
  * @param {'deduct'|'return'} type 
  */
