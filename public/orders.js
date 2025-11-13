@@ -375,7 +375,8 @@ function renderAddonsForSelectedSize(sizeName, getInv) {
             const stockToDisplay = Math.max(0, addonStock);
             const stockColor = (addonStock > 5) ? 'green' : (addonStock > 0 ? 'orange' : 'red');
             const stockText = addonAvailable ? 
-                `(Stock: <span style="font-weight: bold; color: ${stockColor};">${stockToDisplay}</span>)` : 
+                //`(Stock: <span style="font-weight: bold; color: ${stockColor};">${stockToDisplay}</span>)` : 
+                `` : 
                 '(Out of Stock)';
 
             const wrapper = document.createElement("div");
