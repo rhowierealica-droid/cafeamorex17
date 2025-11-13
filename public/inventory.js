@@ -493,7 +493,7 @@ window.generateLowStockPDF = async () => {
         doc.setFont("helvetica", "bold");
         doc.setFontSize(18);
         doc.setTextColor(75, 54, 33);
-        doc.text("Café Amore Low Stock Report", doc.internal.pageSize.width / 2, finalY, { align: 'center' });
+        doc.text("Café Amore Inventory Report", doc.internal.pageSize.width / 2, finalY, { align: 'center' });
         finalY += 8;
 
         // Date
@@ -810,7 +810,7 @@ window.generateLowStockPDF = async () => {
         }
 
         // Save the PDF
-        doc.save(`Low_Stock_Report_${new Date().toLocaleDateString().replace(/\//g, '-')}.pdf`);
+        doc.save(`Inventory_Stock_Report_${new Date().toLocaleDateString().replace(/\//g, '-')}.pdf`);
 
         showMessage({
             title: "Report Generated",
