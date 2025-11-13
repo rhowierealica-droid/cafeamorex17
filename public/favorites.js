@@ -45,6 +45,7 @@ const drinksSection = document.querySelector('section.main-section .category-lis
 const drinksContainer = document.querySelector('.category-list[data-main="Drink"]');
 const sandwichSection = document.querySelector('section.main-section .category-list[data-main="Sandwich"]')?.parentElement;
 const sandwichContainer = document.querySelector('.category-list[data-main="Sandwich"]');
+
 const loginPopup = document.getElementById('loginPopup');
 const loginRedirect = document.getElementById('loginRedirect');
 const termsPopup = document.getElementById('termsPopup');
@@ -158,6 +159,31 @@ onAuthStateChanged(auth, async (user) => {
 });
 loginRedirect?.addEventListener('click', () => window.location.href = 'login.html');
 
+/**
+ * @function checkSeasonalAvailability
+ * @description 
+ * @param {Object} product 
+ * @returns {boolean} 
+ */
+function checkSeasonalAvailability(product) {
+    if (!product.is_seasonal || !product.season_start_date || !product.season_end_date) {
+        return true; // Not marked as seasonal, so it's always available 
+    }
+
+    const now = new Date();
+    // Normalize time for fair comparison
+    const startDate = new Date(product.season_start_date);
+    const endDate = new Date(product.season_end_date);
+    
+    // Set time of day for boundary checks
+    startDate.setHours(0, 0, 0, 0); 
+    endDate.setHours(23, 59, 59, 999); 
+
+    // Check if the current time is within the seasonal window
+    return now >= startDate && now <= endDate;
+}
+
+
 function calculateProductStock(product, inventoryMap) {
   let stockPerSize = [];
   if (product.sizes?.length) {
@@ -250,11 +276,20 @@ function renderProducts(products, favoriteProductIds = []) {
   drinksContainer.innerHTML = "";
   sandwichContainer.innerHTML = "";
 
-  const productsToRender = products.filter(p => favoriteProductIds.includes(p.id));
+  let productsToRender = products.filter(p => favoriteProductIds.includes(p.id));
+
+    // Filter out seasonal products that are currently NOT available
+    productsToRender = productsToRender.filter(product => {
+        // If it's seasonal but not available, HIDE it completely 
+        if (product.is_seasonal && !checkSeasonalAvailability(product)) {
+            return false;
+        }
+        return true;
+    });
 
   if (!productsToRender.length && currentUser) {
-    if (drinksContainer) drinksContainer.innerHTML = `<p style="padding:12px;">You have no favorite products yet.</p>`;
-    if (sandwichContainer) sandwichContainer.innerHTML = `<p style="padding:12px;">You have no favorite products yet.</p>`;
+    if (drinksContainer) drinksContainer.innerHTML = `<p style="padding:12px;">You have no favorite products yet, or your favorites are currently out of season.</p>`;
+    if (sandwichContainer) sandwichContainer.innerHTML = `<p style="padding:12px;">You have no favorite products yet, or your favorites are currently out of season.</p>`;
     if (drinksSection) drinksSection.style.display = 'none';
     if (sandwichSection) sandwichSection.style.display = 'none';
     return;
@@ -375,7 +410,8 @@ function renderProducts(products, favoriteProductIds = []) {
             const favRef = doc(db, "favorites", `${currentUser.uid}_${product.id}`);
             try {
               await deleteDoc(favRef);
-              //showToast(`${product.name} removed from favorites`, 1500, "error");
+              // Re-render the list immediately to remove the card
+                  renderProducts(products.filter(p => p.id !== product.id), favoriteProductIds.filter(id => id !== product.id));
               
 
             } catch (err) { console.error("Error removing favorite:", err); }
@@ -451,7 +487,7 @@ function openCartPopup(product, stockInfo = []) {
   const sizesContainer = cartPopup.querySelector('.sizes-container');
   sizesContainer.innerHTML = '';
   selectedSize = null; // Reset for new product
-  selectedAddons = []; // Reset for new product
+  selectedAddons = []; 
 
   if (Array.isArray(stockInfo) && stockInfo.length) {
     const heading = document.createElement('p'); heading.textContent = 'Sizes:'; sizesContainer.appendChild(heading);
