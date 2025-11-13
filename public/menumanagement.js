@@ -39,6 +39,11 @@ const D = {
     viewIngredientsBtn: document.getElementById("viewIngredientsBtn"), 
     ingredientsImagePopup: document.getElementById("ingredientsImagePopup"), 
     closeIngredientsPopupBtn: document.getElementById("closeIngredientsPopupBtn"), 
+
+    isSeasonal: document.getElementById("isSeasonal"),
+    seasonalDatesContainer: document.getElementById("seasonalDatesContainer"),
+    seasonStartDate: document.getElementById("seasonStartDate"),
+    seasonEndDate: document.getElementById("seasonEndDate"),
 };
 
 const perSizeContainer = document.getElementById("perSizeContainer");
@@ -112,6 +117,12 @@ D.productSubCategory?.addEventListener("change", () => { currentSubCategory = D.
 
 D.viewIngredientsBtn?.addEventListener("click", openIngredientsPopup);
 D.closeIngredientsPopupBtn?.addEventListener("click", closeIngredientsPopup);
+
+D.isSeasonal?.addEventListener('change', () => {
+    if (D.seasonalDatesContainer) {
+        D.seasonalDatesContainer.style.display = D.isSeasonal.checked ? 'block' : 'none';
+    }
+});
 
 
 function initCropper() {
@@ -431,6 +442,13 @@ async function preparePopup(product = null) {
     D.previewImage.style.display = base64Image ? "block" : "none";
     D.productImage.value = null;
 
+    const isSeasonal = product?.is_seasonal || false;
+    if (D.isSeasonal) D.isSeasonal.checked = isSeasonal;
+    if (D.seasonalDatesContainer) D.seasonalDatesContainer.style.display = isSeasonal ? 'block' : 'none';
+    if (D.seasonStartDate) D.seasonStartDate.value = product?.season_start_date || '';
+    if (D.seasonEndDate) D.seasonEndDate.value = product?.season_end_date || '';
+    // ----------------------------
+
     if (product) {
         D.productName.value = product.name;
         D.productDescription.value = product.description;
@@ -488,9 +506,25 @@ D.popupForm?.addEventListener("submit", async e => {
     const categorySub = currentSubCategory || D.productSubCategory?.value || "Others";
     const description = D.productDescription.value.trim();
 
+    //  Get seasonal data from form
+    const isSeasonal = D.isSeasonal?.checked || false;
+    const seasonStartDate = D.seasonStartDate?.value || null;
+    const seasonEndDate = D.seasonEndDate?.value || null;
+
     if (!name) return showPopupMessage("Product name is required.");
     if (!description) return showPopupMessage("Product description is required.");
 
+    //  seasonal dates
+    if (isSeasonal) {
+        if (!seasonStartDate || !seasonEndDate) {
+            return showPopupMessage("Seasonal product requires both start and end dates.");
+        }
+        if (new Date(seasonStartDate) >= new Date(seasonEndDate)) {
+            return showPopupMessage("Start date must be strictly before end date.");
+        }
+    }
+    // ----------------------------
+    
     const sizeCheckboxes = Array.from(document.querySelectorAll(".size-checkbox")).filter(cb => cb.checked);
     if (sizeCheckboxes.length === 0) return showPopupMessage("At least 1 size is required. Check a size and fill in its quantity/price.");
 
@@ -535,6 +569,7 @@ D.popupForm?.addEventListener("submit", async e => {
                 });
             }
 
+            // Global Add-ons
             Object.entries(globalAddonsData).forEach(([addonId, addonData]) => {
                 if (selectedAddons.includes(addonId) && addonData.qty > 0 && addonData.price > 0) {
                     data.addons.push({ id: addonId, name: inventoryMap[addonId]?.name || "", qty: addonData.qty, price: addonData.price });
@@ -547,7 +582,23 @@ D.popupForm?.addEventListener("submit", async e => {
         return showPopupMessage(err.message);
     }
 
-    const productData = { name, categoryMain, categorySub, description, sizes, image: base64Image, available: true };
+    const productData = { 
+        name, 
+        categoryMain, 
+        categorySub, 
+        description, 
+        sizes, 
+        image: base64Image, 
+        available: true, 
+
+        // SEASONAL FIELDS
+        is_seasonal: isSeasonal,
+        season_start_date: isSeasonal ? seasonStartDate : null,
+        season_end_date: isSeasonal ? seasonEndDate : null,
+        // -------------------------
+
+        updatedAt: serverTimestamp() 
+    };
 
     try {
         if (editingProductId) {
@@ -596,6 +647,25 @@ function listenProductChanges() {
     });
 }
 
+/**
+ * @param {Object} product 
+ * @returns {boolean} 
+ */
+function checkSeasonalAvailability(product) {
+    if (!product.is_seasonal || !product.season_start_date || !product.season_end_date) {
+        return true; 
+    }
+
+    const now = new Date();
+    const startDate = new Date(product.season_start_date);
+    const endDate = new Date(product.season_end_date);
+    
+    startDate.setHours(0, 0, 0, 0); 
+    endDate.setHours(23, 59, 59, 999); 
+
+    return now >= startDate && now <= endDate;
+}
+
 function renderProducts(snapshot) {
     const products = snapshot.docs.map(d => ({ id: d.id, ...d.data() }));
     document.querySelectorAll(".product-list").forEach(pl => pl.innerHTML = "");
@@ -625,21 +695,42 @@ function renderProducts(snapshot) {
         } else {
             filtered.forEach(product => {
                 const isOutOfStock = false; 
+                
+                const isSeasonallyAvailable = checkSeasonalAvailability(product);
+                const isProductAvailable = product.available && isSeasonallyAvailable;
+
+                const disableToggleDueToSeason = product.is_seasonal && !isSeasonallyAvailable;
+                const toggleTitle = disableToggleDueToSeason 
+                    ? "Cannot manually enable/disable. Product season has ended." 
+                    : (product.available ? "Disable manually" : "Enable manually");
+
                 const div = document.createElement("div");
                 div.classList.add("product-item");
-                div.classList.toggle("disabled-product", !product.available || isOutOfStock);
+                div.classList.toggle("disabled-product", !isProductAvailable || isOutOfStock);
 
                 const catData = { main: product.categoryMain || normalizeCategory(product.category).main, sub: product.categorySub || normalizeCategory(product.category).sub };
 
+                let badge = '';
+                if (product.is_seasonal && !isSeasonallyAvailable) {
+                    badge = `<span class="product-badge seasonal-inactive">Seasonal (Inactive)</span>`;
+                } else if (product.is_seasonal && isSeasonallyAvailable) {
+                    badge = `<span class="product-badge seasonal-active">Seasonal (Active)</span>`;
+                } else if (!product.available) {
+                    badge = `<span class="product-badge manually-disabled">Disabled</span>`;
+                }
+
                 div.innerHTML = `
                     <img src="${product.image || 'https://placehold.co/100x150/EEEEEE/333333?text=No+Image'}" alt="${product.name}" />
+                    ${badge}
                     <h4>${product.name}</h4>
                     <p>${product.description || ''}</p>
                     <div class="product-subcategory">${catData.sub}</div>
                     <div class="product-actions">
                         <button type="button" class="editBtn" data-id="${product.id}">Edit</button>
                         <button type="button" class="deleteBtn" data-id="${product.id}">Delete</button>
-                        <button type="button" class="toggleBtn" data-id="${product.id}" ${isOutOfStock ? "disabled" : ""}>
+                        <button type="button" class="toggleBtn" data-id="${product.id}" 
+                                ${isOutOfStock || disableToggleDueToSeason ? "disabled" : ""} 
+                                title="${toggleTitle}">
                             ${product.available ? "Disable" : "Enable"}
                         </button>
                     </div>
@@ -647,14 +738,22 @@ function renderProducts(snapshot) {
 
                 div.querySelector(".editBtn")?.addEventListener("click", () => editProduct(product));
                 div.querySelector(".deleteBtn")?.addEventListener("click", () => openDeletePopup(product.id));
-                div.querySelector(".toggleBtn")?.addEventListener("click", async () => {
-                    try {
-                        await updateDoc(doc(db, "products", product.id), { available: !product.available });
-                    } catch (err) {
-                        console.error("Toggle availability error:", err);
-                        showPopupMessage("Failed to toggle availability: " + (err.message || err));
-                    }
-                });
+                
+                const toggleButton = div.querySelector(".toggleBtn");
+                if (toggleButton) {
+                    toggleButton.addEventListener("click", async () => {
+                        if (disableToggleDueToSeason) {
+                            showPopupMessage(toggleTitle); 
+                            return;
+                        }
+                        try {
+                            await updateDoc(doc(db, "products", product.id), { available: !product.available });
+                        } catch (err) {
+                            console.error("Toggle availability error:", err);
+                            showPopupMessage("Failed to toggle availability: " + (err.message || err));
+                        }
+                    });
+                }
 
                 container.appendChild(div);
             });
