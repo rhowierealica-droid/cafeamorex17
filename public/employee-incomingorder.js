@@ -3,11 +3,9 @@ import {
     collection, doc, onSnapshot, updateDoc, getDocs, getDoc, setDoc,
     deleteField, increment, arrayUnion, query, where
 } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
-// import { getAuth, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js"; // REMOVED AUTH IMPORT
 import { getStorage, ref, uploadBytes, getDownloadURL } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-storage.js";
 const storage = getStorage();
 
-// const auth = getAuth(); // REMOVED AUTH INITIALIZATION
 const ordersBody = document.getElementById("ordersBody");
 const tabButtons = document.querySelectorAll(".tab-btn");
 const filterContainer = document.getElementById("filterContainer");
@@ -29,6 +27,7 @@ let popup = null;
 let popupTitle = null;
 let popupButtonsContainer = null;
 let popupReceiptContent = null;
+
 
 const dateRangePicker = flatpickr(customRangeInput, {
     mode: "range",
@@ -63,15 +62,15 @@ function injectPopupStyles() {
     .refund-error { background-color: #6c757d; }
     .view-refund-btn { background-color: #795548; color: white; }
     .view-refund-btn:hover { background-color: #5d4037; }
-    .admin-accept-btn { background-color: #4CAF50; color: white; }
+    .admin-accept-btn { background-color: #4CAF50; }
     .admin-accept-btn:hover { background-color: #45a049; }
-    .admin-decline-btn { background-color: #f44336; color: white;}
+    .admin-decline-btn { background-color: #f44336; }
     .admin-decline-btn:hover { background-color: #d32f2f; }
     .print-receipt-btn { background-color: #007bff; color: white; margin-top: 5px;}
     .print-receipt-btn:hover { background-color: #0056b3; }
-    .pod-upload-btn { background-color: #45a049; color:white;}
-    .pod-upload-btn:hover { background-color: #4CAF50; }
-    .pod-view-btn { background-color: #5bc0de; color: white;}
+    .pod-upload-btn { background-color: #ff9800; }
+    .pod-upload-btn:hover { background-color: #e68a00; }
+    .pod-view-btn { background-color: #5bc0de; }
     .pod-view-btn:hover { background-color: #46b8da; }
     .view-info-btn { background-color: #3f51b5; color: white; margin-top: 5px;}
     .view-info-btn:hover { background-color: #303f9f; }
@@ -131,7 +130,7 @@ function formatQueueNumber(num) {
 }
 
 /**
- * @param {object|number} timestamp -
+ * @param {object|number} timestamp - 
  * @returns {string} 
  */
 function formatPODTimestamp(timestamp) {
@@ -155,7 +154,7 @@ function formatPODTimestamp(timestamp) {
         hour: 'numeric',
         minute: '2-digit',
         second: '2-digit',
-        hour12: true, 
+        hour12: true,
     });
 }
 
@@ -252,8 +251,10 @@ function isDateInFilter(timestamp) {
 }
 
 
-onSnapshot(collection(db, "InStoreOrders"), s => handleOrderSnapshot(s, "In-Store", "InStoreOrders"));
-onSnapshot(collection(db, "DeliveryOrders"), s => handleOrderSnapshot(s, "Delivery", "DeliveryOrders"));
+function initializeFirestoreListeners() {
+    onSnapshot(collection(db, "InStoreOrders"), s => handleOrderSnapshot(s, "In-Store", "InStoreOrders"));
+    onSnapshot(collection(db, "DeliveryOrders"), s => handleOrderSnapshot(s, "Delivery", "DeliveryOrders"));
+}
 
 function handleOrderSnapshot(snapshot, type, collectionName) {
     snapshot.docChanges().forEach(change => {
@@ -304,6 +305,7 @@ function handleOrderSnapshot(snapshot, type, collectionName) {
     });
     renderOrders();
 }
+
 
 function renderOrders() {
     ordersBody.innerHTML = "";
@@ -416,8 +418,8 @@ function renderOrders() {
                         mainStatusDisplay = "Refunded";
                         break;
                     case "Pending":
-                        badgeClass = 'refund-pending';
-                        mainStatusDisplay = "Refunded (Processing)";
+
+                        mainStatusDisplay = "Refunded";
                         break;
                     case "Failed": case "API Failed": case "Denied": case "Canceled":
                         badgeClass = 'refund-failed';
@@ -427,11 +429,14 @@ function renderOrders() {
                         break;
                 }
 
-                refundBadgeHtml = ` <span class="refund-badge ${badgeClass}">${badgeText}</span>`;
+
+                if (badgeText !== "Pending" && badgeText !== "Succeeded" && badgeText !== "Manual" && badgeText !== "Refunded") {
+                   refundBadgeHtml = ` <span class="refund-badge ${badgeClass}">${badgeText}</span>`;
+                }
             }
 
             if (finalRefundStatus && ["Succeeded", "Manual", "Refunded", "Pending"].includes(finalRefundStatus)) {
-                mainStatusDisplay = finalRefundStatus === "Pending" ? "Refunded (Processing)" : "Refunded";
+                mainStatusDisplay = "Refunded";
             } else if (mainStatus === "Refunded" || mainStatus === "Refund Denied") {
                     mainStatusDisplay = mainStatus;
             }
@@ -441,14 +446,17 @@ function renderOrders() {
 
             let actionBtnHtml = "";
             const printButton = `<button class="print-receipt-btn" data-id="${orderId}" data-collection="${orderItem.collection}">View Receipt</button>`;
-            const infoButton = `<button class="view-info-btn" data-id="${orderId}" data-collection="${orderItem.collection}">View Information</button>`;
-            const refundButton = `<button class="view-refund-btn" data-id="${orderId}" data-collection="${orderItem.collection}">View Refund Request</button>`;
-            const podUploadButton = `<button class="pod-upload-btn" data-id="${orderId}" data-collection="${orderItem.collection}">Upload POD</button>`;
-            const podViewButton = `<button class="pod-view-btn" data-id="${orderId}" data-collection="${orderItem.collection}" data-doc-id="${order.proofOfDeliveryDocId}">View POD</button>`;
+            
+            const infoButton = orderItem.type === "Delivery"
+                ? `<button class="view-info-btn" data-id="${orderId}" data-collection="${orderItem.collection}">View Information</button>`
+                : '';
 
+
+            const proofOfDeliveryURL = order.proofOfDeliveryURL;
+            const proofOfDeliveryDocId = order.proofOfDeliveryDocId;
 
             if (order.refundRequest) {
-                actionBtnHtml = refundButton;
+                actionBtnHtml = `<button class="view-refund-btn" data-id="${orderId}" data-collection="${orderItem.collection}">View Refund Request</button>`;
             } else {
                 switch (order.status) {
                     case "Wait for Admin to Accept":
@@ -471,31 +479,40 @@ function renderOrders() {
                             : `<button class="complete-btn" data-id="${orderId}" data-collection="${orderItem.collection}">Completed</button>`;
                         break;
                     case "Delivery":
-                        actionBtnHtml = order.proofOfDeliveryURL && order.proofOfDeliveryDocId 
-                                ? `<button class="complete-btn" data-id="${orderId}" data-collection="${orderItem.collection}" style="background-color: #4CAF50;">Order Completed</button>`
-                                : podUploadButton;
+                        if (proofOfDeliveryURL && proofOfDeliveryDocId) {
+                               actionBtnHtml = `<button class="complete-btn" data-id="${orderId}" data-collection="${orderItem.collection}" style="background-color: #4CAF50;">Order Completed</button>`;
+                        } else {
+                            actionBtnHtml = `<button class="pod-upload-btn" data-id="${orderId}" data-collection="${orderItem.collection}">Upload POD</button>`;
+                        }
+                        break;
+                    case "Refund Pending":
+                        actionBtnHtml = `<button class="view-refund-btn" disabled>Refund Processing...</button>`;
+                        break;
+                    case "Completed":
+                    case "Completed by Customer":
+                    case "Canceled":
+                    case "Refund Denied":
+                    case "Refund Failed":
+                    case "Refunded":
+                        actionBtnHtml = printButton;
                         break;
                 }
             }
-            
-            
-            if (orderItem.type === "Delivery") {
-                 actionBtnHtml += infoButton;
+
+            if (infoButton) {
+                    actionBtnHtml += infoButton;
+            } else if (actionBtnHtml === "" && orderItem.type === "DeliveryOrder") {
+                    actionBtnHtml += infoButton;
             }
 
-            if (["Completed", "Completed by Customer", "Canceled", "Refund Denied", "Refund Failed", "Refunded"].includes(order.status) || order.finalRefundStatus) {
-                 if (!actionBtnHtml.includes("View Receipt")) {
-                    actionBtnHtml += printButton;
-                }
+            if (["Completed", "Completed by Customer", "Canceled", "Refund Denied", "Refund Failed", "Refunded"].includes(order.status) && !actionBtnHtml.includes("View Receipt")) {
+                            actionBtnHtml += printButton;
             }
 
-            if (orderItem.type === "Delivery" && ["Completed", "Completed by Customer"].includes(order.status) && order.proofOfDeliveryURL && order.proofOfDeliveryDocId) {
-                actionBtnHtml += podViewButton;
+            if (orderItem.type === "Delivery" && ["Completed", "Completed by Customer"].includes(order.status) && proofOfDeliveryURL && proofOfDeliveryDocId) {
+                actionBtnHtml += `<button class="pod-view-btn" data-id="${orderId}" data-collection="${orderItem.collection}" data-doc-id="${proofOfDeliveryDocId}">View POD</button>`;
             }
-            
-            if (order.finalRefundStatus === "Pending") {
-                 actionBtnHtml += refundButton; 
-            }
+
 
             tr.innerHTML = `
                 <td>${queue}</td>
@@ -684,7 +701,32 @@ async function showCustomerInfoPopup(orderId, collectionName) {
         customAlert("Failed to load customer information.");
     }
 }
-// --- END: Function to Show Customer Information ---
+
+function showDenyReasonPopup(orderId, collectionName) {
+    if (!popup) createPopup();
+    popupTitle.textContent = "Reason for Denying Refund";
+    popupReceiptContent.innerHTML = "";
+
+    popupButtonsContainer.innerHTML = `
+        <label style="width: 100%; text-align: left; margin-bottom: 5px;">Reason (Required):</label>
+        <textarea id="denyReasonInput" rows="4" style="width: 90%; padding: 8px; margin-bottom: 10px; border: 1px solid #ccc; border-radius: 4px;"></textarea>
+        <button id="confirmDenyBtn" style="margin-top:10px; background-color: #f44336;">Confirm Denial</button>
+        <button id="cancelDenyBtn" style="margin-top:5px;">Cancel</button>
+    `;
+    popup.style.display = "flex";
+
+    document.getElementById("confirmDenyBtn").onclick = () => {
+        const reason = document.getElementById("denyReasonInput").value.trim();
+        if (reason.length < 5) {
+            customAlert("Please provide a meaningful reason (at least 5 characters) for denying the refund.");
+            return;
+        }
+        closePopup();
+        handleRefundAction(orderId, collectionName, "Denied", 0, false, null, reason);
+    };
+
+    document.getElementById("cancelDenyBtn").onclick = closePopup;
+}
 
 
 function showRefundAmountPopup(orderId, collectionName, maxRefundable, paymongoPaymentId) {
@@ -722,8 +764,7 @@ function showRefundAmountPopup(orderId, collectionName, maxRefundable, paymongoP
     };
 }
 
-
-async function handleRefundAction(orderId, collectionName, action, refundAmount = 0, isEPayment = false, paymongoPaymentId = null) {
+async function handleRefundAction(orderId, collectionName, action, refundAmount = 0, isEPayment = false, paymongoPaymentId = null, refundDenialReason = null) {
     const orderRef = doc(db, collectionName, orderId);
     let originalStatus;
 
@@ -743,8 +784,8 @@ async function handleRefundAction(orderId, collectionName, action, refundAmount 
             }
 
             if (isEPayment) {
-                //const endpoint = "http://localhost:3000/refund-payment";
-                const endpoint = "/.netlify/functions/refund-payment";
+                //const endpoint = "http://localhost:3000/refund-payment"; 
+                const endpoint = "/.netlify/functions/refund-payment"; 
 
                 if (paymongoPaymentId && !paymongoPaymentId.startsWith('pay_')) {
                     console.error(`PayMongo Refund Error: Expected a 'pay_' ID but received '${paymongoPaymentId}'.`);
@@ -757,11 +798,13 @@ async function handleRefundAction(orderId, collectionName, action, refundAmount 
                     return;
                 }
 
+                // Optimistic UI update before PayMongo API call
                 await updateDoc(orderRef, {
                     status: "Refunded",
                     refundRequest: deleteField(),
                     finalRefundStatus: "Refunded",
-                    refundAmount: refundAmount
+                    refundAmount: refundAmount,
+                    refundDenialReason: deleteField() // Clear denial reason if accepted
                 });
                 customAlert("PayMongo refund initiated. Status is set to 'Refunded'. Please confirm success on PayMongo dashboard.");
 
@@ -797,7 +840,8 @@ async function handleRefundAction(orderId, collectionName, action, refundAmount 
                     status: "Refunded",
                     refundRequest: deleteField(),
                     finalRefundStatus: "Manual",
-                    refundAmount: refundAmount
+                    refundAmount: refundAmount,
+                    refundDenialReason: deleteField() // Clear denial reason if accepted
                 });
                 customAlert(`Manual Refund of ₱${refundAmount.toFixed(2)} completed. Status updated to 'Refunded (Manual)'.`);
             }
@@ -806,7 +850,8 @@ async function handleRefundAction(orderId, collectionName, action, refundAmount 
             await updateDoc(orderRef, {
                 status: "Refund Denied",
                 refundRequest: deleteField(),
-                finalRefundStatus: "Denied"
+                finalRefundStatus: "Denied",
+                refundDenialReason: refundDenialReason || "No reason provided." // Add denial reason here
             });
             customAlert("Refund request denied. Status updated to 'Refund Denied'.");
         }
@@ -909,7 +954,7 @@ async function uploadProofOfDelivery(orderId, collectionName, file) {
         const podMetadataRef = doc(collection(db, collectionName, orderId, "proofsOfDelivery"));
         const podDocId = podMetadataRef.id;
 
-        const uploadedBy = 'Admin/Staff Console'; 
+        const uploadedBy = 'Admin/Staff Console';
 
         await setDoc(podMetadataRef, {
             imageURL: podUrl,
@@ -920,8 +965,8 @@ async function uploadProofOfDelivery(orderId, collectionName, file) {
 
 
         await updateDoc(doc(db, collectionName, orderId), {
-            proofOfDeliveryURL: podUrl, 
-            proofOfDeliveryDocId: podDocId, 
+            proofOfDeliveryURL: podUrl,
+            proofOfDeliveryDocId: podDocId,
         });
 
 
@@ -973,7 +1018,7 @@ function showProofOfDeliveryUploadPopup(orderId, collectionName) {
                 await updateOrderStatus(orderId, collectionName, "Completed");
                 closePopup();
             } else {
-            
+        
                 showProofOfDeliveryUploadPopup(orderId, collectionName);
             }
 
@@ -986,8 +1031,7 @@ function showProofOfDeliveryUploadPopup(orderId, collectionName) {
 }
 
 /**
- *
- * @param {string} orderId 
+ * * @param {string} orderId 
  * @param {string} collectionName 
  * @param {string} podDocId 
  */
@@ -1087,7 +1131,7 @@ async function updateOrderStatus(orderId, collectionName, newStatus, eta = "") {
             if (!orderData.proofOfDeliveryURL || !orderData.proofOfDeliveryDocId) {
                 customAlert("Action Blocked: A Proof of Delivery (POD) must be uploaded before completing a Delivery Order.");
                 showProofOfDeliveryUploadPopup(orderId, collectionName);
-                return; 
+                return;
             }
             updatePayload.finalRefundStatus = deleteField();
             updatePayload.refundRequest = deleteField();
@@ -1100,8 +1144,8 @@ async function updateOrderStatus(orderId, collectionName, newStatus, eta = "") {
             }
 
 
-            //const endpoint = "http://localhost:3000/generate-paymongo-link";
-            const endpoint = "/.netlify/functions/generate-paymongo-link";
+            //const endpoint = "http://localhost:3000/generate-paymongo-link"; 
+            const endpoint = "/.netlify/functions/generate-paymongo-link"; // Production
             customAlert("Generating secure payment link... Please wait. Do not navigate away.");
 
             const response = await fetch(endpoint, {
@@ -1144,10 +1188,12 @@ async function updateOrderStatus(orderId, collectionName, newStatus, eta = "") {
 
             updatePayload.finalRefundStatus = "Canceled";
             updatePayload.refundRequest = deleteField();
+            updatePayload.refundDenialReason = deleteField();
         }
 
         if (newStatus === "Preparing" || newStatus === "Delivery") {
-             updatePayload.refundRequest = deleteField();
+              updatePayload.refundRequest = deleteField();
+              updatePayload.refundDenialReason = deleteField();
         }
 
         await updateDoc(orderRef, updatePayload);
@@ -1158,7 +1204,7 @@ async function updateOrderStatus(orderId, collectionName, newStatus, eta = "") {
         customAlert(`A critical error occurred while updating the order status: ${e.message}`);
 
         if (originalStatus && originalStatus !== "Processing") {
-             await updateDoc(orderRef, { status: originalStatus }).catch(err => console.error("Failed to revert status:", err));
+              await updateDoc(orderRef, { status: originalStatus }).catch(err => console.error("Failed to revert status:", err));
         }
     }
 }
@@ -1225,7 +1271,7 @@ function attachActionHandlers() {
     });
 
     document.querySelectorAll(".pod-view-btn").forEach(btn => {
-        btn.addEventListener("click", async e => {
+        btn.addEventListener("click", e => {
             const podDocId = e.target.dataset.docId;
             const orderId = e.target.dataset.id;
             const collectionName = e.target.dataset.collection;
@@ -1246,7 +1292,7 @@ function attachActionHandlers() {
             if (!orderSnap.exists()) return;
 
             const orderData = orderSnap.data();
-            if (!orderData.refundRequest && orderData.finalRefundStatus !== "Pending") {
+            if (!orderData.refundRequest) {
                 customAlert("There is no active refund request for this order.");
                 return;
             }
@@ -1266,7 +1312,7 @@ function attachActionHandlers() {
             }).join("");
 
             if (refundItems.length === 0) {
-                 productsHtml = '<div>No specific items selected for refund (Full Order Refund assumed if amount is max).</div>';
+                    productsHtml = '<div>No specific items selected for refund (Full Order Refund assumed if amount is max).</div>';
             }
 
             if (!popup) createPopup();
@@ -1293,16 +1339,16 @@ function attachActionHandlers() {
             };
             document.getElementById("denyRefundBtn").onclick = () => {
                 closePopup();
-                handleRefundAction(orderId, collectionName, "Denied");
+                showDenyReasonPopup(orderId, collectionName); 
             };
             document.getElementById("closeDetailsBtn").onclick = closePopup;
         });
     });
 }
 
-function checkAdminAuth() {
-    console.warn("Authentication check skipped. Assuming admin access.");
+function initializeApp() {
+    initializeFirestoreListeners();
+    renderOrders();
 }
 
-checkAdminAuth();
-renderOrders();
+initializeApp();
