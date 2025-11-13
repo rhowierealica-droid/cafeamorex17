@@ -375,7 +375,7 @@ function listenOrders() {
             else if (tab === "to rate") statusMatch = status === "completed by customer" && !order.feedback;
             else if (tab === "to receive") statusMatch = status === "completed" && !order.refundRequest; 
             else if (tab === "completed") statusMatch = status === "completed by customer" && order.feedback; 
-            else if (tab === "refund") statusMatch = order.refundRequest || ["succeeded", "manual", "failed", "denied", "refund pending"].includes(finalRefundStatus) || status === "refunded" || status === "refundend";
+            else if (tab === "refund") statusMatch = order.refundRequest || ["succeeded", "manual", "failed", "denied", "refund pending"].includes(finalRefundStatus) || status === "refunded" || status === "refundend" || status === "refund denied"; // ADDED "refund denied"
             else statusMatch = status === tab;
             
             if (!statusMatch) return false;
@@ -420,6 +420,22 @@ function listenOrders() {
 
             orderHeader.appendChild(orderTitle);
             orderContainer.appendChild(orderHeader);
+            
+            // Refund Denial Reason ---
+            if (order.status === "Refund Denied" && order.refundDenialReason) {
+                const denialDiv = document.createElement("div");
+                denialDiv.style.padding = "10px";
+                denialDiv.style.backgroundColor = "#ffdddd";
+                denialDiv.style.color = "#cc0000";
+                denialDiv.style.borderRadius = "8px";
+                denialDiv.style.marginBottom = "10px";
+                denialDiv.innerHTML = `
+                    <p style="font-weight:bold; margin-bottom: 5px;">Refund Declined Reason:</p>
+                    <p>${order.refundDenialReason}</p>
+                `;
+                orderContainer.appendChild(denialDiv);
+            }
+            // ------------------------------------------
 
             const itemsContainer = document.createElement("div");
             itemsContainer.className = "order-items-container";
@@ -521,7 +537,7 @@ function listenOrders() {
             }
 
             if (currentTab === "To Receive") {
-                // Refund request  for "To Receive"
+                // Refund request  for "To Receive"
                 if (paymentMethod.includes("e-payment") || paymentMethod === "g" || paymentMethod === "gcash") {
                     const refundBtn = document.createElement("button");
                     refundBtn.textContent = order.refundRequest ? `Refund: ${order.refundStatus || "Requested"}` : "Request Refund";
@@ -760,7 +776,7 @@ async function showProofImagePopup(orderId) {
         popupReceiptContent.innerHTML = `
             <div class="proof-details" style="text-align: left; margin-bottom: 15px; border-bottom: 1px solid #ccc; padding-bottom: 10px;">
                 <p><strong>Image proof uploaded:</strong></p>
-            <i class="fas fa-user"></i> By: <strong>${uploadedBy}</strong>
+             By: <strong>${uploadedBy}</strong>
                 <p style="margin-left: 15px;">At: <strong>${uploadedAt}</strong></p>
             </div>
             <div style="text-align: center;">
