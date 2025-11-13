@@ -38,12 +38,15 @@ function showToast(message = "Item added!", duration = 2000, type = "success") {
   }, duration);
 }
 
-const drinksSection = document.querySelector('.category-section[data-category="Drinks"]');
 const drinksContainer = document.querySelector('.category-list[data-main="Drinks"]');
-const foodSection = document.querySelector('.category-section[data-category="Food"]');
 const foodContainer = document.querySelector('.category-list[data-main="Food"]');
-const othersSection = document.querySelector('.category-section[data-category="Others"]');
 const othersContainer = document.querySelector('.category-list[data-main="Others"]');
+
+const menuContentWrapper = document.querySelector('.menu-content-wrapper');
+
+// Limited Time Offer tab/section
+const tabContainer = document.querySelector('.tab-container');
+
 
 const loginPopup = document.getElementById('loginPopup');
 const loginRedirect = document.getElementById('loginRedirect');
@@ -54,9 +57,6 @@ const welcomeHeader = document.querySelector('.main-content header h1');
 const cartPopup = document.getElementById('cartPopup') || document.createElement('div');
 cartPopup.id = 'cartPopup';
 cartPopup.className = 'popup';
-
-
-
 
 if (loginRedirect) {
   loginRedirect.addEventListener('click', () => {
@@ -162,6 +162,29 @@ onAuthStateChanged(auth, async (user) => {
   }
 });
 
+/**
+ * @function checkSeasonalAvailability
+ * @description 
+ * @returns {boolean} 
+ */
+function checkSeasonalAvailability(product) {
+    if (!product.is_seasonal || !product.season_start_date || !product.season_end_date) {
+        return false; 
+    }
+
+    const now = new Date();
+    const startDate = new Date(product.season_start_date);
+    const endDate = new Date(product.season_end_date);
+    
+    // Set time of day for boundary checks
+    startDate.setHours(0, 0, 0, 0); 
+    endDate.setHours(23, 59, 59, 999); 
+
+    // Check if the current time is within the seasonal window
+    return now >= startDate && now <= endDate;
+}
+
+
 function calculateProductStock(product, inventoryMap) {
   let stockPerSize = [];
   if (product.sizes?.length) {
@@ -210,7 +233,7 @@ function calculateProductStock(product, inventoryMap) {
   return stockPerSize;
 }
 
-function setupTabs(firstCategoryWithProducts) {
+function setupTabs(initialCategory) {
   const tabButtons = document.querySelectorAll('.tab-button');
   const tabSections = document.querySelectorAll('.category-section');
 
@@ -235,8 +258,7 @@ function setupTabs(firstCategoryWithProducts) {
     });
   });
 
-  const initialCategory = firstCategoryWithProducts || 'Drinks';
-  showTab(initialCategory);
+  showTab(initialCategory || 'Drinks');
 }
 
 // Stars ng bohai ko
@@ -247,6 +269,114 @@ function getStarHtml(rating) {
     starsHtml += i <= rating ? '★' : '☆';
   }
   return `<span class="rating-stars">${starsHtml}</span>`;
+}
+
+function createProductCard(product, stockInfo, inventoryMap, currentUser) {
+    const card = document.createElement('div');
+    card.classList.add('product-card');
+
+    let displayPrice = product.price || 0;
+    if (stockInfo.length) displayPrice = Math.min(...stockInfo.map(s => s.price || Infinity));
+    const isUnavailable = !product.available || stockInfo.every(s => s.stock <= 0);
+
+    if (isUnavailable) card.classList.add('unavailable');
+
+    if (!product.available) {
+        card.classList.add('disabled-product');
+    }
+
+    const imgHTML = product.image ? `<img src="${product.image}" alt="${product.name}" style="width:100%; border-radius:10px; margin-bottom:10px; margin-top:20px;">` : '';
+
+    card.innerHTML = `
+        ${imgHTML}
+        <h3>${product.name || 'Unnamed Product'}</h3>
+        ${product.description ? `<p class="product-desc-card">${product.description}</p>` : ''}
+        <p>₱${displayPrice.toFixed(2)}</p>
+        ${!isUnavailable ? `<button class="add-cart-btn">Add to Cart</button>` : ''}
+    `;
+
+    const starsContainer = document.createElement('div');
+    starsContainer.className = 'stars-outer';
+    const starsInner = document.createElement('div');
+    starsInner.className = 'stars-inner';
+    starsContainer.appendChild(starsInner);
+    const ratingNumber = document.createElement('span');
+    ratingNumber.className = 'rating-number';
+    card.appendChild(starsContainer);
+    card.appendChild(ratingNumber);
+
+    (async () => {
+        const orderSnapshot = await getDocs(collection(db, "DeliveryOrders"));
+        let totalRating = 0, count = 0;
+        const productFeedbacks = []; 
+
+        orderSnapshot.forEach(docSnap => {
+            const order = docSnap.data();
+            order.feedback?.forEach(f => {
+                if (f.productId === product.id || f.productName === product.name) {
+                    totalRating += f.rating || 0;
+                    count++;
+                    productFeedbacks.push(f);
+                }
+            });
+        });
+        let avgRating = count ? totalRating / count : 0;
+        starsInner.style.width = `${(avgRating / 5) * 100}%`;
+        ratingNumber.textContent = count ? `(${avgRating.toFixed(1)})` : '';
+        card.dataset.feedbacks = JSON.stringify(productFeedbacks);
+
+    })();
+
+    const addBtn = card.querySelector('.add-cart-btn');
+    if (!isUnavailable && addBtn) {
+        addBtn.addEventListener('click', () => {
+            openCartPopup(product, stockInfo);
+        });
+    }
+
+    const favIcon = document.createElement('i');
+    favIcon.className = 'fa-regular fa-heart favorite-icon';
+    card.appendChild(favIcon);
+
+    if (currentUser) {
+        const favRef = doc(db, "favorites", `${currentUser.uid}_${product.id}`);
+        getDoc(favRef).then(favDoc => {
+            if (favDoc.exists()) {
+                favIcon.classList.replace('fa-regular', 'fa-solid');
+                favIcon.classList.add('favorited');
+            }
+        });
+    }
+
+    favIcon.addEventListener('click', async () => {
+        if (!currentUser) { openPopup(loginPopup); return; }
+        const favRef = doc(db, "favorites", `${currentUser.uid}_${product.id}`);
+        const favSnap = await getDoc(favRef);
+        try {
+            if (favSnap.exists()) {
+                await deleteDoc(favRef);
+                favIcon.classList.replace('fa-solid', 'fa-regular');
+                favIcon.classList.remove('favorited');
+            } else {
+                await setDoc(favRef, { userId: currentUser.uid, productId: product.id, addedAt: new Date() });
+                favIcon.classList.replace('fa-regular', 'fa-solid');
+                favIcon.classList.add('favorited');
+            }
+        } catch (err) { console.error(err); }
+    });
+
+    const reviewBtn = document.createElement('button');
+    reviewBtn.textContent = "Reviews";
+    reviewBtn.className = "reviews-btn";
+    card.appendChild(reviewBtn);
+
+    reviewBtn.addEventListener('click', async () => {
+        const storedFeedbacks = card.dataset.feedbacks;
+        const feedbacks = storedFeedbacks ? JSON.parse(storedFeedbacks) : [];
+        showReviewsPopup(product.name, feedbacks);
+    });
+    
+    return card;
 }
 
 
@@ -260,13 +390,88 @@ function loadProductsRealtime() {
     });
 
     onSnapshot(collection(db, "products"), productSnapshot => {
-      const products = productSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-      if(drinksContainer) drinksContainer.innerHTML = "";
+        const allProducts = productSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+
+        const limitedTimeProducts = [];
+        const nonSeasonalProducts = [];
+
+        for (const product of allProducts) {
+            const isSeasonalActive = product.is_seasonal && checkSeasonalAvailability(product);
+            
+            if (isSeasonalActive) {
+                limitedTimeProducts.push(product);
+            }
+            
+            if (!product.is_seasonal || isSeasonalActive) {
+                nonSeasonalProducts.push(product);
+            }
+        }
+      
+      if(drinksContainer) drinksContainer.innerHTML = "";
       if(foodContainer) foodContainer.innerHTML = "";
       if(othersContainer) othersContainer.innerHTML = "";
 
+        let limitedOfferSection = document.querySelector('.category-section[data-category="Limited Time Offer"]');
+        let limitedOfferTab = document.querySelector('.tab-button[data-category="Limited Time Offer"]');
+        
+        if (limitedOfferSection) limitedOfferSection.remove();
+        if (limitedOfferTab) limitedOfferTab.remove();
+        
+        let limitedOfferContainer = null;
+        let ltoHasProducts = limitedTimeProducts.length > 0;
+        let firstCategoryWithProducts = null;
+
+        if (ltoHasProducts && menuContentWrapper && tabContainer) {
+            limitedOfferSection = document.createElement('section');
+            limitedOfferSection.className = 'category-section';
+            limitedOfferSection.setAttribute('data-category', 'Limited Time Offer');
+            
+            limitedOfferContainer = document.createElement('div');
+            limitedOfferContainer.className = 'category-list';
+            limitedOfferContainer.setAttribute('data-main', 'Limited Time Offer');
+            limitedOfferSection.appendChild(limitedOfferContainer);
+
+            menuContentWrapper.prepend(limitedOfferSection);
+
+            const limitedTabButton = document.createElement('button');
+            limitedTabButton.className = 'tab-button';
+            limitedTabButton.setAttribute('data-category', 'Limited Time Offer');
+            limitedTabButton.textContent = 'Limited Time Offer';
+            tabContainer.prepend(limitedTabButton); 
+
+            const subCatSection = document.createElement('div');
+            subCatSection.className = 'subcategory-section';
+            
+            const horizontalContainer = document.createElement('div');
+            horizontalContainer.className = 'subcategory-products';
+            horizontalContainer.style.display = 'flex';
+            horizontalContainer.style.flexWrap = 'wrap';
+            horizontalContainer.style.gap = '15px';
+            
+            const divider = document.createElement('hr');
+            divider.style.borderTop = '1px dashed #ccc';
+            divider.style.margin = '20px 0';
+
+            const title = document.createElement('h3');
+            title.textContent = 'Currently Available';
+            title.style.margin = '10px 0 15px 0';
+            title.style.color = '#704225';
+
+            limitedOfferContainer.appendChild(divider);
+            limitedOfferContainer.appendChild(title);
+            limitedOfferContainer.appendChild(horizontalContainer);
+            
+            for (const product of limitedTimeProducts) {
+                const stockInfo = calculateProductStock(product, inventoryMap);
+                const card = createProductCard(product, stockInfo, inventoryMap, currentUser);
+                horizontalContainer.appendChild(card);
+            }
+            firstCategoryWithProducts = "Limited Time Offer";
+        }
+
+
       const grouped = {};
-      for (const product of products) {
+      for (const product of nonSeasonalProducts) {
         const mainCategory = product.categoryMain || "Others";
         const subCategory = product.categorySub || "General";
         
@@ -278,14 +483,13 @@ function loadProductsRealtime() {
       }
 
       const mainCats = [
-        { name: "Drinks", container: drinksContainer, section: drinksSection },
-        { name: "Food", container: foodContainer, section: foodSection },
-        { name: "Others", container: othersContainer, section: othersSection },
+            { name: "Drinks", container: drinksContainer },
+            { name: "Food", container: foodContainer },
+            { name: "Others", container: othersContainer },
       ];
 
-      let firstCategoryWithProducts = null;
-
-      mainCats.forEach(({ name, container, section }) => {
+      // Render Main Categories (Drinks, Food, Others)
+      mainCats.forEach(({ name, container }) => {
         if (!container) return; 
         container.innerHTML = "";
         let mainCatHasProducts = false;
@@ -323,120 +527,19 @@ function loadProductsRealtime() {
 
             for (const product of productsArray) {
               const stockInfo = calculateProductStock(product, inventoryMap);
-              const card = document.createElement('div');
-              card.classList.add('product-card');
-
-              let displayPrice = product.price || 0;
-              if (stockInfo.length) displayPrice = Math.min(...stockInfo.map(s => s.price || Infinity));
-              const isUnavailable = !product.available || stockInfo.every(s => s.stock <= 0);
-              if (isUnavailable) card.classList.add('unavailable');
-
-              if (!product.available) {
-                card.classList.add('disabled-product');
-              }
-
-              const imgHTML = product.image ? `<img src="${product.image}" alt="${product.name}" style="width:100%; border-radius:10px; margin-bottom:10px; margin-top:20px;">` : '';
-
-              card.innerHTML = `
-                ${imgHTML}
-                <h3>${product.name || 'Unnamed Product'}</h3>
-                ${product.description ? `<p class="product-desc-card">${product.description}</p>` : ''}
-                <p>₱${displayPrice.toFixed(2)}</p>
-                ${!isUnavailable ? `<button class="add-cart-btn">Add to Cart</button>` : ''}
-              `;
-
-              const starsContainer = document.createElement('div');
-              starsContainer.className = 'stars-outer';
-              const starsInner = document.createElement('div');
-              starsInner.className = 'stars-inner';
-              starsContainer.appendChild(starsInner);
-              const ratingNumber = document.createElement('span');
-              ratingNumber.className = 'rating-number';
-              card.appendChild(starsContainer);
-              card.appendChild(ratingNumber);
-
-              (async () => {
-                const orderSnapshot = await getDocs(collection(db, "DeliveryOrders"));
-                let totalRating = 0, count = 0;
-                const productFeedbacks = []; 
-
-                orderSnapshot.forEach(docSnap => {
-                  const order = docSnap.data();
-                  order.feedback?.forEach(f => {
-                    if (f.productId === product.id || f.productName === product.name) {
-                      totalRating += f.rating || 0;
-                      count++;
-                        productFeedbacks.push(f);
-                    }
-                  });
-                });
-                let avgRating = count ? totalRating / count : 0;
-                starsInner.style.width = `${(avgRating / 5) * 100}%`;
-                ratingNumber.textContent = count ? `(${avgRating.toFixed(1)})` : '';
-                card.dataset.feedbacks = JSON.stringify(productFeedbacks);
-
-              })();
-
+              const card = createProductCard(product, stockInfo, inventoryMap, currentUser);
               horizontalContainer.appendChild(card);
-
-              const addBtn = card.querySelector('.add-cart-btn');
-              if (!isUnavailable && addBtn) {
-                addBtn.addEventListener('click', () => {
-                  openCartPopup(product, stockInfo);
-                });
-              }
-
-              const favIcon = document.createElement('i');
-              favIcon.className = 'fa-regular fa-heart favorite-icon';
-              card.appendChild(favIcon);
-
-              if (currentUser) {
-                const favRef = doc(db, "favorites", `${currentUser.uid}_${product.id}`);
-                getDoc(favRef).then(favDoc => {
-                  if (favDoc.exists()) {
-                    favIcon.classList.replace('fa-regular', 'fa-solid');
-                    favIcon.classList.add('favorited');
-                  }
-                });
-              }
-
-              favIcon.addEventListener('click', async () => {
-                if (!currentUser) { openPopup(loginPopup); return; }
-                const favRef = doc(db, "favorites", `${currentUser.uid}_${product.id}`);
-                const favSnap = await getDoc(favRef);
-                try {
-                  if (favSnap.exists()) {
-                    await deleteDoc(favRef);
-                    favIcon.classList.replace('fa-solid', 'fa-regular');
-                    favIcon.classList.remove('favorited');
-                  } else {
-                    await setDoc(favRef, { userId: currentUser.uid, productId: product.id, addedAt: new Date() });
-                    favIcon.classList.replace('fa-regular', 'fa-solid');
-                    favIcon.classList.add('favorited');
-                  }
-                } catch (err) { console.error(err); }
-              });
-
-              const reviewBtn = document.createElement('button');
-              reviewBtn.textContent = "Reviews";
-              reviewBtn.className = "reviews-btn";
-              card.appendChild(reviewBtn);
-
-              reviewBtn.addEventListener('click', async () => {
-                const storedFeedbacks = card.dataset.feedbacks;
-                const feedbacks = storedFeedbacks ? JSON.parse(storedFeedbacks) : [];
-                showReviewsPopup(product.name, feedbacks);
-              });
             }
           }
         }
 
-        if (mainCatHasProducts && !firstCategoryWithProducts) {
+        if (mainCatHasProducts && !firstCategoryWithProducts && !ltoHasProducts) {
           firstCategoryWithProducts = name;
         }
       });
 
-      setupTabs(firstCategoryWithProducts); 
+        const initialActiveTab = ltoHasProducts ? "Limited Time Offer" : firstCategoryWithProducts;
+      setupTabs(initialActiveTab); 
     });
   });
 }
@@ -621,7 +724,7 @@ function showReviewsPopup(productName, feedbacks) {
       
       if (emailMasked !== "Anonymous" && emailMasked.includes('@')) { 
         const [name, domain] = emailMasked.split('@'); 
-        // Mask the name '
+        // Mask the name '
         emailMasked = `${name.slice(0,3)}****@${domain}`; 
       }
 
@@ -682,7 +785,6 @@ style.textContent = `
 .stars-outer::before, .stars-inner::before { content: "★★★★★"; }
 .rating-number { margin-left: 5px; font-weight: 500; color: #333; font-size: 14px; }
 
-/* NEW CSS for Tabs */
 .tab-container {
   display: flex;
   overflow-x: auto; /* Allows scrolling on small screens */
@@ -716,9 +818,25 @@ style.textContent = `
   border-radius: 5px 5px 0 0;
 }
 
+.tab-button[data-category="Limited Time Offer"] {
+    color: #ef4444; /* Red color for attention */
+    font-weight: 700;
+}
+.tab-button.active[data-category="Limited Time Offer"] {
+    border-bottom: 3px solid #ef4444;
+}
+
 .category-section {
   /* Initially hidden, controlled by JavaScript */
   display: none; 
+}
+
+.subcategory-products {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 15px;
+}
+.product-card {
 }
 `;
 document.head.appendChild(style);
