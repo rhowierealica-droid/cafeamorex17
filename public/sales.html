@@ -13,8 +13,7 @@
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf.plugin.autotable.min.js"></script>
 
-      <link rel="stylesheet" href="AdminNotification.css">
-
+  <link rel="stylesheet" href="AdminNotification.css">
   <link rel="stylesheet" href="sales.css" />
   <link rel="stylesheet" href="admin-nav.css" />
 </head>
@@ -51,15 +50,16 @@
     <div class="logout"><i class="fas fa-sign-out-alt"></i> Log Out</div>
   </aside>
 
-<div class="top-bar">
-        <div class="hamburger" id="hamburger">
-            <i class="fas fa-bars"></i>
-        </div>
-        <div class="mobile-logo">
-            <img src="logo.png" alt="Café Amore Logo">
-            <span class="brand">Café Amore</span>
-        </div>
+  <div class="top-bar">
+    <div class="hamburger" id="hamburger">
+      <i class="fas fa-bars"></i>
     </div>
+    <div class="mobile-logo">
+      <img src="logo.png" alt="Café Amore Logo">
+      <span class="brand">Café Amore</span>
+    </div>
+  </div>
+
   <div class="main-content">
     <h1>Sales Dashboard</h1>
 
@@ -70,7 +70,7 @@
         <option value="week">This Week</option>
         <option value="month">This Month</option>
         <option value="year">This Year</option>
-        <option value="all">All</option>
+        <option value="all" selected>All</option>
         <option value="custom">Custom Range</option>
       </select>
 
@@ -128,13 +128,14 @@
           <h3>Cash Payments</h3>
           <p id="cashTotal">₱0.00</p>
         </div>
+
         <div class="card payment-card">
           <h3>E-Payments</h3>
           <p id="ePayTotal">₱0.00</p>
         </div>
 
         <div class="payment-best-sellers">
-          <h2>Top 5 Best Sellers</h2>
+          <h2>Top 5 Best Sellers (Regular Product)</h2>
           <table>
             <thead>
               <tr>
@@ -146,6 +147,39 @@
             <tbody id="bestSellersTable"></tbody>
           </table>
         </div>
+
+        <div class="payment-best-sellers" id="seasonalProductsContainer" style="display: none;">
+          <div class="seasonal-filter-group" style="display: flex; gap: 10px; align-items: center; margin-bottom: 10px;">
+    <label for="seasonalMonthFilter" style="font-weight: 600;">Filter Month:</label>
+    <select id="seasonalMonthFilter">
+        <option value="ALL" selected>ALL</option>
+        <option value="1">January</option>
+        <option value="2">February</option>
+        <option value="3">March</option>
+        <option value="4">April</option>
+        <option value="5">May</option>
+        <option value="6">June</option>
+        <option value="7">July</option>
+        <option value="8">August</option>
+        <option value="9">September</option>
+        <option value="10">October</option>
+        <option value="11">November</option>
+        <option value="12">December</option>
+    </select>
+</div>
+
+          <h2>Seasonal Product Top 5</h2>
+          <table>
+            <thead>
+              <tr>
+                <th>Product</th>
+                <th>Qty Sold</th>
+                <th>Total Sales</th>
+              </tr>
+            </thead>
+            <tbody id="seasonalSellersTable"></tbody>
+          </table>
+        </div>
       </div>
     </div>
   </div>
@@ -155,7 +189,6 @@
   <script type="module" src="AccessAdmin.js"></script>
   <script type="module" src="AutoCancel.js"></script>
   <script type="module" src="AdminNotification.js"></script>
-
 
   <script type="module">
     import { initOrderBadge } from './notification.js';
