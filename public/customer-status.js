@@ -88,7 +88,7 @@ function injectPopupStyles() {
       border-top: 1px dashed #ccc;
       padding-top: 15px;
     }
-    #popupButtonsContainer button, .action-btn {
+    #popupButtonsContainer button{
       background-color: #8b5e3c;
       color: #fff;
       border: none;
@@ -99,7 +99,7 @@ function injectPopupStyles() {
       width: 80%;
       font-weight: bold;
     }
-    #popupButtonsContainer button:hover, .action-btn:hover {
+    #popupButtonsContainer button:hover{
       background-color: #6d4428;
     }
     #popupReceiptContent {
@@ -114,21 +114,21 @@ function injectPopupStyles() {
         font-size: 14px;
         line-height: 1.2;
     }
- .print-receipt-btn, .view-proof-btn { 
-    background-color: #007bff; 
+ .print-receipt-btn, .view-proof-btn{ 
     color: white; 
-    margin: 5px 0; 
-    padding: 8px 15px;
+    margin: 10px 0; 
+    padding: 12px 20px;
     border: none;
     border-radius: 6px;
     cursor: pointer;
-    width: 30%;   
+    width: 100%;   
     font-weight: bold;
     display: block; 
 }
-    .view-proof-btn { background-color: red;  }
-    .print-receipt-btn:hover { background-color: #0056b3; }
-    .view-proof-btn:hover { background-color: #138496; }
+    .view-proof-btn { background-color: #f3d9b1;  color: #552915;}
+    .print-receipt-btn { background-color: #a65b35;  }
+    .print-receipt-btn:hover { background-color: #8e4d2cff; }
+    .view-proof-btn:hover { background-color: #e0caa8; }
     #downloadReceiptBtn { background-color: #28a745; color: white; }
     #downloadReceiptBtn:hover { background-color: #1e7e34; }
     #closeAlertBtn, #closeReceiptBtn { background-color: #6c757d; }
@@ -140,7 +140,7 @@ function injectPopupStyles() {
         justify-content: center; align-items: center; z-index: 10000;
     }
     .modal-content {
-        background: white; padding: 25px; border-radius: 8px; max-width: 90%; max-height: 90vh; overflow-y: auto; position: relative;
+        background: white; padding: 25px; border-radius: 8px; max-width: 60%; max-height: 90vh; overflow-y: auto; position: relative;
     }
     .close-btn { position: absolute; top: 10px; right: 20px; font-size: 24px; cursor: pointer; color:#333; }
     .feedback-item { 
@@ -414,7 +414,12 @@ function listenOrders() {
             orderHeader.className = "order-header";
 
             const orderTitle = document.createElement("h3");
-            let titleText = `Order #${formatQueueNumber(order.queueNumber || order.queueNumberNumeric || "N/A")} - Status: ${order.status || "Unknown"}`;
+            let displayStatus = order.status;
+            if (order.refundRequest) {
+                displayStatus = "Please wait for admin to approve your refund.";
+            }
+            let titleText = `Order #${formatQueueNumber(order.queueNumber || order.queueNumberNumeric)} - Status: ${displayStatus || "Unknown"}`;
+            
             if (order.estimatedTime) titleText += ` | ETA: ${order.estimatedTime}`;
             orderTitle.textContent = titleText;
 
@@ -426,7 +431,7 @@ function listenOrders() {
                 const denialDiv = document.createElement("div");
                 denialDiv.style.padding = "10px";
                 denialDiv.style.backgroundColor = "#ffdddd";
-                denialDiv.style.color = "#cc0000";
+                denialDiv.style.color = "#704225";
                 denialDiv.style.borderRadius = "8px";
                 denialDiv.style.marginBottom = "10px";
                 denialDiv.innerHTML = `
@@ -494,7 +499,8 @@ function listenOrders() {
                     const paymentBtn = document.createElement("button");
                     paymentBtn.textContent = "Complete Payment (Gcash)";
                     paymentBtn.className = "action-btn paymongo-btn";
-                    paymentBtn.style.backgroundColor = "#28a745";
+                    paymentBtn.style.backgroundColor = "#f3d9b1";
+                    paymentBtn.style.color = "#552915";
 
                     paymentBtn.addEventListener("click", () => {
                         console.log(`Redirecting to PayMongo Checkout: ${order.checkoutUrl}`);
@@ -521,7 +527,7 @@ function listenOrders() {
                     btn.textContent = order.refundRequest ? `Refund: ${order.refundStatus || "Requested"}` : "Request Refund";
                     btn.disabled = !!order.refundRequest;
                     btn.className = "action-btn cancel-refund-btn";
-                    btn.style.backgroundColor = order.refundRequest ? "#ccc" : "#dc3545"; 
+                    btn.style.backgroundColor = order.refundRequest ? "#ccc" : "#4b3621"; 
                     btn.style.cursor = order.refundRequest ? "not-allowed" : "pointer";
                     if (!order.refundRequest) {
                         btn.addEventListener("click", () => openRefundModal(order.id, order.items));
@@ -543,7 +549,7 @@ function listenOrders() {
                     refundBtn.textContent = order.refundRequest ? `Refund: ${order.refundStatus || "Requested"}` : "Request Refund";
                     refundBtn.disabled = !!order.refundRequest;
                     refundBtn.className = "action-btn cancel-refund-btn";
-                    refundBtn.style.backgroundColor = order.refundRequest ? "#ccc" : "#dc3545";
+                    refundBtn.style.backgroundColor = order.refundRequest ? "#ccc" : "#4b3621";
                     refundBtn.style.cursor = order.refundRequest ? "not-allowed" : "pointer";
                     if (!order.refundRequest) {
                         refundBtn.addEventListener("click", () => openRefundModal(order.id, order.items));
@@ -870,7 +876,7 @@ function showConfirmModal(orderId) {
         <p>This action is irreversible and marks the order as complete. You will then be able to leave feedback.</p>
         <div style="margin-top:20px; display:flex; justify-content:center; gap:15px;">
             <button id="confirm-yes" class="action-btn">Yes, I Received It</button>
-            <button id="confirm-no" class="action-btn" style="background:#ccc;color:#333;">Not Yet</button>
+            <button id="confirm-no" class="action-btn">Not Yet</button>
         </div>
     `;
     confirmModal.appendChild(modalContent);
@@ -912,7 +918,7 @@ function openRefundModal(orderId, orderItems) {
             <form id="refund-form">
                 <div id="refund-items"></div>
                 <p style="font-weight:bold; margin-top:10px;" id="total-refundable"></p>
-                <button type="submit" class="action-btn" style="width:100%; margin-top:15px; background-color:#dc3545;">Submit Refund Request</button>
+                <button type="submit" class="action-btn" style="width:80%; margin-top:15px; background-color: #704225; color: white;">Submit Refund Request</button>
             </form>
         </div>
     `;
@@ -1028,6 +1034,7 @@ function openFeedbackModal(orderId, items) {
     submitBtn.type = "submit";
     submitBtn.className = "action-btn";
     submitBtn.textContent = "Submit Feedback";
+    submitBtn.style.width = "background-color: #704225;"
     submitBtn.style.width = "100%";
 
     modalContent.innerHTML = `<h2>Leave Product Feedback</h2>`; 
