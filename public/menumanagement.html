@@ -67,7 +67,7 @@
 
         <div class="category-table" data-category="Drinks" id="drinksTable">
             <h3>Drinks</h3>
-            <button class="add-btn" id="addDrinkBtn">+ Add Drink</button>
+            <button class="add-btn" id="addDrinkBtn" data-main-category="Drinks">+ Add Drink</button>
 
             <label for="drinksFilter">Filter by Subcategory:</label>
             <select id="drinksFilter">
@@ -84,7 +84,7 @@
 
         <div class="category-table" data-category="Food" id="foodTable" style="display: none;">
             <h3>Food</h3>
-            <button class="add-btn" id="addFoodBtn">+ Add Food</button>
+            <button class="add-btn" id="addFoodBtn" data-main-category="Food">+ Add Food</button>
 
             <label for="foodFilter">Filter by Subcategory:</label>
             <select id="foodFilter">
@@ -100,7 +100,7 @@
 
         <div class="category-table" data-category="Others" id="othersTable" style="display: none;">
             <h3>Others</h3>
-            <button class="add-btn" id="addOthersBtn">+ Add Other Item</button>
+            <button class="add-btn" id="addOthersBtn" data-main-category="Others">+ Add Other Item</button>
 
             <label for="othersFilter">Filter by Subcategory:</label>
             <select id="othersFilter">
@@ -143,7 +143,22 @@
                     <div id="imagePreview" class="image-preview">
                         <img id="previewImage" src="" alt="Preview" style="display:none; max-width:200px; margin-top:10px;">
                     </div>
-
+                    
+                    <div class="popup-section">Seasonal Settings</div>
+                    <div class="form-group checkbox-group">
+                        <input type="checkbox" id="isSeasonal">
+                        <label for="isSeasonal">Mark as Seasonal Product</label>
+                    </div>
+                    <div id="seasonalDatesContainer" style="display: none;">
+                        <div class="form-group">
+                            <label for="seasonStartDate">Season Start Date:</label>
+                            <input type="date" id="seasonStartDate">
+                        </div>
+                        <div class="form-group">
+                            <label for="seasonEndDate">Season End Date:</label>
+                            <input type="date" id="seasonEndDate">
+                        </div>
+                    </div>
                     <div class="popup-section">Ingredients</div>
                     
                     <button type="button" id="viewIngredientsBtn" class="secondary-btn view-ingredients-btn" style="margin-bottom: 15px;">
