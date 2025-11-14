@@ -62,18 +62,18 @@ function injectPopupStyles() {
     .refund-error { background-color: #6c757d; }
     .view-refund-btn { background-color: #795548; color: white; }
     .view-refund-btn:hover { background-color: #5d4037; }
-    .admin-accept-btn { background-color: #4CAF50; }
-    .admin-accept-btn:hover { background-color: #45a049; }
-    .admin-decline-btn { background-color: #f44336; }
+    .admin-accept-btn { background-color: #704225; color: white;}
+    .admin-accept-btn:hover { background-color: #563b28; }
+    .admin-decline-btn { background-color: #c0392b; color: white}
     .admin-decline-btn:hover { background-color: #d32f2f; }
-    .print-receipt-btn { background-color: #007bff; color: white; margin-top: 5px;}
-    .print-receipt-btn:hover { background-color: #0056b3; }
-    .pod-upload-btn { background-color: #ff9800; }
-    .pod-upload-btn:hover { background-color: #e68a00; }
-    .pod-view-btn { background-color: #5bc0de; }
-    .pod-view-btn:hover { background-color: #46b8da; }
-    .view-info-btn { background-color: #3f51b5; color: white; margin-top: 5px;}
-    .view-info-btn:hover { background-color: #303f9f; }
+    .print-receipt-btn { background-color: #704225; color: white; margin-top: 5px;}
+    .print-receipt-btn:hover { background-color: #563b28; }
+    .pod-upload-btn { background-color: #704225; color: white;}
+    .pod-upload-btn:hover { background-color: #563b28; }
+    .pod-view-btn { background-color: #f3d9b1; color: #4b3621; }
+    .pod-view-btn:hover { background-color: #bfa174; }
+    .view-info-btn { background-color: #a65b35; color: white; margin-top: 5px;}
+    .view-info-btn:hover { background-color: #8e4d2cff; }
     `;
     document.head.appendChild(style);
 }
