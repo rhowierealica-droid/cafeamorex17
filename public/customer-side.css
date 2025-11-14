@@ -25,8 +25,8 @@
   margin: 0;
   cursor: pointer;
 }
-.sidebar .logo img { width: 40px; height: 40px; }T
-.sidebar .brand { font-weight: bold; font-size: 1.3em; color: #4b3621; }
+.sidebar .logo img { width: 40px; height: 40px; }
+.brand { font-weight: bold; font-size: 1.3em; color: #4b3621; }
 
 .sidebar nav ul {
   list-style: none;
