@@ -223,21 +223,21 @@ body {
 }
 
 .user-order-card .action-btn {
-  margin-top: 20px;
+  margin-top: 10px;
   padding: 12px 20px;
   width: 100%;
   text-align: center;
   font-weight: bold;
   border: none;
   border-radius: 6px;
-  background: #ff6600;
+  background: #552915;
   color: #fff;
   cursor: pointer;
   transition: background 0.2s ease;
 }
 
 .user-order-card .action-btn:hover {
-  background: #e65c00;
+  background: #704225;
 }
 
 .modal {
@@ -305,25 +305,24 @@ body {
 }
 
 #confirm-yes {
-  background-color: #28a745;
+  background-color: #704225;
   color: #fff;
 }
 
 #confirm-yes:hover {
-  background-color: #218838;
+  background-color: #563b28;
 }
 
 #confirm-no {
-  background-color: #dc3545;
-  color: #fff;
+  background-color: #f3d9b1;
 }
 
 #confirm-no:hover {
-  background-color: #c82333;
+  background-color: #bfa174;
 }
 
 #feedback-form button[type="submit"] {
-  background-color: #007bff;
+  background-color: #704225;
   color: #fff;
   width: 100%;
   padding: 12px;
@@ -333,7 +332,7 @@ body {
 }
 
 #feedback-form button[type="submit"]:hover {
-  background-color: #0069d9;
+  background-color: #563b28;
 }
 
 .feedback-item {
@@ -363,22 +362,6 @@ body {
   display: inline-block;
 }
 
-.action-btn {
-  padding: 10px 20px;
-  margin-top: 20px;
-  margin-bottom: 20px;
-  background-color: #4b3621;
-  color: white;
-  border: none;
-  border-radius: 8px;
-  cursor: pointer;
-  font-size: 16px;
-  transition: background-color 0.2s;
-}
-
-.action-btn:hover {
-  background-color: #5c452e;
-}
 
 @media screen and (max-width: 480px) {
   .modal-content {
