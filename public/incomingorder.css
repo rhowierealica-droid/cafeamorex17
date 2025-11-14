@@ -160,14 +160,16 @@ body {
 }
 
 
-.accept-btn { background-color: #4caf50; color: white; }
-.accept-btn:hover { background-color: #3e8e41; }
+.accept-btn { background-color: #704225; color: white; }
+.accept-btn:hover { background-color: #563b28; }
 
-.cancel-btn { background-color: #f44336; color: white; }
+.cancel-btn { background-color: #c0392b; color: white; }
 .cancel-btn:hover { background-color: #d32f2f; }
 
 .complete-btn { background-color: #2196f3; color: white; }
 .complete-btn:hover { background-color: #1976d2; }
+
+.eta-btn { background-color: #704225; color: white; }
 
 .cancel-refund-btn {
     background-color: #f44336;
