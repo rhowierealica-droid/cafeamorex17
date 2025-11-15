@@ -90,8 +90,8 @@ exports.handler = async (event, context) => {
               },
             },
             // ✅ Update with your live domain
-            success_url: "https://cafeamore.shop/customer-status.html",
-            cancel_url: "https://cafeamore.shop/cart.html",
+            success_url: "https://cafeamorex.shop/customer-status.html",
+            cancel_url: "https://cafeamorex.shop/cart.html",
             send_email_receipt: true,
             description: description || "Order Payment (Admin Approved)",
             line_items: lineItems,
@@ -150,5 +150,6 @@ exports.handler = async (event, context) => {
 };
 
 // Netlify automatically uses exports.handler as the function entry point
+
 
 
